@@ -1,0 +1,26 @@
+{
+  "name": "coupang-functions",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "src/index.js",
+  "scripts": {
+    "lint": "eslint \"src/**/*.js\"",
+    "test": "node --test --experimental-test-coverage",
+    "build": "echo \"No build step\"",
+    "set-admin": "node scripts/setAdminClaim.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.2.0",
+    "firebase-functions": "^4.9.1",
+    "node-fetch": "^3.3.2",
+    "p-retry": "^6.1.1"
+  },
+  "devDependencies": {
+    "@firebase/functions-test": "^0.3.4",
+    "eslint": "^9.9.1"
+  }
+}

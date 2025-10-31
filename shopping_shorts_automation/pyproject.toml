@@ -1,0 +1,58 @@
+[project]
+name = "shopping-shorts-automation"
+version = "0.1.0"
+description = "쇼핑 쇼츠 반자동 제작 시스템 Phase 1 구현체"
+readme = { file = "README.md", content-type = "text/markdown; charset=UTF-8" }
+license = { text = "MIT" }
+authors = [{ name = "Time to Shorts Team" }]
+requires-python = ">=3.10"
+dependencies = [
+  "streamlit>=1.31,<2.0",
+  "openai>=1.12,<2.0",
+  "pandas>=2.2,<3.0",
+  "python-dotenv>=1.0,<2.0",
+  "tenacity>=8.2,<9.0",
+  "requests>=2.31,<3.0",
+  "selenium>=4.17,<5.0",
+  "beautifulsoup4>=4.12,<5.0",
+  "webdriver-manager>=4.0,<5.0",
+  "yt-dlp>=2024.3.10",
+]
+
+[project.optional-dependencies]
+tts = [
+  "elevenlabs>=0.2.26,<0.3",
+  "google-cloud-texttospeech>=2.16,<3.0",
+]
+cloud = [
+  "google-api-python-client>=2.115,<3.0",
+  "google-auth-httplib2>=0.2,<1.0",
+  "google-auth-oauthlib>=1.2,<2.0",
+  "gspread>=5.12,<6.0",
+  "oauth2client>=4.1,<5.0",
+  "boto3>=1.34,<2.0",
+]
+dev = [
+  "pytest>=7.4,<8.0",
+  "black>=24.1,<25.0",
+  "flake8>=7.0,<8.0",
+  "mypy>=1.8,<2.0",
+  "isort>=5.13,<6.0",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"

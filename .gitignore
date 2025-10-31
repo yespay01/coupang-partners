@@ -1,0 +1,204 @@
+# 쿠팡 파트너스 프로젝트 Git 제외 파일
+
+# ===== 환경 변수 및 비밀 정보 =====
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+credentials.json
+secrets.json
+config.private.json
+
+# ===== Python =====
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.virtualenv/
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ===== Node.js (향후 프로젝트 대비) =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.pnpm-store/
+
+# ===== 운영 체제 =====
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ===== 에디터/IDE =====
+*.swp
+*.swo
+*.swn
+*~
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ===== 프로젝트 특화 =====
+# 프로젝트 산출물
+project_output/
+*/project_output/
+output/
+results/
+
+# 다운로드된 미디어
+douyin_media/
+*/douyin_media/
+downloads/
+
+# 로그 파일
+*.log
+logs/
+*.log.*
+
+# 임시 파일
+tmp/
+temp/
+*.tmp
+*.temp
+
+# 데이터 파일 (필요시 제외)
+*.csv
+*.xlsx
+*.db
+*.sqlite
+*.sqlite3
+
+# 크롬 드라이버 등
+chromedriver*
+geckodriver*
+*.exe
+!*.py
+
+# ===== AI 도구 캐시 =====
+.copilot/
+.cursor/
+.claude/
+
+# ===== 백업 파일 =====
+*.bak
+*.backup
+*_backup
+*_old
+
+# ===== 압축 파일 =====
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# 단, 특정 파일은 추적 (예외)
+!shopping_shorts_automation.tar.gz
+
+# ===== 미디어 파일 (용량 큰 파일) =====
+# 일반적으로 Git에 커밋하지 않음
+# resources/media/ 폴더는 용량 확인 후 LFS 사용 권장
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mp3
+*.wav
+*.m4a
+*.aac
+
+# 단, 문서에 참조된 미디어는 예외 처리 가능
+# (필요시 Git LFS 사용)
+
+# ===== 기타 =====
+.cache/
+.sass-cache/
+*.pid
+*.seed
+*.pid.lock
+
+# ===== Git LFS =====
+# 대용량 파일은 Git LFS 사용 권장
+# git lfs track "*.mp4"
+# git lfs track "*.m4a"
+
+# ===== 프로젝트별 추가 제외 =====
+# shopping_shorts_automation 프로젝트
+shopping_shorts_automation/project_output/
+shopping_shorts_automation/douyin_media/
+shopping_shorts_automation/.streamlit/
+
+# 향후 프로젝트는 여기에 추가

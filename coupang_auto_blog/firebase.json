@@ -1,0 +1,15 @@
+{
+  "functions": {
+    "source": "functions"
+  },
+  "hosting": [
+    {
+      "site": "your-hosting-site-id",
+      "source": "web",
+      "frameworksBackend": {
+        "region": "asia-northeast3"
+      }
+    }
+  ]
+}
+
