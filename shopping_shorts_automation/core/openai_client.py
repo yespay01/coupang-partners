@@ -101,9 +101,11 @@ class OpenAIClient:
 
     def _send_gemini(self, messages: list[dict[str, Any]], **kwargs: Any) -> str:
         """Send request to Google Gemini API."""
+        import google.generativeai as genai
+
         # Convert OpenAI message format to Gemini format
-        gemini_messages = []
         system_instruction = None
+        prompt_parts = []
 
         for msg in messages:
             role = msg.get("role", "")
@@ -112,14 +114,15 @@ class OpenAIClient:
             if role == "system":
                 # Gemini uses system_instruction instead of system messages
                 system_instruction = content
-            elif role == "user":
-                gemini_messages.append({"role": "user", "parts": [content]})
-            elif role == "assistant":
-                gemini_messages.append({"role": "model", "parts": [content]})
+            elif role == "user" or role == "assistant":
+                # Combine all messages into a single prompt
+                prompt_parts.append(content)
 
-        # Create a new model instance with system instruction if provided
+        # Combine all parts into a single prompt
+        full_prompt = "\n\n".join(prompt_parts) if prompt_parts else "Hello"
+
+        # Create model with system instruction if provided
         if system_instruction:
-            import google.generativeai as genai
             model = genai.GenerativeModel(
                 self.model,
                 system_instruction=system_instruction
@@ -127,13 +130,9 @@ class OpenAIClient:
         else:
             model = self.client
 
-        # Start chat with history (all messages except the last one)
-        chat = model.start_chat(history=gemini_messages[:-1] if len(gemini_messages) > 1 else [])
-
-        # Send the last message
-        last_message = gemini_messages[-1]["parts"][0] if gemini_messages else ""
-        response = chat.send_message(
-            last_message,
+        # Generate content directly (simpler and more reliable)
+        response = model.generate_content(
+            full_prompt,
             generation_config={
                 "temperature": kwargs.get("temperature", self.temperature),
                 "max_output_tokens": kwargs.get("max_tokens", 1200),
