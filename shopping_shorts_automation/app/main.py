@@ -138,17 +138,27 @@ def main() -> None:
 
         ### 🔗 유용한 링크
 
-        **레퍼런스 영상 검색:**
-        - 🇨🇳 [Douyin (抖音)](https://www.douyin.com/) - 중국판 TikTok, 쇼핑 쇼츠 레퍼런스
-        - 🇰🇷 [릴스 인사이트](https://www.instagram.com/reels/) - 인스타그램 릴스
-        - 📱 [YouTube Shorts](https://www.youtube.com/shorts/) - 유튜브 쇼츠
+        **🇨🇳 중국 쇼트 비디오 플랫폼** (레퍼런스 검색용)
+        - [Douyin (抖音)](https://www.douyin.com/) - 중국 1위, 쇼핑 쇼츠 최다
+        - [Kuaishou (快手)](https://www.kuaishou.com/) - Douyin 경쟁사, 지방 도시 중심
+        - [Xiaohongshu (小红书/RED)](https://www.xiaohongshu.com/) - 라이프스타일 & 쇼핑
+        - [Bilibili (哔哩哔哩)](https://www.bilibili.com/) - 동영상 플랫폼
 
-        **편집 툴:**
-        - 🎬 [CapCut](https://www.capcut.com/) - 무료 영상 편집
-        - 🎙️ [Typecast](https://typecast.ai/) - AI 음성 생성
+        ⚠️ **참고**: 중국 플랫폼은 중국 VPN 사용 시에만 접근 가능합니다.
 
-        **분석 도구:**
-        - 📊 [쿠팡 파트너스](https://partners.coupang.com/) - 제휴 링크 생성 및 수익 확인
+        **🌏 국제 쇼트 비디오 플랫폼**
+        - [TikTok](https://www.tiktok.com/) - Douyin 국제 버전
+        - [Instagram Reels](https://www.instagram.com/reels/) - 한국 콘텐츠 많음
+        - [YouTube Shorts](https://www.youtube.com/shorts/) - 유튜브 쇼츠
+
+        **🎬 편집 툴**
+        - [CapCut (剪映)](https://www.capcut.com/) - 무료 영상 편집 (한글 지원)
+        - [Typecast](https://typecast.ai/) - AI 음성 생성 (한글 TTS)
+        - [Canva](https://www.canva.com/) - 썸네일 제작
+
+        **📊 분석 & 수익화**
+        - [쿠팡 파트너스](https://partners.coupang.com/) - 제휴 링크 생성 및 수익 확인
+        - [네이버 애드포스트](https://adpost.naver.com/) - 블로그 수익화
         - 📈 [YouTube Studio](https://studio.youtube.com/) - 쇼츠 성과 분석
 
         ---
@@ -541,7 +551,18 @@ def display_results(
                 )
                 st.markdown(f"[링크 열기]({video.share_url})")
         else:
-            st.info("검색 결과가 없거나 요청이 실패했습니다. VPN/쿠키 설정을 확인해 주세요.")
+            st.warning("⚠️ Douyin 자동 검색 실패")
+            st.markdown("""
+            **Douyin API는 중국 외부에서 접근이 제한됩니다.**
+
+            대신 아래 플랫폼에서 수동으로 검색하세요:
+            - 🇨🇳 [Douyin](https://www.douyin.com/) - 중국 VPN 필요
+            - 🌏 [TikTok](https://www.tiktok.com/) - VPN 불필요
+            - 📱 [Xiaohongshu (小红书)](https://www.xiaohongshu.com/)
+            - 📺 [Kuaishou (快手)](https://www.kuaishou.com/)
+
+            💡 위에서 생성된 **중국어 키워드**를 복사해서 검색하세요!
+            """)
 
     if douyin_download_requested:
         st.subheader("⬇️ Douyin 다운로드 결과")
@@ -558,7 +579,7 @@ def display_results(
                 duration = record.get("duration") or "-"
                 st.markdown(f"- **{title}** · 길이 {duration}초 · `{rel_path}`")
         else:
-            st.info("다운로드된 파일이 없습니다. Selenium/yt-dlp 로그를 확인해 주세요.")
+            st.info("다운로드된 파일이 없습니다. Douyin 검색이 실패하면 자동 다운로드도 불가능합니다.")
 
     st.subheader("📁 산출물 다운로드")
     mime_map = {
