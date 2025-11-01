@@ -6,6 +6,12 @@ from typing import Any, Iterable
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+
 
 class OpenAIClient:
     """Wrapper around the OpenAI chat completion API with sensible defaults."""
@@ -15,12 +21,24 @@ class OpenAIClient:
         model: str | None = None,
         temperature: float = 0.7,
     ) -> None:
-        api_key = os.environ.get("OPENAI_API_KEY")
+        # Try to get API key from Streamlit secrets first, then environment
+        api_key = None
+        if HAS_STREAMLIT and hasattr(st, 'secrets') and 'OPENAI_API_KEY' in st.secrets:
+            api_key = st.secrets["OPENAI_API_KEY"]
+        else:
+            api_key = os.environ.get("OPENAI_API_KEY")
+
         if not api_key:
             raise EnvironmentError("OPENAI_API_KEY 가 설정되지 않았습니다.")
 
         self.client = OpenAI(api_key=api_key)
-        self.model = model or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
+        # Try to get model from Streamlit secrets first, then environment
+        if HAS_STREAMLIT and hasattr(st, 'secrets') and 'OPENAI_MODEL' in st.secrets:
+            self.model = model or st.secrets["OPENAI_MODEL"]
+        else:
+            self.model = model or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
         self.temperature = temperature
 
     @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))
