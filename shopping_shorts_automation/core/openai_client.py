@@ -82,6 +82,10 @@ class OpenAIClient:
     @retry(wait=wait_exponential(multiplier=2, min=4, max=60), stop=stop_after_attempt(5))
     def send(self, messages: Iterable[dict[str, Any]], **kwargs: Any) -> str:
         """Send a chat completion request and return the model message content."""
+        # Set default max_tokens to 4000 for longer responses
+        if "max_tokens" not in kwargs:
+            kwargs["max_tokens"] = 4000
+
         if self.provider == "gemini":
             return self._send_gemini(list(messages), **kwargs)
         elif self.provider == "openai":
