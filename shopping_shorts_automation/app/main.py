@@ -58,13 +58,35 @@ def env_int(name: str, default: int) -> int:
         return default
 
 
+def load_history_from_file() -> list[dict[str, Any]]:
+    """Load history from JSON file."""
+    history_file = ProjectPaths.discover().output_root / "history.json"
+    if history_file.exists():
+        try:
+            import json
+            with open(history_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+
+def save_history_to_file(history: list[dict[str, Any]]) -> None:
+    """Save history to JSON file."""
+    import json
+    history_file = ProjectPaths.discover().output_root / "history.json"
+    history_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(history_file, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+
+
 def main() -> None:
     st.title("🎬 쇼핑 쇼츠 반자동 제작 시스템")
     st.caption("Phase 1: AI 기반 기획 자동화 · Phase 2: 영상 소스 자동화")
 
-    # Initialize session state for history
+    # Initialize session state for history (load from file on first run)
     if "history" not in st.session_state:
-        st.session_state.history = []
+        st.session_state.history = load_history_from_file()
     if "current_result" not in st.session_state:
         st.session_state.current_result = None
 
@@ -82,6 +104,7 @@ def main() -> None:
             if st.button("히스토리 전체 삭제", type="secondary"):
                 st.session_state.history = []
                 st.session_state.current_result = None
+                save_history_to_file([])  # Save to file
                 st.rerun()
         else:
             st.info("아직 생성된 콘텐츠가 없습니다.")
@@ -365,6 +388,9 @@ def process_generation(
         st.session_state.history.append(result_data)
         if len(st.session_state.history) > 10:
             st.session_state.history = st.session_state.history[-10:]
+
+        # Save to file for persistence
+        save_history_to_file(st.session_state.history)
 
         # Set as current result
         st.session_state.current_result = result_data
