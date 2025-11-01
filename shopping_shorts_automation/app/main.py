@@ -62,6 +62,30 @@ def main() -> None:
     st.title("🎬 쇼핑 쇼츠 반자동 제작 시스템")
     st.caption("Phase 1: AI 기반 기획 자동화 · Phase 2: 영상 소스 자동화")
 
+    # Initialize session state for history
+    if "history" not in st.session_state:
+        st.session_state.history = []
+    if "current_result" not in st.session_state:
+        st.session_state.current_result = None
+
+    # Sidebar: History
+    with st.sidebar:
+        st.header("📋 생성 히스토리")
+        if st.session_state.history:
+            st.caption(f"총 {len(st.session_state.history)}개의 결과")
+            for idx, item in enumerate(reversed(st.session_state.history), start=1):
+                with st.expander(f"{idx}. {item['product_name'][:20]}...", expanded=False):
+                    st.caption(f"생성 시각: {item['timestamp']}")
+                    if st.button(f"이 결과 보기", key=f"view_{len(st.session_state.history)-idx}"):
+                        st.session_state.current_result = st.session_state.history[len(st.session_state.history)-idx]
+                        st.rerun()
+            if st.button("히스토리 전체 삭제", type="secondary"):
+                st.session_state.history = []
+                st.session_state.current_result = None
+                st.rerun()
+        else:
+            st.info("아직 생성된 콘텐츠가 없습니다.")
+
     # 사용 가이드 및 유용한 링크
     with st.expander("📖 사용 가이드 및 유용한 링크", expanded=False):
         st.markdown("""
@@ -199,12 +223,50 @@ def main() -> None:
 
         submit = st.form_submit_button("🚀 콘텐츠 자동 생성")
 
-    if not submit:
-        return
+    # Handle form submission
+    if submit:
+        if not product_name.strip():
+            st.warning("상품명을 입력해 주세요.")
+            return
 
-    if not product_name.strip():
-        st.warning("상품명을 입력해 주세요.")
-        return
+        process_generation(
+            product_name=product_name,
+            target_audience=target_audience,
+            tone=tone,
+            style=style,
+            brand_voice=brand_voice,
+            language=language,
+            enable_douyin=enable_douyin,
+            enable_douyin_download=enable_douyin_download,
+            douyin_download_limit=douyin_download_limit,
+            douyin_scroll_times=douyin_scroll_times,
+            douyin_crawler_results=douyin_crawler_results,
+            douyin_headless=douyin_headless,
+            douyin_audio_only=douyin_audio_only,
+        )
+
+    # Display current result if available
+    if st.session_state.current_result:
+        display_current_result(st.session_state.current_result)
+
+
+def process_generation(
+    product_name: str,
+    target_audience: str,
+    tone: str,
+    style: str,
+    brand_voice: str,
+    language: str,
+    enable_douyin: bool,
+    enable_douyin_download: bool,
+    douyin_download_limit: int,
+    douyin_scroll_times: int,
+    douyin_crawler_results: int,
+    douyin_headless: bool,
+    douyin_audio_only: bool,
+) -> None:
+    """Process content generation and save to session state."""
+    from datetime import datetime
 
     with st.spinner("AI가 콘텐츠를 생성하는 중입니다..."):
         script_service = ScriptService()
@@ -286,24 +348,29 @@ def main() -> None:
             douyin_downloads=download_records,
         )
 
-    st.success("콘텐츠가 생성되었습니다.")
-    # Display output path (use relative path if possible, otherwise absolute)
-    try:
-        display_path = output_dir.relative_to(ProjectPaths.discover().base_dir)
-    except ValueError:
-        # On Streamlit Cloud, output_dir might be in /tmp
-        display_path = output_dir
-    st.markdown(f"**결과 폴더**: `{display_path}`")
+        # Save to session state
+        result_data = {
+            "product_name": product_name,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "script_bundle": script_bundle,
+            "keyword_payload": keyword_payload,
+            "output_dir": str(output_dir),
+            "douyin_videos": [video.as_dict() for video in douyin_videos] if douyin_videos else [],
+            "douyin_requested": enable_douyin,
+            "download_records": download_records,
+            "download_requested": enable_douyin_download,
+        }
 
-    display_results(
-        script_bundle,
-        keyword_payload,
-        output_dir,
-        douyin_videos,
-        enable_douyin,
-        download_records,
-        enable_douyin_download,
-    )
+        # Add to history (limit to last 10)
+        st.session_state.history.append(result_data)
+        if len(st.session_state.history) > 10:
+            st.session_state.history = st.session_state.history[-10:]
+
+        # Set as current result
+        st.session_state.current_result = result_data
+
+    st.success("콘텐츠가 생성되었습니다.")
+    st.rerun()  # Refresh to show the result
 
 
 def save_outputs(
@@ -373,6 +440,34 @@ def save_outputs(
     checklist_builder = ChecklistBuilder()
     checklist_items = checklist_builder.build()
     checklist_builder.export(output_dir, checklist_items)
+
+
+def display_current_result(result_data: dict[str, Any]) -> None:
+    """Display the current result from session state."""
+    st.success("콘텐츠가 생성되었습니다.")
+    # Display output path
+    output_dir_str = result_data["output_dir"]
+    output_dir = Path(output_dir_str)
+
+    try:
+        display_path = output_dir.relative_to(ProjectPaths.discover().base_dir)
+    except ValueError:
+        display_path = output_dir
+    st.markdown(f"**결과 폴더**: `{display_path}`")
+    st.caption(f"생성 시각: {result_data['timestamp']}")
+
+    # Reconstruct DouyinVideo objects from dict
+    douyin_videos = [DouyinVideo(**video_dict) for video_dict in result_data.get("douyin_videos", [])]
+
+    display_results(
+        script_bundle=result_data["script_bundle"],
+        keyword_payload=result_data["keyword_payload"],
+        output_dir=output_dir,
+        douyin_videos=douyin_videos,
+        douyin_requested=result_data.get("douyin_requested", False),
+        douyin_downloads=result_data.get("download_records", []),
+        douyin_download_requested=result_data.get("download_requested", False),
+    )
 
 
 def display_results(
