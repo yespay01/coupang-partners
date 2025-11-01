@@ -1,6 +1,11 @@
 # 쇼핑 쇼츠 반자동 제작 시스템
 
-Phase 1 범위의 AI 기반 콘텐츠 기획 자동화 프로젝트입니다. Streamlit UI를 통해 상품 정보를 입력하면 GPT-4o를 활용해 쇼츠 대본, 썸네일 문구, 키워드, 체크리스트를 자동으로 생성하고 폴더 구조에 맞춰 저장합니다. Phase 2 옵션으로 Douyin Selenium 크롤링 및 yt-dlp 다운로드를 지원합니다.
+Phase 1~2 완료 상태의 AI 기반 콘텐츠 기획 자동화 프로젝트입니다. Streamlit UI를 통해 상품 정보를 입력하면 **Google Gemini** (무료!) 또는 OpenAI API를 활용해 쇼츠 대본, 썸네일 문구, 키워드, 체크리스트를 자동으로 생성하고 폴더 구조에 맞춰 저장합니다. Phase 2 옵션으로 Douyin Selenium 크롤링 및 yt-dlp 다운로드를 지원합니다.
+
+🆕 **최신 업데이트 (2025-11-01)**:
+- ✅ Google Gemini API 지원 (무료!)
+- ✅ 히스토리 기능 추가 (생성 결과 저장 및 재조회)
+- ✅ Streamlit Cloud 배포 완료
 
 ## 주요 기능
 
@@ -15,7 +20,8 @@ Phase 1 범위의 AI 기반 콘텐츠 기획 자동화 프로젝트입니다. St
 ## 요구 사항
 
 - Python 3.10 이상
-- OpenAI API Key (`OPENAI_API_KEY`)
+- **Google Gemini API Key** (`GEMINI_API_KEY`) - 무료! 추천
+  - 또는 OpenAI API Key (`OPENAI_API_KEY`) - 유료
 
 ## 설치 및 실행
 
@@ -28,8 +34,18 @@ pip install -r requirements.txt
 환경 변수를 `.env` 파일에 설정합니다.
 
 ```env
-OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-4o-mini        # 선택 사항
+# AI Provider 설정 (무료 Gemini 추천!)
+AI_PROVIDER=gemini
+
+# Google Gemini API 설정 (무료!)
+GEMINI_API_KEY=your-gemini-api-key-here
+GEMINI_MODEL=gemini-2.5-flash
+
+# OpenAI API 설정 (유료 - 필요시에만)
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_MODEL=gpt-4o-mini
+
+# 기타 설정
 ENABLE_DOUYIN_SEARCH=false      # 기본 검색 토글
 DOUYIN_COOKIE=                  # 필요한 경우 브라우저 쿠키 전체 문자열
 ENABLE_DOUYIN_DOWNLOAD=false    # Selenium + yt-dlp 자동 다운로드
