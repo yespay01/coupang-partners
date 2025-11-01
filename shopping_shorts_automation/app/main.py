@@ -287,7 +287,13 @@ def main() -> None:
         )
 
     st.success("콘텐츠가 생성되었습니다.")
-    st.markdown(f"**결과 폴더**: `{output_dir.relative_to(ProjectPaths.discover().base_dir)}`")
+    # Display output path (use relative path if possible, otherwise absolute)
+    try:
+        display_path = output_dir.relative_to(ProjectPaths.discover().base_dir)
+    except ValueError:
+        # On Streamlit Cloud, output_dir might be in /tmp
+        display_path = output_dir
+    st.markdown(f"**결과 폴더**: `{display_path}`")
 
     display_results(
         script_bundle,
