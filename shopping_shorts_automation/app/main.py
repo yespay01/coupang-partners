@@ -151,15 +151,27 @@ def main() -> None:
         - [Instagram Reels](https://www.instagram.com/reels/) - 한국 콘텐츠 많음
         - [YouTube Shorts](https://www.youtube.com/shorts/) - 유튜브 쇼츠
 
+        **📥 동영상 다운로드 사이트** (레퍼런스 수집용)
+        - [SnapTik](https://snaptik.app/) - TikTok/Douyin 다운로드 (워터마크 제거)
+        - [SSSTik](https://ssstik.io/) - TikTok 다운로드 (무료, 빠름)
+        - [Douyin Downloader](https://douyin.wtf/) - Douyin 전용 다운로더
+        - [Instagram Reels Downloader](https://igram.io/) - Instagram Reels 다운로드
+        - [SaveFrom.net](https://savefrom.net/) - YouTube Shorts 다운로드
+        - [Loader.to](https://loader.to/) - 여러 플랫폼 지원 (TikTok, YouTube, Instagram)
+        - [9xBuddy](https://9xbuddy.org/) - 다양한 플랫폼 지원
+
+        💡 **사용법**: 영상 링크 복사 → 다운로드 사이트 붙여넣기 → 다운로드
+
         **🎬 편집 툴**
         - [CapCut (剪映)](https://www.capcut.com/) - 무료 영상 편집 (한글 지원)
         - [Typecast](https://typecast.ai/) - AI 음성 생성 (한글 TTS)
         - [Canva](https://www.canva.com/) - 썸네일 제작
+        - [Clipchamp](https://clipchamp.com/) - 온라인 영상 편집 (무료)
 
         **📊 분석 & 수익화**
         - [쿠팡 파트너스](https://partners.coupang.com/) - 제휴 링크 생성 및 수익 확인
         - [네이버 애드포스트](https://adpost.naver.com/) - 블로그 수익화
-        - 📈 [YouTube Studio](https://studio.youtube.com/) - 쇼츠 성과 분석
+        - [YouTube Studio](https://studio.youtube.com/) - 쇼츠 성과 분석
 
         ---
 
