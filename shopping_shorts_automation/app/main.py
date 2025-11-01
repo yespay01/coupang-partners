@@ -151,16 +151,22 @@ def main() -> None:
         - [Instagram Reels](https://www.instagram.com/reels/) - 한국 콘텐츠 많음
         - [YouTube Shorts](https://www.youtube.com/shorts/) - 유튜브 쇼츠
 
-        **📥 동영상 다운로드 사이트** (레퍼런스 수집용)
-        - [SnapTik](https://snaptik.app/) - TikTok/Douyin 다운로드 (워터마크 제거)
-        - [SSSTik](https://ssstik.io/) - TikTok 다운로드 (무료, 빠름)
-        - [Douyin Downloader](https://douyin.wtf/) - Douyin 전용 다운로더
-        - [Instagram Reels Downloader](https://igram.io/) - Instagram Reels 다운로드
-        - [SaveFrom.net](https://savefrom.net/) - YouTube Shorts 다운로드
-        - [Loader.to](https://loader.to/) - 여러 플랫폼 지원 (TikTok, YouTube, Instagram)
-        - [9xBuddy](https://9xbuddy.org/) - 다양한 플랫폼 지원
+        **📥 동영상 다운로드 도구** (레퍼런스 수집용)
 
-        💡 **사용법**: 영상 링크 복사 → 다운로드 사이트 붙여넣기 → 다운로드
+        **🖥️ 데스크톱 프로그램** (광고 없음, 안전함 ⭐ 추천)
+        - [4K Video Downloader](https://www.4kdownload.com/) - TikTok, YouTube, Instagram 지원
+        - [SnapDownloader](https://snapdownloader.com/) - 900개 이상 사이트 지원
+        - [JDownloader](https://jdownloader.org/) - 오픈소스, 무료
+
+        **💻 명령줄 도구** (개발자용, 가장 안전)
+        - [yt-dlp](https://github.com/yt-dlp/yt-dlp) - TikTok, YouTube, Instagram 모두 지원
+
+        **🌐 웹사이트** (팝업 차단기 권장)
+        - [SaveFrom.net](https://savefrom.net/) - YouTube 다운로드
+        - [SnapTik](https://snaptik.app/) - TikTok 다운로드 (광고 주의)
+
+        💡 **사용법**: 영상 링크 복사 → 도구에 붙여넣기 → 다운로드
+        ⚠️ **주의**: 웹사이트 사용 시 팝업 차단기 켜고, 프로그램 다운로드는 공식 사이트에서만!
 
         **🎬 편집 툴**
         - [CapCut (剪映)](https://www.capcut.com/) - 무료 영상 편집 (한글 지원)
