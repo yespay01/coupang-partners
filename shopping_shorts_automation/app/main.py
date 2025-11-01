@@ -62,6 +62,56 @@ def main() -> None:
     st.title("🎬 쇼핑 쇼츠 반자동 제작 시스템")
     st.caption("Phase 1: AI 기반 기획 자동화 · Phase 2: 영상 소스 자동화")
 
+    # 사용 가이드 및 유용한 링크
+    with st.expander("📖 사용 가이드 및 유용한 링크", expanded=False):
+        st.markdown("""
+        ### 🎯 사용 프로세스
+
+        **1단계: 상품 정보 입력**
+        - 상품명/핵심 특징 입력 (예: "무선 이어폰", "블루라이트 차단 안경")
+        - 타깃 고객층 지정 (예: "25-40세 직장인")
+        - 콘텐츠 톤과 스타일 선택
+
+        **2단계: AI 콘텐츠 생성**
+        - "생성" 버튼 클릭
+        - ⏳ AI가 대본, 썸네일, 키워드 자동 생성 (약 30초~1분)
+        - Douyin 레퍼런스 영상 검색 (선택사항)
+
+        **3단계: 결과 확인 및 다운로드**
+        - 생성된 콘텐츠 확인
+        - 하단의 다운로드 버튼으로 파일 저장
+        - 대본(txt), 키워드(txt), 메타데이터(json) 등
+
+        **4단계: 영상 제작**
+        - CapCut 또는 편집 툴에서 대본 활용
+        - Douyin 레퍼런스 영상 참고
+        - 썸네일 문구 활용
+
+        ---
+
+        ### 🔗 유용한 링크
+
+        **레퍼런스 영상 검색:**
+        - 🇨🇳 [Douyin (抖音)](https://www.douyin.com/) - 중국판 TikTok, 쇼핑 쇼츠 레퍼런스
+        - 🇰🇷 [릴스 인사이트](https://www.instagram.com/reels/) - 인스타그램 릴스
+        - 📱 [YouTube Shorts](https://www.youtube.com/shorts/) - 유튜브 쇼츠
+
+        **편집 툴:**
+        - 🎬 [CapCut](https://www.capcut.com/) - 무료 영상 편집
+        - 🎙️ [Typecast](https://typecast.ai/) - AI 음성 생성
+
+        **분석 도구:**
+        - 📊 [쿠팡 파트너스](https://partners.coupang.com/) - 제휴 링크 생성 및 수익 확인
+        - 📈 [YouTube Studio](https://studio.youtube.com/) - 쇼츠 성과 분석
+
+        ---
+
+        ### 💡 팁
+        - Douyin 검색 시 VPN이 필요할 수 있습니다
+        - 생성 시간이 오래 걸리면 잠시만 기다려주세요 (무료 API 사용 중)
+        - 여러 옵션을 시도해보며 최적의 결과를 찾으세요!
+        """)
+
     enable_douyin_default = env_flag("ENABLE_DOUYIN_SEARCH", "false")
     enable_douyin_download_default = env_flag("ENABLE_DOUYIN_DOWNLOAD", "false")
     douyin_download_limit_default = env_int("DOUYIN_DOWNLOAD_LIMIT", 3)
