@@ -141,7 +141,7 @@ class OpenAIClient:
         )
 
         # Add delay to avoid rate limits (Gemini free tier: 15 RPM)
-        # Wait 4 seconds between requests to stay under limit
-        time.sleep(4)
+        # Wait 6 seconds between requests to stay well under limit
+        time.sleep(6)
 
         return response.text
