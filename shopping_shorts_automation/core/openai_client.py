@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Iterable
 
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -78,7 +79,7 @@ class OpenAIClient:
         self.client = OpenAI(api_key=api_key)
         self.model = model or self._get_config("OPENAI_MODEL", "gpt-4o-mini")
 
-    @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))
+    @retry(wait=wait_exponential(multiplier=2, min=4, max=60), stop=stop_after_attempt(5))
     def send(self, messages: Iterable[dict[str, Any]], **kwargs: Any) -> str:
         """Send a chat completion request and return the model message content."""
         if self.provider == "gemini":
@@ -138,5 +139,9 @@ class OpenAIClient:
                 "max_output_tokens": kwargs.get("max_tokens", 1200),
             }
         )
+
+        # Add delay to avoid rate limits (Gemini free tier: 15 RPM)
+        # Wait 4 seconds between requests to stay under limit
+        time.sleep(4)
 
         return response.text
