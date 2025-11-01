@@ -121,26 +121,52 @@ class OpenAIClient:
         # Combine all parts into a single prompt
         full_prompt = "\n\n".join(prompt_parts) if prompt_parts else "Hello"
 
+        # Configure safety settings to be less restrictive
+        safety_settings = {
+            "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+            "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+            "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
+            "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
+        }
+
         # Create model with system instruction if provided
         if system_instruction:
             model = genai.GenerativeModel(
                 self.model,
-                system_instruction=system_instruction
+                system_instruction=system_instruction,
+                safety_settings=safety_settings
             )
         else:
             model = self.client
 
         # Generate content directly (simpler and more reliable)
-        response = model.generate_content(
-            full_prompt,
-            generation_config={
-                "temperature": kwargs.get("temperature", self.temperature),
-                "max_output_tokens": kwargs.get("max_tokens", 1200),
-            }
-        )
+        try:
+            response = model.generate_content(
+                full_prompt,
+                generation_config={
+                    "temperature": kwargs.get("temperature", self.temperature),
+                    "max_output_tokens": kwargs.get("max_tokens", 1200),
+                },
+                safety_settings=safety_settings
+            )
 
-        # Add delay to avoid rate limits (Gemini free tier: 15 RPM)
-        # Wait 6 seconds between requests to stay well under limit
-        time.sleep(6)
+            # Check if response was blocked
+            if not response.text:
+                # Try to get block reason
+                if hasattr(response, 'prompt_feedback'):
+                    block_reason = response.prompt_feedback
+                    raise ValueError(f"Gemini API 응답이 차단되었습니다: {block_reason}")
+                raise ValueError("Gemini API 응답이 비어있습니다.")
 
-        return response.text
+            # Add delay to avoid rate limits (Gemini free tier: 15 RPM)
+            # Wait 6 seconds between requests to stay well under limit
+            time.sleep(6)
+
+            return response.text
+
+        except Exception as e:
+            # Provide more detailed error information
+            error_msg = f"Gemini API 호출 중 오류: {str(e)}"
+            if hasattr(e, '__cause__'):
+                error_msg += f"\n원인: {e.__cause__}"
+            raise ValueError(error_msg) from e
