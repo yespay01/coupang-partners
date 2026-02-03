@@ -58,9 +58,134 @@ def env_int(name: str, default: int) -> int:
         return default
 
 
+def load_history_from_file() -> list[dict[str, Any]]:
+    """Load history from JSON file."""
+    history_file = ProjectPaths.discover().output_root / "history.json"
+    if history_file.exists():
+        try:
+            import json
+            with open(history_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+
+def save_history_to_file(history: list[dict[str, Any]]) -> None:
+    """Save history to JSON file."""
+    import json
+    history_file = ProjectPaths.discover().output_root / "history.json"
+    history_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(history_file, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+
+
 def main() -> None:
     st.title("🎬 쇼핑 쇼츠 반자동 제작 시스템")
     st.caption("Phase 1: AI 기반 기획 자동화 · Phase 2: 영상 소스 자동화")
+
+    # Initialize session state for history (load from file on first run)
+    if "history" not in st.session_state:
+        st.session_state.history = load_history_from_file()
+    if "current_result" not in st.session_state:
+        st.session_state.current_result = None
+
+    # Sidebar: History
+    with st.sidebar:
+        st.header("📋 생성 히스토리")
+        if st.session_state.history:
+            st.caption(f"총 {len(st.session_state.history)}개의 결과")
+            for idx, item in enumerate(reversed(st.session_state.history), start=1):
+                with st.expander(f"{idx}. {item['product_name'][:20]}...", expanded=False):
+                    st.caption(f"생성 시각: {item['timestamp']}")
+                    if st.button(f"이 결과 보기", key=f"view_{len(st.session_state.history)-idx}"):
+                        st.session_state.current_result = st.session_state.history[len(st.session_state.history)-idx]
+                        st.rerun()
+            if st.button("히스토리 전체 삭제", type="secondary"):
+                st.session_state.history = []
+                st.session_state.current_result = None
+                save_history_to_file([])  # Save to file
+                st.rerun()
+        else:
+            st.info("아직 생성된 콘텐츠가 없습니다.")
+
+    # 사용 가이드 및 유용한 링크
+    with st.expander("📖 사용 가이드 및 유용한 링크", expanded=False):
+        st.markdown("""
+        ### 🎯 사용 프로세스
+
+        **1단계: 상품 정보 입력**
+        - 상품명/핵심 특징 입력 (예: "무선 이어폰", "블루라이트 차단 안경")
+        - 타깃 고객층 지정 (예: "25-40세 직장인")
+        - 콘텐츠 톤과 스타일 선택
+
+        **2단계: AI 콘텐츠 생성**
+        - "생성" 버튼 클릭
+        - ⏳ AI가 대본, 썸네일, 키워드 자동 생성 (약 30초~1분)
+        - Douyin 레퍼런스 영상 검색 (선택사항)
+
+        **3단계: 결과 확인 및 다운로드**
+        - 생성된 콘텐츠 확인
+        - 하단의 다운로드 버튼으로 파일 저장
+        - 대본(txt), 키워드(txt), 메타데이터(json) 등
+
+        **4단계: 영상 제작**
+        - CapCut 또는 편집 툴에서 대본 활용
+        - Douyin 레퍼런스 영상 참고
+        - 썸네일 문구 활용
+
+        ---
+
+        ### 🔗 유용한 링크
+
+        **🇨🇳 중국 쇼트 비디오 플랫폼** (레퍼런스 검색용)
+        - [Douyin (抖音)](https://www.douyin.com/) - 중국 1위, 쇼핑 쇼츠 최다
+        - [Kuaishou (快手)](https://www.kuaishou.com/) - Douyin 경쟁사, 지방 도시 중심
+        - [Xiaohongshu (小红书/RED)](https://www.xiaohongshu.com/) - 라이프스타일 & 쇼핑
+        - [Bilibili (哔哩哔哩)](https://www.bilibili.com/) - 동영상 플랫폼
+
+        ⚠️ **참고**: 중국 플랫폼은 중국 VPN 사용 시에만 접근 가능합니다.
+
+        **🌏 국제 쇼트 비디오 플랫폼**
+        - [TikTok](https://www.tiktok.com/) - Douyin 국제 버전
+        - [Instagram Reels](https://www.instagram.com/reels/) - 한국 콘텐츠 많음
+        - [YouTube Shorts](https://www.youtube.com/shorts/) - 유튜브 쇼츠
+
+        **📥 동영상 다운로드 도구** (레퍼런스 수집용)
+
+        **🖥️ 데스크톱 프로그램** (광고 없음, 안전함 ⭐ 추천)
+        - [4K Video Downloader](https://www.4kdownload.com/) - TikTok, YouTube, Instagram 지원
+        - [SnapDownloader](https://snapdownloader.com/) - 900개 이상 사이트 지원
+        - [JDownloader](https://jdownloader.org/) - 오픈소스, 무료
+
+        **💻 명령줄 도구** (개발자용, 가장 안전)
+        - [yt-dlp](https://github.com/yt-dlp/yt-dlp) - TikTok, YouTube, Instagram 모두 지원
+
+        **🌐 웹사이트** (팝업 차단기 권장)
+        - [SaveFrom.net](https://savefrom.net/) - YouTube 다운로드
+        - [SnapTik](https://snaptik.app/) - TikTok 다운로드 (광고 주의)
+
+        💡 **사용법**: 영상 링크 복사 → 도구에 붙여넣기 → 다운로드
+        ⚠️ **주의**: 웹사이트 사용 시 팝업 차단기 켜고, 프로그램 다운로드는 공식 사이트에서만!
+
+        **🎬 편집 툴**
+        - [CapCut (剪映)](https://www.capcut.com/) - 무료 영상 편집 (한글 지원)
+        - [Typecast](https://typecast.ai/) - AI 음성 생성 (한글 TTS)
+        - [Canva](https://www.canva.com/) - 썸네일 제작
+        - [Clipchamp](https://clipchamp.com/) - 온라인 영상 편집 (무료)
+
+        **📊 분석 & 수익화**
+        - [쿠팡 파트너스](https://partners.coupang.com/) - 제휴 링크 생성 및 수익 확인
+        - [네이버 애드포스트](https://adpost.naver.com/) - 블로그 수익화
+        - [YouTube Studio](https://studio.youtube.com/) - 쇼츠 성과 분석
+
+        ---
+
+        ### 💡 팁
+        - Douyin 검색 시 VPN이 필요할 수 있습니다
+        - 생성 시간이 오래 걸리면 잠시만 기다려주세요 (무료 API 사용 중)
+        - 여러 옵션을 시도해보며 최적의 결과를 찾으세요!
+        """)
 
     enable_douyin_default = env_flag("ENABLE_DOUYIN_SEARCH", "false")
     enable_douyin_download_default = env_flag("ENABLE_DOUYIN_DOWNLOAD", "false")
@@ -149,12 +274,50 @@ def main() -> None:
 
         submit = st.form_submit_button("🚀 콘텐츠 자동 생성")
 
-    if not submit:
-        return
+    # Handle form submission
+    if submit:
+        if not product_name.strip():
+            st.warning("상품명을 입력해 주세요.")
+            return
 
-    if not product_name.strip():
-        st.warning("상품명을 입력해 주세요.")
-        return
+        process_generation(
+            product_name=product_name,
+            target_audience=target_audience,
+            tone=tone,
+            style=style,
+            brand_voice=brand_voice,
+            language=language,
+            enable_douyin=enable_douyin,
+            enable_douyin_download=enable_douyin_download,
+            douyin_download_limit=douyin_download_limit,
+            douyin_scroll_times=douyin_scroll_times,
+            douyin_crawler_results=douyin_crawler_results,
+            douyin_headless=douyin_headless,
+            douyin_audio_only=douyin_audio_only,
+        )
+
+    # Display current result if available
+    if st.session_state.current_result:
+        display_current_result(st.session_state.current_result)
+
+
+def process_generation(
+    product_name: str,
+    target_audience: str,
+    tone: str,
+    style: str,
+    brand_voice: str,
+    language: str,
+    enable_douyin: bool,
+    enable_douyin_download: bool,
+    douyin_download_limit: int,
+    douyin_scroll_times: int,
+    douyin_crawler_results: int,
+    douyin_headless: bool,
+    douyin_audio_only: bool,
+) -> None:
+    """Process content generation and save to session state."""
+    from datetime import datetime
 
     with st.spinner("AI가 콘텐츠를 생성하는 중입니다..."):
         script_service = ScriptService()
@@ -236,18 +399,32 @@ def main() -> None:
             douyin_downloads=download_records,
         )
 
-    st.success("콘텐츠가 생성되었습니다.")
-    st.markdown(f"**결과 폴더**: `{output_dir.relative_to(ProjectPaths.discover().base_dir)}`")
+        # Save to session state
+        result_data = {
+            "product_name": product_name,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "script_bundle": script_bundle,
+            "keyword_payload": keyword_payload,
+            "output_dir": str(output_dir),
+            "douyin_videos": [video.as_dict() for video in douyin_videos] if douyin_videos else [],
+            "douyin_requested": enable_douyin,
+            "download_records": download_records,
+            "download_requested": enable_douyin_download,
+        }
 
-    display_results(
-        script_bundle,
-        keyword_payload,
-        output_dir,
-        douyin_videos,
-        enable_douyin,
-        download_records,
-        enable_douyin_download,
-    )
+        # Add to history (limit to last 10)
+        st.session_state.history.append(result_data)
+        if len(st.session_state.history) > 10:
+            st.session_state.history = st.session_state.history[-10:]
+
+        # Save to file for persistence
+        save_history_to_file(st.session_state.history)
+
+        # Set as current result
+        st.session_state.current_result = result_data
+
+    st.success("콘텐츠가 생성되었습니다.")
+    st.rerun()  # Refresh to show the result
 
 
 def save_outputs(
@@ -319,6 +496,34 @@ def save_outputs(
     checklist_builder.export(output_dir, checklist_items)
 
 
+def display_current_result(result_data: dict[str, Any]) -> None:
+    """Display the current result from session state."""
+    st.success("콘텐츠가 생성되었습니다.")
+    # Display output path
+    output_dir_str = result_data["output_dir"]
+    output_dir = Path(output_dir_str)
+
+    try:
+        display_path = output_dir.relative_to(ProjectPaths.discover().base_dir)
+    except ValueError:
+        display_path = output_dir
+    st.markdown(f"**결과 폴더**: `{display_path}`")
+    st.caption(f"생성 시각: {result_data['timestamp']}")
+
+    # Reconstruct DouyinVideo objects from dict
+    douyin_videos = [DouyinVideo(**video_dict) for video_dict in result_data.get("douyin_videos", [])]
+
+    display_results(
+        script_bundle=result_data["script_bundle"],
+        keyword_payload=result_data["keyword_payload"],
+        output_dir=output_dir,
+        douyin_videos=douyin_videos,
+        douyin_requested=result_data.get("douyin_requested", False),
+        douyin_downloads=result_data.get("download_records", []),
+        douyin_download_requested=result_data.get("download_requested", False),
+    )
+
+
 def display_results(
     script_bundle: dict[str, Any],
     keyword_payload: dict[str, Any],
@@ -364,7 +569,18 @@ def display_results(
                 )
                 st.markdown(f"[링크 열기]({video.share_url})")
         else:
-            st.info("검색 결과가 없거나 요청이 실패했습니다. VPN/쿠키 설정을 확인해 주세요.")
+            st.warning("⚠️ Douyin 자동 검색 실패")
+            st.markdown("""
+            **Douyin API는 중국 외부에서 접근이 제한됩니다.**
+
+            대신 아래 플랫폼에서 수동으로 검색하세요:
+            - 🇨🇳 [Douyin](https://www.douyin.com/) - 중국 VPN 필요
+            - 🌏 [TikTok](https://www.tiktok.com/) - VPN 불필요
+            - 📱 [Xiaohongshu (小红书)](https://www.xiaohongshu.com/)
+            - 📺 [Kuaishou (快手)](https://www.kuaishou.com/)
+
+            💡 위에서 생성된 **중국어 키워드**를 복사해서 검색하세요!
+            """)
 
     if douyin_download_requested:
         st.subheader("⬇️ Douyin 다운로드 결과")
@@ -381,7 +597,7 @@ def display_results(
                 duration = record.get("duration") or "-"
                 st.markdown(f"- **{title}** · 길이 {duration}초 · `{rel_path}`")
         else:
-            st.info("다운로드된 파일이 없습니다. Selenium/yt-dlp 로그를 확인해 주세요.")
+            st.info("다운로드된 파일이 없습니다. Douyin 검색이 실패하면 자동 다운로드도 불가능합니다.")
 
     st.subheader("📁 산출물 다운로드")
     mime_map = {
