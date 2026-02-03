@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { DashboardNav } from "@/components/admin/DashboardNav";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const metadata = {
   title: "관리자 대시보드 | 쿠팡 자동 블로그",
@@ -13,20 +15,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <Link href="/" className="text-sm font-semibold tracking-tight text-white">
             쿠팡 자동 블로그
           </Link>
-          <nav className="flex items-center gap-4 text-xs font-medium text-slate-300 sm:text-sm">
-            <Link href="/admin" className="hover:text-white">
-              대시보드
-            </Link>
-            <Link href="/admin/reviews" className="hover:text-white">
-              후기 승인
-            </Link>
-            <Link href="/admin/logs" className="hover:text-white">
-              로그 뷰어
-            </Link>
-          </nav>
+          <DashboardNav />
         </div>
       </header>
-      <main className="bg-slate-50 text-slate-900">{children}</main>
+      <main className="bg-slate-50 text-slate-900">
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </main>
     </div>
   );
 }

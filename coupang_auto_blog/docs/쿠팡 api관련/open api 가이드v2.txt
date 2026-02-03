@@ -1,0 +1,177 @@
+개요
+해당 문서의 목적은 Partner API를 사용하기 위해 필요한 정보를 개발자에게 제공하는 것입니다. 새로운 Reco API는 통합을 보다 쉽게 하기 위해 추가 파라미터를 지원하는 HTTP POST 기반의 통합 방식을 제공합니다.
+
+시작하기
+설정에 대한 문서를 참고하세요. Open API 도움말
+
+1단계: API에 대한 액세스 키를 생성합니다.
+2단계: HMAC 서명을 생성합니다.
+API 엔드포인트
+https://api-gateway.coupang.com/v2/providers/affiliate_open_api/apis/openapi/v2/products/reco
+Parameters
+Name	Description
+body *
+(body)
+필드	데이터 유형	설명
+Site	domain	스트링 | 추천	쿠팡 광고가 노출될 최상위 웹 도메인명
+웹사이트의 경우 실제 사이트명
+Site ID와의 1-1 관계
+id	스트링	사이트의 고유 식별자
+page	스트링 | 추천	실제 노출이 표시될 페이지의 URL
+App	bundleId	스트링 | 추천	앱 에코시스템 내에서 앱을 식별하는 데 사용되는 고유 스트링
+안드로이드의 경우 번들 또는 패키지명, iOS의 경우 번들 식별자
+domain	스트링 | 추천	앱 도메인
+id	스트링	앱의 고유 식별자
+Device	id	스트링 | 32 | 필수	디바이스의 GAID 또는 IDFA, 안드로이드의 경우 구글 광고 ID, iOS의 경우 IDFA
+ip	스트링 | 추천	광고를 보는 고객의 IP 주소
+lmt	정수 | 필수	디바이스에서 설정된 대로 광고 트래킹
+안드로이드: 1 - 관심 기반 광고 수신 거부 활성화, 0 - 비활성화
+iOS: 1 - 광고 트래킹 제한 스위치 활성화, 0 - 비활성화
+ua	스트링 | 추천	광고를 보는 고객의 사용자 에이전트
+Imp	adType	정수 | 선택 사항	사용자에게 표시되는 소재 유형
+1: text - 텍스트만
+2: banner - 일반 디스플레이 광고
+3: native - 디스플레이 네이티브 광고
+4: interstitial - 전체 페이지 광고
+5: video - 보상 없는 비디오 광고
+6: rvideo - 보상형 비디오 광고
+imageSize	스트링 | 필수	필요한 상품 이미지의 너비 X 높이
+참고: 필요한 화면 비율에 따라 이미지 크기를 조정할 수 있습니다.
+placementId	스트링 | 추천	인벤토리 영역을 위한 ID
+고유한 광고 영역을 참조해야 함
+pos	정수 | 선택 사항	광고 영역 위치
+1: 화면 상단
+3: 화면 하단
+4: 헤더 영역
+5: 푸터 영역
+6: 사이드바 영역
+7: 전체 화면
+User	puid	스트링 | 필수	퍼블리셔가 정의한 최종 사용자의 ID
+제3자 쿠키 또는 ID에 의존하지 않고 사용자를 인식할 수 있는 대체 id 및 개인정보 보호 우선 방식
+Affiliate	subId	스트링 | 선택 사항	어필리에이트 채널의 ID, 정산 단위
+정산을 위해 반드시 쿠팡 파트너스 플랫폼에 등록되어 있어야 함. 해당 파라미터 사용에 대한 자세한 내용은 담당 어카운트 매니저에게 문의
+subParam	스트링 | 선택 사항	사용자 지정 파라미터의 ID
+Example Value
+Model
+{
+  "affiliate": {
+    "subId": "string",
+    "subParam": "string"
+  },
+  "app": {
+    "bundleId": "string",
+    "domain": "string",
+    "id": "string"
+  },
+  "device": {
+    "id": "string",
+    "ip": "string",
+    "lmt": 0,
+    "ua": "string"
+  },
+  "imp": {
+    "adType": 1,
+    "imageSize": "string",
+    "placementId": "string",
+    "pos": 1
+  },
+  "site": {
+    "domain": "string",
+    "id": "string",
+    "page": "string"
+  },
+  "user": {
+    "puid": "string"
+  }
+}
+Responses
+rCode	Description
+200	
+필드	데이터 유형	설명
+isRocket	boolean	true - 로켓 배송 상품, false - 로켓 배송 상품 아님
+productId	long	쿠팡 상품 ID
+productImage	string	상품 이미지 URL
+productName	string (max 200)	상품명, 최대 200자
+productPrice	float	상품 가격
+productUrl	string	상품 페이지의 트래킹 URL
+categoryName	string (max 20)	상품 카테고리명, 최대 길이 20
+impressionUrl	string	상품에 대한 노출 트래킹 URL은 상품이 노출될 때 호출되어야 함
+Example Value
+Model
+{
+  "accessPasses": [
+    "string"
+  ],
+  "data": [
+    {
+      "isRocket": true,
+      "productId": 0,
+      "productImage": "string",
+      "productName": "string",
+      "productPrice": 0,
+      "productUrl": "string",
+      "categoryName": "string",
+      "impressionUrl": "string"
+    }
+  ],
+  "rCode": "string",
+  "rMessage": "string"
+}
+201	
+Created
+401	
+Unauthorized
+403	
+Forbidden
+404	
+NotFound
+노출 측정 가이드라인
+구현 방식: 노출 트래킹은 고객 측 그리고 추천이 표시되는 디바이스에서 구현되어야 합니다. 노출 URL 트래커는 상품 추천이최종 사용자에게 노출되고 실제 사람이 상품을 본 경우에만 실행되어야 합니다.
+캐싱/만료 규칙
+다음은 노출 특성에 따라 합리적인 지연 예시로 제시된 만료 시간입니다. 만료 시간이 지나면 상품 추천을 다시 요청해야 합니다.
+디바이스 유형	캐시 만료
+데스크탑 및 모바일 웹 브라우저	5분
+모바일 앱	60분
+API 처리 정책
+인증 및 권한 부여
+
+키는 안전하게 관리해야 하며 타인과 공유해서는 안 됩니다.
+
+요청 제한
+
+기본 QPS는 분당 100회입니다. 더 높은 요청량이 필요할 경우 쿠팡 비즈니스팀에 문의하세요.
+
+데이터 처리
+
+노출 측정 가이드라인에 명시된 기준을 초과하여 API 응답을 캐시하지 않습니다. API 응답 캐싱을 비활성화해 데이터를 최신 상태로 안전하게 유지합니다. 각 요청마다 API에서 최신 데이터를 받아야 하며, 이는 규정 준수뿐만 아니라 더 개인화된 상품 추천을 제공받아 커미션 수익 가능성을 높입니다.
+
+API 응답을 변조하지 않습니다. – API 응답을 변조하는 행위는 엄격히 금지됩니다. 데이터 무결성과 보안 유지를 위해 API에서 받은 데이터를 사용합니다.
+
+Reco v1과 v2 비교
+아래 표는 Reco API 간 주요 차이점을 명확하게 보여줍니다. 최신 API로 전환하는 데 도움이 될 것입니다.
+
+비교 항목	V1	V2
+HTTP Method	GET	POST
+엔드 포인트	https://api-gateway.coupang.com/providers/affiliate_open_api/apis/openapi/v1/products/reco	https://api-gateway.coupang.com/v2/providers/affiliate_open_api/apis/openapi/v2/products/reco
+파라미터	deviceId: 스트링
+imageSize: 스트링
+subId: 스트링
+tsource: 스트링
+puid: 스트링	JSON 구조화된 문서 (하단 예제 참조)
+V2 API 파라미터 예제
+{
+  "site": {
+    "id": "사이트ID",
+    "domain": "domain.com"
+  },
+  "device": {
+    "id": "디바이스ID",
+    "lmt": 0
+  },
+  "imp": {
+    "imageSize": "200x200"
+  },
+  "user": {
+    "puid": "사용자ID"
+  }
+}

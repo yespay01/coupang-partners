@@ -58,7 +58,21 @@ export const handleAdminActions = onDocumentCreated("admin_actions/{actionId}", 
   const message = buildSlackMessage(docId, data);
 
   await Promise.all([
-    notifySlack(message, "info"),
+    notifySlack({
+      route: "admin",
+      level: "info",
+      title: "관리자 액션 처리",
+      text: message,
+      fields: [
+        { label: "다음 상태", value: data.nextStatus ?? "-" },
+        { label: "소스", value: data.source ?? "unknown" },
+        {
+          label: "건수",
+          value: Array.isArray(data.reviewIds) ? `${data.reviewIds.length}` : "1",
+        },
+      ],
+      context: docId ? `actionId=${docId}` : undefined,
+    }),
     logAdminAction({
       docId,
       message,
@@ -71,4 +85,3 @@ export const handleAdminActions = onDocumentCreated("admin_actions/{actionId}", 
     }),
   ]);
 });
-

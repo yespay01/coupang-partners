@@ -1,0 +1,17 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/admin/session/route": "app/api/admin/session/route.js",
+  "/api/coupang/ads/route": "app/api/coupang/ads/route.js",
+  "/api/coupang/reports/route": "app/api/coupang/reports/route.js",
+  "/api/settings/coupang/test/route": "app/api/settings/coupang/test/route.js",
+  "/api/settings/route": "app/api/settings/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/page": "app/page.js",
+  "/review/[id]/page": "app/review/[id]/page.js",
+  "/reviews/page": "app/reviews/page.js",
+  "/(dashboard)/admin/login/page": "app/(dashboard)/admin/login/page.js",
+  "/(dashboard)/admin/logs/page": "app/(dashboard)/admin/logs/page.js",
+  "/(dashboard)/admin/reviews/page": "app/(dashboard)/admin/reviews/page.js",
+  "/(dashboard)/admin/page": "app/(dashboard)/admin/page.js",
+  "/(dashboard)/admin/settings/page": "app/(dashboard)/admin/settings/page.js"
+}

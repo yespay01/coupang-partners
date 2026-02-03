@@ -1,0 +1,60 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 개발용: 모든 접근 허용
+    // TODO: 프로덕션 배포 전에 보안 규칙 강화 필요
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+
+// 프로덕션용 보안 규칙 (배포 전 주석 해제)
+/*
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 관리자 여부 확인 함수
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    // 로그 컬렉션: 관리자만 읽기, Functions만 쓰기
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // 리뷰 컬렉션: 발행된 것만 공개, 관리자만 쓰기
+    match /reviews/{reviewId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // 상품 컬렉션: 관리자만 접근
+    match /products/{productId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 시스템 설정: 관리자만 접근
+    match /system_settings/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 수익 컬렉션: 관리자만 접근
+    match /earnings/{earningId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 재시도 큐: Cloud Functions만 접근
+    match /review_retry_queue/{queueId} {
+      allow read, write: if false;
+    }
+
+    // 기타 모든 문서: 기본적으로 차단
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+*/

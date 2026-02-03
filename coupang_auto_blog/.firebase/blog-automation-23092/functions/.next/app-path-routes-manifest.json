@@ -1,0 +1,17 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/api/admin/session/route": "/api/admin/session",
+  "/api/coupang/ads/route": "/api/coupang/ads",
+  "/api/coupang/reports/route": "/api/coupang/reports",
+  "/api/settings/coupang/test/route": "/api/settings/coupang/test",
+  "/api/settings/route": "/api/settings",
+  "/favicon.ico/route": "/favicon.ico",
+  "/page": "/",
+  "/review/[id]/page": "/review/[id]",
+  "/reviews/page": "/reviews",
+  "/(dashboard)/admin/login/page": "/admin/login",
+  "/(dashboard)/admin/logs/page": "/admin/logs",
+  "/(dashboard)/admin/reviews/page": "/admin/reviews",
+  "/(dashboard)/admin/page": "/admin",
+  "/(dashboard)/admin/settings/page": "/admin/settings"
+}

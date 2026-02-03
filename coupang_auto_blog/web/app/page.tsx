@@ -1,132 +1,387 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getDb, normalizeTimestamp, type ReviewDoc } from "@/lib/firestore";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+} from "firebase/firestore";
 
-const automationTimeline = [
-  { time: "02:00", title: "상품 자동 수집", description: "쿠팡 API에서 신규 상품 메타 데이터를 가져옵니다." },
-  { time: "02:10", title: "AI 후기 생성", description: "OpenAI를 호출해 초안을 만들고 품질 규칙을 통과한 것만 저장합니다." },
-  { time: "09:10", title: "승인 즉시 게시", description: "관리자 승인이 떨어지면 ISR 페이지와 sitemap을 자동 갱신합니다." },
-  { time: "18:00", title: "수익 통계 갱신", description: "클릭/주문 데이터를 Firestore에 집계하고 로그로 추적합니다." },
-];
+type PublishedReview = ReviewDoc & {
+  id: string;
+};
 
-const previewMetrics = [
-  { label: "대기 중 상품", value: "24", hint: "검수 대기" },
-  { label: "금일 생성 리뷰", value: "12", hint: "자동 생성 완료" },
-  { label: "어제 대비 클릭", value: "+18%", hint: "리다이렉트 로그 기준" },
-];
+async function fetchPublishedReviews(maxCount: number): Promise<PublishedReview[]> {
+  const db = await getDb();
+  const q = query(
+    collection(db, "reviews"),
+    where("status", "==", "published"),
+    orderBy("createdAt", "desc"),
+    limit(maxCount)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      productId: data.productId,
+      productName: data.productName,
+      author: data.author,
+      status: data.status,
+      content: data.content,
+      createdAt: normalizeTimestamp(data.createdAt),
+      updatedAt: normalizeTimestamp(data.updatedAt ?? data.createdAt),
+      toneScore: data.toneScore,
+      charCount: data.charCount,
+    };
+  });
+}
 
-const featuredCategories = [
-  { name: "라이프스타일", description: "생활용품·인테리어·조명 등 유저 체감도가 높은 카테고리" },
-  { name: "디지털&가전", description: "가전/IT 제품 리뷰 및 스펙 비교 요약" },
-  { name: "주방/쿠킹", description: "자취용 주방기기와 식기 추천 콘텐츠" },
-];
+function formatDate(dateString: string): string {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return dateString;
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
 
-export default function Home() {
+function stripHtmlTags(html: string): string {
+  if (!html) return "";
+  // HTML 태그 제거
+  return html
+    .replace(/<!--[\s\S]*?-->/g, "") // HTML 주석 제거
+    .replace(/<[^>]*>/g, "") // HTML 태그 제거
+    .replace(/&nbsp;/g, " ") // &nbsp; 를 공백으로
+    .replace(/&amp;/g, "&") // &amp; 를 &로
+    .replace(/&lt;/g, "<") // &lt; 를 <로
+    .replace(/&gt;/g, ">") // &gt; 를 >로
+    .replace(/&quot;/g, '"') // &quot; 를 "로
+    .replace(/\s+/g, " ") // 연속 공백을 하나로
+    .trim();
+}
+
+function truncateContent(content: string, maxLength: number = 120): string {
+  if (!content) return "";
+  const plainText = stripHtmlTags(content);
+  if (plainText.length <= maxLength) return plainText;
+  return plainText.slice(0, maxLength) + "...";
+}
+
+function ReviewCard({ review }: { review: PublishedReview }) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-white text-slate-900">
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-16 sm:px-8">
-          <span className="w-fit rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-            Coupang Partners Automation
-          </span>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-            AI 기반 후기 생성과 검수 워크플로를 한 번에.
-          </h1>
-          <p className="max-w-2xl text-base text-slate-600 sm:text-lg">
-            상품 데이터 수집부터 메타데이터 갱신, 승인 후 게시까지 자동화 루틴을 통째로 제공하는 운영 대시보드
-            초안을 준비했습니다. 지금은 더미 데이터지만, 파이어베이스와 연동되면 실시간으로 업데이트됩니다.
+    <article className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition line-clamp-2">
+            {review.productName || `상품 리뷰 #${review.id.slice(0, 6)}`}
+          </h3>
+          <p className="mt-2 text-sm text-slate-600 line-clamp-3">
+            {truncateContent(review.content || "", 150)}
           </p>
-          <div className="flex flex-wrap gap-3">
-            <span className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
-              🔄 자동 수집 &amp; 재시도 큐
-            </span>
-            <span className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
-              🤖 OpenAI 품질 규칙 적용
-            </span>
-            <span className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
-              📊 수익 대시보드 예정
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-3">
+        </div>
+      </div>
+      <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            {review.author || "AI 리뷰어"}
+          </span>
+          <span>{formatDate(review.createdAt || "")}</span>
+        </div>
+        <Link
+          href={`/review/${review.id}`}
+          className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700 transition"
+        >
+          자세히 보기
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function ReviewCardSkeleton() {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm animate-pulse">
+      <div className="h-6 bg-slate-200 rounded w-3/4 mb-3" />
+      <div className="space-y-2">
+        <div className="h-4 bg-slate-100 rounded w-full" />
+        <div className="h-4 bg-slate-100 rounded w-5/6" />
+      </div>
+      <div className="mt-4 flex items-center justify-between">
+        <div className="h-3 bg-slate-100 rounded w-24" />
+        <div className="h-3 bg-slate-100 rounded w-16" />
+      </div>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-12 text-center">
+      <div className="mx-auto w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+        <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold text-slate-700 mb-2">아직 게시된 리뷰가 없습니다</h3>
+      <p className="text-sm text-slate-500 mb-6">
+        관리자가 리뷰를 승인하면 여기에 표시됩니다.
+      </p>
+      <Link
+        href="/admin"
+        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
+      >
+        관리자 대시보드로 이동
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </Link>
+    </div>
+  );
+}
+
+const categories = [
+  { name: "전체", slug: "all" },
+  { name: "라이프스타일", slug: "lifestyle" },
+  { name: "디지털/가전", slug: "digital" },
+  { name: "주방/쿠킹", slug: "kitchen" },
+  { name: "패션/뷰티", slug: "fashion" },
+];
+
+export default function HomePage() {
+  const [latestReviews, setLatestReviews] = useState<PublishedReview[]>([]);
+  const [popularReviews, setPopularReviews] = useState<PublishedReview[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState("all");
+
+  useEffect(() => {
+    async function loadReviews() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const reviews = await fetchPublishedReviews(12);
+
+        // 최신순으로 6개
+        setLatestReviews(reviews.slice(0, 6));
+
+        // 인기 리뷰는 현재 조회수 데이터가 없으므로 나머지를 표시
+        // 실제로는 조회수/클릭수 기준으로 정렬
+        setPopularReviews(reviews.slice(0, 6).reverse());
+      } catch (err) {
+        console.error("리뷰 로딩 실패:", err);
+        setError("리뷰를 불러오는 중 오류가 발생했습니다.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadReviews();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50/50 to-white">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-lg">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="flex h-16 items-center justify-between">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">C</span>
+              </div>
+              <span className="font-bold text-slate-900">쿠팡 리뷰</span>
+            </Link>
+            <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+              {categories.slice(1).map((cat) => (
+                <button
+                  key={cat.slug}
+                  onClick={() => setActiveCategory(cat.slug)}
+                  className={`hover:text-slate-900 transition ${
+                    activeCategory === cat.slug ? "text-blue-600" : ""
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </nav>
             <Link
               href="/admin"
-              className="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition"
             >
-              관리자 대시보드 보기
+              관리자
             </Link>
-            <a
-              href="https://console.firebase.google.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white hover:shadow-sm"
-            >
-              Firebase 콘솔 열기
-            </a>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto flex min-h-[60vh] max-w-6xl flex-col gap-16 px-6 py-16 sm:px-8">
-        <section className="grid gap-6 md:grid-cols-3">
-          {previewMetrics.map((metric) => (
-            <article
-              key={metric.label}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <p className="text-sm font-medium text-slate-500">{metric.label}</p>
-              <p className="mt-3 text-3xl font-semibold text-slate-900">{metric.value}</p>
-              <p className="mt-1 text-xs text-slate-500">{metric.hint}</p>
-            </article>
-          ))}
-        </section>
-
-        <section className="grid gap-10 lg:grid-cols-[2fr,3fr]">
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold text-slate-900">자동화 타임라인</h2>
-            <p className="text-sm text-slate-600">
-              README에 정의된 스케줄을 바탕으로 대략적인 오퍼레이션 흐름을 시각화했습니다. UI와 데이터는 이후
-              파이어베이스 컬렉션과 연동할 예정입니다.
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
+        <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+          <div className="text-center">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium text-white/90 backdrop-blur">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+              </span>
+              AI가 작성한 신뢰할 수 있는 리뷰
+            </span>
+            <h1 className="mt-6 text-3xl font-bold tracking-tight sm:text-5xl">
+              쿠팡 상품 리뷰를
+              <br />
+              <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                한눈에 확인하세요
+              </span>
+            </h1>
+            <p className="mx-auto mt-4 max-w-xl text-base text-slate-300 sm:text-lg">
+              AI가 분석하고 정리한 쿠팡 파트너스 상품 리뷰를 만나보세요.
+              <br className="hidden sm:block" />
+              실제 구매에 도움이 되는 정보만 엄선했습니다.
             </p>
-            <ul className="space-y-3">
-              {automationTimeline.map((step) => (
-                <li key={step.time} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-sm font-mono text-slate-500">{step.time}</span>
-                    <span className="text-base font-semibold text-slate-900">{step.title}</span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-600">{step.description}</p>
-                </li>
-              ))}
-            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Category Filter (Mobile) */}
+      <div className="md:hidden border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-3">
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+            {categories.map((cat) => (
+              <button
+                key={cat.slug}
+                onClick={() => setActiveCategory(cat.slug)}
+                className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                  activeCategory === cat.slug
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+        {error && (
+          <div className="mb-8 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            {error}
+          </div>
+        )}
+
+        {/* Latest Reviews Section */}
+        <section className="mb-16">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">최신 리뷰</h2>
+              <p className="mt-1 text-sm text-slate-500">방금 게시된 따끈따끈한 리뷰</p>
+            </div>
+            <Link
+              href="/reviews?sort=latest"
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 transition flex items-center gap-1"
+            >
+              전체보기
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
           </div>
 
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold text-slate-900">우선 구축 카테고리</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {featuredCategories.map((category) => (
-                <article key={category.name} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h3 className="text-lg font-semibold text-slate-900">{category.name}</h3>
-                  <p className="mt-2 text-sm text-slate-600">{category.description}</p>
-                  <span className="mt-3 inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                    콘텐츠 초안 준비 중
-                  </span>
-                </article>
+          {isLoading ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {[...Array(6)].map((_, i) => (
+                <ReviewCardSkeleton key={i} />
               ))}
             </div>
-          </div>
+          ) : latestReviews.length > 0 ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {latestReviews.map((review) => (
+                <ReviewCard key={review.id} review={review} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState />
+          )}
         </section>
 
-        <section className="rounded-3xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center">
-          <h2 className="text-xl font-semibold text-slate-900">Firebase 연동 체크포인트</h2>
-          <p className="mt-3 text-sm text-slate-600">
-            `.env.local`에 Firebase 웹 키를 추가하고 `lib/firebaseClient.ts`에서 초기화됩니다. 관리용 대시보드와
-            공개 블로그 뷰를 위해 Auth 및 Firestore 모듈을 곧 연결할 예정입니다.
+        {/* Popular Reviews Section */}
+        {!isLoading && popularReviews.length > 0 && (
+          <section className="mb-16">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">인기 리뷰</h2>
+                <p className="mt-1 text-sm text-slate-500">많은 분들이 찾아본 리뷰</p>
+              </div>
+              <Link
+                href="/reviews?sort=popular"
+                className="text-sm font-medium text-blue-600 hover:text-blue-700 transition flex items-center gap-1"
+              >
+                전체보기
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {popularReviews.map((review) => (
+                <ReviewCard key={`popular-${review.id}`} review={review} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* CTA Section */}
+        <section className="rounded-3xl bg-gradient-to-br from-slate-100 to-slate-50 p-8 sm:p-12 text-center">
+          <h2 className="text-2xl font-bold text-slate-900 mb-3">
+            더 많은 리뷰가 궁금하신가요?
+          </h2>
+          <p className="text-slate-600 mb-6 max-w-lg mx-auto">
+            매일 새로운 상품 리뷰가 AI에 의해 자동으로 생성되고 있습니다.
+            관리자 승인을 거쳐 신뢰할 수 있는 리뷰만 게시됩니다.
           </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              href="/reviews"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition"
+            >
+              모든 리뷰 보기
+            </Link>
+            <Link
+              href="/admin"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+            >
+              관리자 대시보드
+            </Link>
+          </div>
         </section>
       </main>
 
-      <footer className="border-t border-slate-200 bg-white/80">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <p>© {new Date().getFullYear()} Coupang Partners Auto Blog Pilot</p>
-          <p>이 페이지는 프로젝트 초기 껍데기(Scaffold)이며 이후 실제 데이터와 컴포넌트가 추가됩니다.</p>
+      {/* Footer */}
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">C</span>
+              </div>
+              <span>쿠팡 파트너스 자동화 블로그</span>
+            </div>
+            <p>© {new Date().getFullYear()} Coupang Partners Auto Blog. AI 기반 리뷰 시스템.</p>
+          </div>
         </div>
       </footer>
     </div>

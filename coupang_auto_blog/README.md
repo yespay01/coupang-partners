@@ -41,7 +41,10 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4o-mini
 SLACK_WEBHOOK_URL=your_slack_webhook_url
+SLACK_WEBHOOK_ROUTES={"default":"https://hooks.slack.com/services/xxx","generation":"https://hooks.slack.com/services/yyy","admin":"https://hooks.slack.com/services/zzz"}
+SLACK_LEVEL_MENTIONS={"error":"<!here>","warn":""}
 ```
+> `SLACK_WEBHOOK_ROUTES`/`SLACK_LEVEL_MENTIONS`는 선택 항목이며, 이벤트별 채널 라우팅과 심각도 기반 멘션 정책을 JSON 으로 선언합니다.
 
 ### 실행
 
@@ -54,7 +57,8 @@ npm run dev
 **Firebase Functions (로컬)**:
 ```bash
 cd functions
-npm run serve
+npm install
+npm run serve   # Firebase Functions Emulator (firebase-tools)
 ```
 
 **배포**:
@@ -358,7 +362,7 @@ REVIEW_RETRY_BASE_MINUTES=5
    ```
 3. 브라우저에서 <http://localhost:3000> 접속  
    - 관리자 기능을 쓰려면 `.env.local`에 Firebase 웹 앱 키와 `ADMIN_GUARD_BYPASS=true` 등의 변수를 세팅합니다.  
-   - Functions 에뮬레이터는 `functions/` 디렉터리에서 `npm install` 후 필요한 경우 `firebase emulators:start --only functions` 명령으로 구동합니다.
+   - Functions 에뮬레이터는 `functions/` 디렉터리에서 `npm install` 후 `npm run serve` (firebase-tools 기반)로 실행합니다.
 
 ---
 
@@ -367,6 +371,10 @@ REVIEW_RETRY_BASE_MINUTES=5
   - AI 후기 생성 시 길이/금칙어/톤 스코어 검증 로직 추가 및 `reviewUtils` 모듈화
   - Firestore 재시도 큐를 Transaction 기반으로 전환하고 `status=retry_pending` 메타데이터 저장
   - `admin_actions` 컬렉션을 모니터링해 Slack 알림과 운영 로그를 자동 기록하는 트리거 추가
+- **운영 알림**
+  - Slack Webhook 알림에 공통 템플릿/필드/블록 포맷을 적용하고, 수준(`info/warn/error/success`)별 이모지 및 메시지를 일관되게 노출
+  - Slack 전송 실패 시 최대 3회 재시도(backoff)하도록 개선해 일시적 네트워크 오류에도 경보 누락을 방지
+  - `SLACK_WEBHOOK_ROUTES` / `SLACK_LEVEL_MENTIONS` 환경변수로 이벤트(Generation/Admin)별 채널 라우팅과 오류 시 `<!here>` 멘션 자동화를 지원
 - **프런트엔드 (Next.js)**
   - `web/` 프로젝트 Scaffold + Tailwind 기반 랜딩/관리자 레이아웃 구성
   - Firebase Client/Firestore 유틸을 통한 실시간 대시보드 스트리밍 훅 구현 (`useAdminDashboardData`)
@@ -385,7 +393,6 @@ REVIEW_RETRY_BASE_MINUTES=5
 ## 🔜 다음 작업 제안
 1. GitHub Actions 배포 파이프라인에 프리뷰 채널/롤백 전략과 시크릿 관리 자동화를 추가
 2. 후기/로그 필터 상태를 Firestore 서버 쿼리로 연결해 SSR/CSR 일관성 확보
-3. Slack 알림 템플릿을 운영 기준에 맞춰 세분화하고, 응답 실패 재시도 정책 보강
 
 ---
 

@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const BYPASS = process.env.ADMIN_GUARD_BYPASS === "true";
+// 프로덕션에서는 BYPASS 모드 비활성화
+const BYPASS = process.env.NODE_ENV !== "production" && process.env.ADMIN_GUARD_BYPASS === "true";
 const ADMIN_SESSION_COOKIE = "admin_session";
 
 export function middleware(request: NextRequest) {
   if (BYPASS) {
+    console.log("[개발 모드] Admin guard bypass 활성화");
     return NextResponse.next();
   }
 

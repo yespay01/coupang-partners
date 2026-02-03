@@ -1,0 +1,247 @@
+ 분석 완료했습니다. 현재 프로젝트 상황과 쿠팡 상품 API를 어떻게 활용할 수 있는지 정리해드리겠습니다.
+
+  현재 구현 상태
+
+  ✅ 이미 구현된 API                                                                                                             ─
+
+  1. /products/bestcategories/{categoryId} - 카테고리별 베스트 상품
+  2. /products/search - 키워드 검색
+  3. /deeplink - 딥링크 생성
+
+  ❌ 미구현 API (활용 가능)
+
+  1. /products/goldbox - 골드박스 상품 (매일 오전 7:30 업데이트)
+  2. /products/coupangPL - 쿠팡 PL 전체 상품
+  3. /products/coupangPL/{brandId} - 쿠팡 PL 브랜드별 상품
+  4. /products/reco - 개인화 추천 상품 (ADID 필요)
+
+  ---
+  프로젝트 방향과 접목 전략
+
+  현재 수집 워크플로우
+
+  1. 관리자가 settings에서 키워드/카테고리 설정
+     ↓
+  2. 매일 새벽 2시 자동 수집 (collectProductsScheduler)
+     ↓
+  3. 키워드 기반 검색 (최대 50%)
+     + 카테고리 베스트 상품 (나머지 50%)
+     ↓
+  4. 딥링크 자동 생성
+     ↓
+  5. products 컬렉션에 저장 (status: pending)
+     ↓
+  6. AI가 리뷰 자동 생성 (별도 프로세스)
+
+  개선 방향 - 상품 소스 다각화
+
+  추가할 API들의 장점:
+
+  1. 골드박스 (/products/goldbox)
+    - 매일 오전 7:30 업데이트되는 타임딜 상품
+    - 할인율이 높아 클릭률/전환율 상승 기대
+    - 활용: 매일 오전 8시에 골드박스 수집 스케줄러 추가
+  2. 쿠팡 PL (/products/coupangPL)
+    - 탐사, 코멧, 곰곰 등 쿠팡 자체 브랜드
+    - 수수료율이 일반 상품보다 높을 가능성
+    - 활용: 주 1회 쿠팡 PL 브랜드 상품 수집
+  3. 개인화 추천 (/products/reco)
+    - ADID(광고 식별자) 필요
+    - 활용: 블로그 방문자의 쿠키/디바이스 ID로 맞춤 상품 추천
+
+  ---
+  구체적인 개선 계획
+
+  Phase 1: 골드박스 API 추가
+
+  파일: functions/src/coupangApi.js
+  export async function getGoldboxProducts(params, credentials) {
+    const { limit = 20, subId } = params;
+    const { accessKey, secretKey } = credentials;
+
+    const queryParams = new URLSearchParams();
+    if (subId) queryParams.append("subId", subId);
+
+    const path = `/v2/providers/affiliate_open_api/apis/openapi/products/goldbox?${queryParams.toString()}`;
+
+    try {
+      const result = await coupangRequest("GET", path, accessKey, secretKey);
+
+      if (result.rCode !== 0) {
+        return { success: false, message: result.rMessage, products: [] };
+      }
+
+      return {
+        success: true,
+        products: result.data ?? [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+        products: [],
+      };
+    }
+  }
+
+  파일: functions/src/collectProducts.js
+  // 골드박스 상품 수집 추가
+  async function collectGoldbox(client, maxProducts) {
+    try {
+      const result = await client.getGoldboxProducts(maxProducts);
+
+      if (!result.success) {
+        logger.warn(`골드박스 조회 실패: ${result.message}`);
+        return 0;
+      }
+
+      let collected = 0;
+      for (const product of result.products) {
+        if (collected >= maxProducts) break;
+
+        const deeplinkResult = await client.createDeeplinks([product.productUrl]);
+        const affiliateUrl = deeplinkResult.deeplinks?.[0]?.shortenUrl || product.productUrl;
+
+        const saved = await saveProduct(
+          { ...product, affiliateUrl },
+          "goldbox"
+        );
+
+        if (saved) collected++;
+      }
+
+      return collected;
+    } catch (error) {
+      logger.error("골드박스 수집 오류:", error);
+      return 0;
+    }
+  }
+
+  Phase 2: 쿠팡 PL API 추가
+
+  파일: functions/src/coupangApi.js
+  // 쿠팡 PL 전체
+  export async function getCoupangPLProducts(params, credentials) {
+    const { limit = 100, subId } = params;
+    const { accessKey, secretKey } = credentials;
+
+    const queryParams = new URLSearchParams({ limit: String(limit) });
+    if (subId) queryParams.append("subId", subId);
+
+    const path = `/v2/providers/affiliate_open_api/apis/openapi/products/coupangPL?${queryParams.toString()}`;
+
+    try {
+      const result = await coupangRequest("GET", path, accessKey, secretKey);
+      // ... 위와 동일
+    }
+  }
+
+  // 쿠팡 PL 브랜드별
+  export async function getCoupangPLBrandProducts(params, credentials) {
+    const { brandId, limit = 100, subId } = params;
+    const { accessKey, secretKey } = credentials;
+
+    const queryParams = new URLSearchParams({ limit: String(limit) });
+    if (subId) queryParams.append("subId", subId);
+
+    const path = `/v2/providers/affiliate_open_api/apis/openapi/products/coupangPL/${brandId}?${queryParams.toString()}`;
+
+    try {
+      const result = await coupangRequest("GET", path, accessKey, secretKey);
+      // ... 위와 동일
+    }
+  }
+
+  Phase 3: 수집 전략 개선
+
+  우선순위 기반 수집:
+  // collectProductsScheduler 수정
+  async function collectProducts() {
+    const maxProducts = automation.maxProductsPerRun || 10;
+    let totalCollected = 0;
+
+    // 1. 골드박스 (타임딜 - 최우선, 20%)
+    const goldboxCount = await collectGoldbox(client, Math.floor(maxProducts * 0.2));
+    totalCollected += goldboxCount;
+
+    // 2. 카테고리 베스트 (40%)
+    const bestCount = await collectByCategories(
+      client,
+      categories,
+      Math.floor(maxProducts * 0.4)
+    );
+    totalCollected += bestCount;
+
+    // 3. 키워드 검색 (30%)
+    const keywordCount = await collectByKeywords(
+      client,
+      keywords,
+      Math.floor(maxProducts * 0.3)
+    );
+    totalCollected += keywordCount;
+
+    // 4. 쿠팡 PL (나머지 10%)
+    const plCount = await collectCoupangPL(
+      client,
+      maxProducts - totalCollected
+    );
+    totalCollected += plCount;
+
+    return totalCollected;
+  }
+
+  ---
+  웹 UI 개선 방안
+
+  설정 페이지에 수집 소스 선택 추가
+
+  web/components/admin/settings/TopicSettings.tsx
+  <div className="space-y-4">
+    <label className="flex items-center">
+      <input type="checkbox" checked={settings.goldboxEnabled} />
+      <span>골드박스 상품 수집 (매일 오전 7:30 업데이트)</span>
+    </label>
+
+    <label className="flex items-center">
+      <input type="checkbox" checked={settings.coupangPLEnabled} />
+      <span>쿠팡 PL 브랜드 상품 수집</span>
+    </label>
+
+    {settings.coupangPLEnabled && (
+      <div className="ml-6">
+        <label>브랜드 선택:</label>
+        <select multiple>
+          <option value="1001">탐사</option>
+          <option value="1002">코멧</option>
+          <option value="1006">곰곰</option>
+          {/* ... */}
+        </select>
+      </div>
+    )}
+  </div>
+
+  ---
+  요약 - 어떻게 접목할 것인가
+
+  1. 즉시 추가 권장
+
+  - ✅ 골드박스 API → 타임딜 상품으로 클릭률 향상
+  - ✅ 쿠팡 PL API → 수수료율 높은 자체 브랜드 상품
+
+  2. 선택적 추가
+
+  - 개인화 추천 API → 블로그에 임베드 위젯으로 활용 가능 (ADID 필요)
+
+  3. 수집 전략 개선
+
+  - 골드박스 20% + 베스트 40% + 키워드 30% + PL 10%
+  - 다양한 소스로 상품 풀 확대
+  - 중복 상품 자동 필터링 (productId 기준)
+
+  4. API 호출 제한 고려
+
+  - 검색 API: 1분당 50회
+  - 기타 API: 제한 명시 안됨 (합리적으로 사용)
+  - 골드박스는 하루 1회만 호출하면 충분
+
+  작업을 시작할까요? 어떤 API부터 추가하고 싶으신가요?

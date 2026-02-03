@@ -2,9 +2,16 @@
   "functions": {
     "source": "functions"
   },
+  "firestore": {
+    "indexes": "firestore.indexes.json",
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "hosting": [
     {
-      "site": "your-hosting-site-id",
+      "site": "blog-automation-23092",
       "source": "web",
       "frameworksBackend": {
         "region": "asia-northeast3"

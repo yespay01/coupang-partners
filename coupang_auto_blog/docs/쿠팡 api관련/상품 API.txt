@@ -1,0 +1,421 @@
+GET
+​/products​/bestcategories​/{categoryId}
+카테고리 별 베스트 상품에 대한 상세 상품 정보를 생성합니다.
+Parameters
+Name	Description
+categoryId *
+integer
+(path)
+카테고리 코드
+
+Id	이름
+1001	여성패션
+1002	남성패션
+1010	뷰티
+1011	출산/유아동
+1012	식품
+1013	주방용품
+1014	생활용품
+1015	홈인테리어
+1016	가전디지털
+1017	스포츠/레저
+1018	자동차용품
+1019	도서/음반/DVD
+1020	완구/취미
+1021	문구/오피스
+1024	헬스/건강식품
+1025	국내여행
+1026	해외여행
+1029	반려동물용품
+1030	유아동패션
+limit
+integer
+(query)
+최대 상품 수는 100개 이며, 기본값은 20개 입니다.
+example: https://api-gateway.coupang.com/v2/providers/affiliate_open_api/apis/openapi/products/bestcategories/1001?limit=50
+
+subId
+string
+(query)
+채널 아이디. (등록되지 않은 채널 아이디는 정산에서 제외됩니다.)
+
+imageSize
+string
+(query)
+이미지 사이즈를 조정할 수 있습니다. 예: 512x512
+Responses
+rCode	Description
+0	
+Successfully get products
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "categoryName": "Coupang PL",
+      "isRocket": false,
+      "isFreeShipping": false,
+      "productId": 27664441,
+      "productImage": "http://static.coupangcdn.com/image/product/image/vendoritem/2018/03/12/3205353792/48d92887-82e7-46f5-8704-89df99a23bde.jpg",
+      "productName": "탐사 소프트 100% 천연펄프 3겹 롤화장지 30m, 30롤, 1팩",
+      "productPrice": 15600,
+      "productUrl": "https://link.coupang.com/re/AFFSDP?lptag=AF1234567&pageKey=319834306&itemId=1023216541&vendorItemId=70064597513&traceid=V0-113-5fddb21eaffbb2ef"
+    }
+  ]
+}
+400	
+Invalid or Unsupported Category Id
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+
+GET
+​/products​/goldbox
+골드박스 상품에 대한 상세 상품 정보를 생성합니다. (골드박스 상품은 매일 오전 7:30에 업데이트 됩니다)
+Parameters
+Name	Description
+subId
+string
+(query)
+채널 아이디. (등록되지 않은 채널 아이디는 정산에서 제외됩니다.)
+
+imageSize
+string
+(query)
+이미지 사이즈를 조정할 수 있습니다. 예: 512x512
+
+Responses
+rCode	Description
+0	
+Successfully get products
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "categoryName": "Coupang PL",
+      "isRocket": false,
+      "isFreeShipping": false,
+      "productId": 27664441,
+      "productImage": "http://static.coupangcdn.com/image/product/image/vendoritem/2018/03/12/3205353792/48d92887-82e7-46f5-8704-89df99a23bde.jpg",
+      "productName": "탐사 소프트 100% 천연펄프 3겹 롤화장지 30m, 30롤, 1팩",
+      "productPrice": 15600,
+      "productUrl": "https://link.coupang.com/re/AFFSDP?lptag=AF1234567&pageKey=319834306&itemId=1023216541&vendorItemId=70064597513&traceid=V0-113-5fddb21eaffbb2ef"
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+
+GET
+​/products​/coupangPL
+쿠팡 PL 상품에 대한 상세 정보를 생성합니다.
+Parameters
+Name	Description
+limit
+integer
+(query)
+최대 상품 수는 100개 이며, 기본값은 20개 입니다.
+example: https://api-gateway.coupang.com/v2/providers/affiliate_open_api/apis/openapi/products/coupangPL?limit=50
+
+subId
+string
+(query)
+채널 아이디. (등록되지 않은 채널 아이디는 정산에서 제외됩니다.)
+
+imageSize
+string
+(query)
+이미지 사이즈를 조정할 수 있습니다. 예: 512x512
+
+Responses
+rCode	Description
+0	
+Successfully get products
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "categoryName": "Coupang PL",
+      "isRocket": false,
+      "isFreeShipping": false,
+      "productId": 27664441,
+      "productImage": "http://static.coupangcdn.com/image/product/image/vendoritem/2018/03/12/3205353792/48d92887-82e7-46f5-8704-89df99a23bde.jpg",
+      "productName": "탐사 소프트 100% 천연펄프 3겹 롤화장지 30m, 30롤, 1팩",
+      "productPrice": 15600,
+      "productUrl": "https://link.coupang.com/re/AFFSDP?lptag=AF1234567&pageKey=319834306&itemId=1023216541&vendorItemId=70064597513&traceid=V0-113-5fddb21eaffbb2ef"
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+
+GET
+​/products​/coupangPL​/{brandId}
+쿠팡 PL 브랜드 별 상품 상세 정보를 생성합니다.
+Parameters
+Name	Description
+brandId *
+integer
+(path)
+브랜드 코드
+
+brandId	brand Name
+1001	탐사
+1002	코멧
+1003	Gomgom
+1004	줌
+1006	곰곰
+1007	꼬리별
+1008	베이스알파에센셜
+1010	비타할로
+1011	비지엔젤
+limit
+integer
+(query)
+최대 상품 수는 100개 이며, 기본값은 20개 입니다.
+example: https://api-gateway.coupang.com/v2/providers/affiliate_open_api/apis/openapi/products/coupangPL/1001?limit=50
+
+subId
+string
+(query)
+채널 아이디. (등록되지 않은 채널 아이디는 정산에서 제외됩니다.)
+
+imageSize
+string
+(query)
+이미지 사이즈를 조정할 수 있습니다. 예: 512x512
+
+Responses
+rCode	Description
+0	
+Successfully get products
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "categoryName": "Coupang PL",
+      "isRocket": false,
+      "isFreeShipping": false,
+      "productId": 27664441,
+      "productImage": "http://static.coupangcdn.com/image/product/image/vendoritem/2018/03/12/3205353792/48d92887-82e7-46f5-8704-89df99a23bde.jpg",
+      "productName": "탐사 소프트 100% 천연펄프 3겹 롤화장지 30m, 30롤, 1팩",
+      "productPrice": 15600,
+      "productUrl": "https://link.coupang.com/re/AFFSDP?lptag=AF1234567&pageKey=319834306&itemId=1023216541&vendorItemId=70064597513&traceid=V0-113-5fddb21eaffbb2ef"
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+
+GET
+​/products​/search
+검색 키워드에 대한 쿠팡 검색 결과와 상세 상품 정보를 생성합니다 (1 분당 최대 50번 호출 가능합니다.)
+Parameters
+Name	Description
+keyword *
+string
+(query)
+검색 키워드
+
+limit
+integer
+(query)
+최대 상품 수는 10개 이며, 기본값은 10개 입니다.
+example: https://api-gateway.coupang.com/v2/providers/affiliate_open_api/apis/openapi/products/search?keyword=food&limit=5
+
+subId
+string
+(query)
+채널 아이디. (등록되지 않은 채널 아이디는 정산에서 제외됩니다.)
+
+imageSize
+string
+(query)
+이미지 사이즈를 조정할 수 있습니다. 예: 512x512
+
+srpLinkOnly
+boolean
+(query)
+키워드 검색 결과의 상세 상품 정보를 생략하고, 검색결과 페이지의 링크만 제공합니다. (TRUE인 경우 상세 상품 정보 생략, FALSE (기본값)인 경우 상세 상품 정보 제공)
+
+Responses
+rCode	Description
+0	
+Successfully get products
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": {
+    "landingUrl": "https://link.coupang.com/re/AFFSRP?lptag=AF1234567&pageKey=fashion&traceid=V0-153-5243b8cd44933da5",
+    "productData": [
+      {
+        "keyword": "Water",
+        "rank": 12,
+        "isRocket": false,
+        "isFreeShipping": false,
+        "productId": 27664441,
+        "productImage": "https://ads-partners.coupang.com/image1/mGVkZG3M0yixutAImCvHtQrgcjH0xPEaBYzlmOyWTuZd1KWBjpJK19dOf4S9HZ_h-SXudkWLWXUMXvyvYKqkBbHrTuiZPf_V5TvegSbo3AQGtZzN5307l5XehqmA9GmvJtl9jh8_R2iUhctR1-yhGdQte7ZGYxh_mfrGCERtdK83P4vDXivwrau5aPTWuHt6jwryAmOJwisfsH2mQfBOsqy0wAX1dPPSieiUPxtDa1PFmhzR88bPQ4ccNzmo8sgSab8NQAhf4pKy1Li0zb3h-M8LUs8ACg==",
+        "productName": "탐사 소프트 100% 천연펄프 3겹 롤화장지 30m, 30롤, 1팩",
+        "productPrice": 15600,
+        "productUrl": "https://link.coupang.com/re/AFFSDP?lptag=AF1234567&pageKey=319834306&itemId=1023216541&vendorItemId=70064597513&traceid=V0-163-5fddb21eaffbb2ef"
+      }
+    ]
+  }
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+
+GET
+​/products​/reco
+입력된 ADID 값을 이용해 개인화 추천 상품을 조회합니다.
+Parameters
+Name	Description
+deviceId
+string
+(query)
+ADID, GAID 혹은 IDFA
+
+subId
+string
+(query)
+채널 아이디. (등록되지 않은 채널 아이디는 정산에서 제외됩니다.)
+
+imageSize
+string
+(query)
+이미지 사이즈를 조정할 수 있습니다. 예: 512x512
+
+Responses
+rCode	Description
+0	
+Successfully get recommended products
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": {
+    "isRocket": false,
+    "productId": 27664441,
+    "productImage": "https://ads-partners.coupang.com/image1/mGVkZG3M0yixutAImCvHtQrgcjH0xPEaBYzlmOyWTuZd1KWBjpJK19dOf4S9HZ_h-SXudkWLWXUMXvyvYKqkBbHrTuiZPf_V5TvegSbo3AQGtZzN5307l5XehqmA9GmvJtl9jh8_R2iUhctR1-yhGdQte7ZGYxh_mfrGCERtdK83P4vDXivwrau5aPTWuHt6jwryAmOJwisfsH2mQfBOsqy0wAX1dPPSieiUPxtDa1PFmhzR88bPQ4ccNzmo8sgSab8NQAhf4pKy1Li0zb3h-M8LUs8ACg==",
+    "productName": "탐사 소프트 100% 천연펄프 3겹 롤화장지 30m, 30롤, 1팩",
+    "productPrice": 15600,
+    "productUrl": "https://link.coupang.com/re/AFFSDP?lptag=AF1234567&pageKey=319834306&itemId=1023216541&vendorItemId=70064597513&traceid=V0-113-5fddb21eaffbb2ef"
+  }
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+
+links
+입력된 쿠팡 상품 링크를 파트너스 회원의 링크로 변환합니다.
+
+
+POST
+​/deeplink
+쿠팡 URL을 회원 트래킹 코드가 포함된 단축 URL로 변환합니다.
+Parameters
+Name	Description
+body *
+(body)
+쿠팡 URL
+
+Example Value
+Model
+{
+  "coupangUrls": [
+    "https://www.coupang.com/vp/products/184614775"
+  ],
+  "subId": "string"
+}
+Responses
+rCode	Description
+0	
+OK
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "originalUrl": "https://www.coupang.com/vp/products/184614775",
+      "shortenUrl": "https://coupa.ng/blE0dT",
+      "landingUrl": "https://link.coupang.com/re/AFFSDP?lptag=AF1234567&pageKey=319834306&itemId=1023216541&vendorItemId=70064597513&traceid=V0-183-5fddb21eaffbb2ef"
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

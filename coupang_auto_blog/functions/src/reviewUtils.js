@@ -52,6 +52,36 @@ export function buildPrompt(product) {
   `;
 }
 
+/**
+ * Firestore 설정 기반 프롬프트 빌드
+ * @param {Object} product - 상품 정보 { name, category }
+ * @param {Object} promptSettings - 프롬프트 설정
+ */
+export function buildPromptFromSettings(product, promptSettings) {
+  const { reviewTemplate, additionalGuidelines, minLength, maxLength } = promptSettings;
+
+  const productName = product.name || product.productName || "상품";
+  const category = product.category || product.categoryName || "기타";
+
+  // 템플릿 변수 치환
+  const basePrompt = reviewTemplate
+    .replace(/{productName}/g, productName)
+    .replace(/{category}/g, category)
+    .replace(/{minLength}/g, String(minLength))
+    .replace(/{maxLength}/g, String(maxLength));
+
+  // 상세 가이드라인 변수 치환
+  const guidelines = additionalGuidelines
+    ? additionalGuidelines
+        .replace(/{productName}/g, productName)
+        .replace(/{category}/g, category)
+        .replace(/{minLength}/g, String(minLength))
+        .replace(/{maxLength}/g, String(maxLength))
+    : "";
+
+  return basePrompt + (guidelines ? "\n\n" + guidelines : "");
+}
+
 export function analyzeToneScore(text) {
   const tokens = (text.toLowerCase().match(/[a-z0-9가-힣]+/g) ?? []).filter(Boolean);
   if (tokens.length === 0) {
@@ -96,6 +126,35 @@ export function validateReviewContent(reviewText) {
   const toneScore = analyzeToneScore(reviewText);
   if (toneScore <= 0.4) {
     throw new Error(`REVIEW_TONE_SCORE_TOO_LOW:${toneScore}`);
+  }
+
+  return { toneScore, charCount };
+}
+
+/**
+ * Firestore 설정 기반 리뷰 내용 검증
+ * @param {string} reviewText - 검증할 리뷰 텍스트
+ * @param {Object} promptSettings - 프롬프트 설정
+ */
+export function validateReviewContentWithSettings(reviewText, promptSettings) {
+  const { minLength, maxLength, toneScoreThreshold } = promptSettings;
+  const charCount = Array.from(reviewText ?? "").length;
+
+  // 글자 수 검증
+  if (charCount < minLength || charCount > maxLength) {
+    throw new Error(`REVIEW_LENGTH_OUT_OF_RANGE:${charCount} (허용: ${minLength}~${maxLength})`);
+  }
+
+  // 금지 패턴 검증
+  const bannedPattern = bannedPatterns.find((pattern) => pattern.test(reviewText));
+  if (bannedPattern) {
+    throw new Error("REVIEW_CONTAINS_BANNED_PHRASE");
+  }
+
+  // 톤 점수 검증
+  const toneScore = analyzeToneScore(reviewText);
+  if (toneScore <= toneScoreThreshold) {
+    throw new Error(`REVIEW_TONE_SCORE_TOO_LOW:${toneScore} (임계값: ${toneScoreThreshold})`);
   }
 
   return { toneScore, charCount };

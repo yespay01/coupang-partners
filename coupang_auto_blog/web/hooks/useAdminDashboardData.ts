@@ -29,6 +29,9 @@ export type WorkflowItem = {
   content?: string;
   toneScore?: number;
   charCount?: number;
+  slug?: string;
+  publishedAt?: string;
+  media?: Array<{ type: string; url: string; alt?: string }>;
 };
 
 export type LogEntry = {
@@ -37,6 +40,7 @@ export type LogEntry = {
   message: string;
   createdAt: string;
   context: string;
+  payload?: Record<string, unknown>;
 };
 
 export type DashboardData = {
@@ -58,6 +62,8 @@ export type DashboardData = {
   goToPrevLogPage: () => Promise<void>;
   logPageIndex: number;
   totalLogCount: number | null;
+  refreshReviews: () => Promise<void>;
+  refreshLogs: () => Promise<void>;
 };
 
 const FALLBACK_METRICS: EarningsMetric[] = [
@@ -143,6 +149,30 @@ const LOG_LEVELS = ["info", "warn", "error"] as const;
 type ReviewStatus = (typeof REVIEW_STATUSES)[number];
 type LogLevel = (typeof LOG_LEVELS)[number];
 type DatePreset = "all" | "24h" | "7d" | "30d";
+
+// LogDoc를 LogEntry로 변환 (optional 필드에 기본값 제공)
+function toLogEntry(doc: LogDoc): LogEntry {
+  // payload가 없고 context가 JSON 문자열이면 파싱해서 payload로 사용
+  let payload = doc.payload;
+  const context = doc.context ?? "";
+
+  if (!payload && context.startsWith("{")) {
+    try {
+      payload = JSON.parse(context);
+    } catch {
+      // JSON 파싱 실패하면 그냥 넘어감
+    }
+  }
+
+  return {
+    id: doc.id,
+    level: doc.level ?? "info",
+    message: doc.message ?? "",
+    createdAt: doc.createdAt ?? "",
+    context,
+    payload,
+  };
+}
 
 const DATE_PRESET_TO_MS: Record<Exclude<DatePreset, "all">, number> = {
   "24h": 24 * 60 * 60 * 1000,
@@ -243,7 +273,7 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
           documents.length
             ? documents.map((doc) => ({
                 id: doc.id,
-                label: doc.label ?? doc.date ?? "N/A",
+                label: doc.date ?? "N/A",
                 value: doc.value ?? `${doc.commission ?? 0}`,
                 trend: doc.trend,
               }))
@@ -313,7 +343,7 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
             ? result.documents.map((doc) => ({
                 id: doc.id,
                 productId: doc.productId,
-                product: doc.productName ?? doc.productId ?? "미상",
+                product: (doc.productName && doc.productName.trim()) || doc.productId || "미상",
                 author: doc.author ?? "auto-bot",
                 status: doc.status ?? "draft",
                 updatedAt: doc.updatedAt ?? "",
@@ -321,6 +351,9 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
                 content: doc.content,
                 toneScore: doc.toneScore,
                 charCount: doc.charCount,
+                slug: (doc as any).slug,
+                publishedAt: (doc as any).publishedAt,
+                media: (doc as any).media,
               }))
             : FALLBACK_WORKFLOW,
         );
@@ -423,7 +456,7 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
           createdAfter,
         });
 
-        setLogs(result.documents.length ? result.documents : FALLBACK_LOGS);
+        setLogs(result.documents.length ? result.documents.map(toLogEntry) : FALLBACK_LOGS);
         setTotalLogCount(result.totalCount ?? null);
         logCurrentCursorRef.current = result.lastSnapshot;
         setHasNextLogPage(result.hasMore);
@@ -469,6 +502,14 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
     await loadLogPage({ cursor: previous });
   }, [loadLogPage]);
 
+  const refreshReviews = useCallback(async () => {
+    await loadReviewPage({ cursor: null, resetStack: true });
+  }, [loadReviewPage]);
+
+  const refreshLogs = useCallback(async () => {
+    await loadLogPage({ cursor: null, resetStack: true });
+  }, [loadLogPage]);
+
   return useMemo(
     () => ({
       metrics,
@@ -489,6 +530,8 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
       goToPrevLogPage,
       logPageIndex,
       totalLogCount,
+      refreshReviews,
+      refreshLogs,
     }),
     [
       metrics,
@@ -509,6 +552,8 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
       goToPrevLogPage,
       logPageIndex,
       totalLogCount,
+      refreshReviews,
+      refreshLogs,
     ],
   );
 }

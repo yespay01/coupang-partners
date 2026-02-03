@@ -125,7 +125,7 @@ export const useAdminDashboardStore = create(
         logDateFilter: state.logDateFilter,
         reviewPageIndex: state.reviewPageIndex,
         logPageIndex: state.logPageIndex,
-      }),
+      }) as AdminDashboardStore,
     },
   ),
 );

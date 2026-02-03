@@ -1,11 +1,14 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import OpenAI from "openai";
-import { computeNextRunAt, buildPrompt, validateReviewContent } from "./reviewUtils.js";
+import { computeNextRunAt, buildPromptFromSettings, validateReviewContentWithSettings } from "./reviewUtils.js";
 import { notifySlack } from "./slack.js";
+import { generateText } from "./aiProviders.js";
+import { getSystemSettings } from "./services/settingsService.js";
+import { collectAllImages } from "./imageUtils.js";
 
 if (!getApps().length) {
   initializeApp();
@@ -14,37 +17,30 @@ if (!getApps().length) {
 const db = getFirestore();
 const RETRY_COLLECTION = "review_retry_queue";
 const MAX_ATTEMPTS = Number(process.env.REVIEW_MAX_ATTEMPTS ?? 3);
-const openaiApiKey = process.env.OPENAI_API_KEY;
 
-if (!openaiApiKey) {
-  logger.warn("OPENAI_API_KEY is not set. Review generation will fail until configured.");
-}
+/**
+ * AI를 사용하여 리뷰 생성 (다중 제공자 지원)
+ */
+async function createReviewWithAI(product, settings) {
+  const { ai, prompt: promptSettings } = settings;
 
-const openai = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
+  // 프롬프트 빌드
+  const userPrompt = buildPromptFromSettings(product, promptSettings);
+  const systemPrompt = promptSettings.systemPrompt;
 
-async function createReviewWithAI(product) {
-  if (!openai) {
-    throw new Error("OpenAI 클라이언트가 초기화되지 않았습니다.");
-  }
+  // AI 텍스트 생성
+  const result = await generateText(ai, userPrompt, systemPrompt);
 
-  const prompt = buildPrompt(product);
-  const response = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-    temperature: 0.7,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const reviewText = response.choices?.[0]?.message?.content?.trim();
-  const usage = response.usage ?? {};
-
-  if (!reviewText) {
-    throw new Error("OpenAI 응답에 리뷰 텍스트가 없습니다.");
+  if (!result.text) {
+    throw new Error("AI 응답에 리뷰 텍스트가 없습니다.");
   }
 
   return {
-    reviewText,
-    promptTokens: usage.prompt_tokens ?? 0,
-    completionTokens: usage.completion_tokens ?? 0,
+    reviewText: result.text,
+    promptTokens: result.usage.promptTokens,
+    completionTokens: result.usage.completionTokens,
+    provider: result.provider,
+    model: result.model,
   };
 }
 
@@ -65,7 +61,17 @@ async function logGeneration({ productId, attempt, source, level, message, usage
 
 async function enqueueRetry({ productId, attempt, reason }) {
   if (attempt >= MAX_ATTEMPTS) {
-    await notifySlack(`후기 생성에 ${MAX_ATTEMPTS}회 실패했습니다. 상품 ID: ${productId}`, "error");
+    await notifySlack({
+      route: "generation",
+      level: "error",
+      title: "후기 생성 한계 도달",
+      text: `상품 ID: \`${productId}\``,
+      fields: [
+        { label: "최대 시도", value: `${MAX_ATTEMPTS}` },
+        { label: "마지막 오류", value: reason ?? "원인 미상" },
+      ],
+      context: "재시도 큐에서 추가 시도 중단",
+    });
     await logGeneration({
       productId,
       attempt,
@@ -104,21 +110,38 @@ async function enqueueRetry({ productId, attempt, reason }) {
     return { nextAttempt: computedAttempt, nextRunAt: nextAttemptAt };
   });
 
-  await notifySlack(
-    `후기 생성 실패. ${nextAttempt}번째 시도를 ${nextRunAt.toISOString()}에 재시도합니다. 상품 ID: ${productId}`,
-    "warn",
-  );
+  await notifySlack({
+    route: "generation",
+    level: "warn",
+    title: "후기 생성 재시도 예약",
+    text: `상품 ID: \`${productId}\``,
+    fields: [
+      { label: "다음 시도", value: `${nextAttempt}` },
+      { label: "실행 예정", value: nextRunAt.toISOString() },
+      { label: "오류", value: reason },
+    ],
+  });
 }
 
 async function handleReviewGeneration({ productId, product, attempt, source }) {
-  const { reviewText, promptTokens, completionTokens } = await createReviewWithAI(product);
-  const { toneScore, charCount } = validateReviewContent(reviewText);
+  // Firestore에서 설정 로드
+  const settings = await getSystemSettings();
+
+  const { reviewText, promptTokens, completionTokens, provider, model } = await createReviewWithAI(product, settings);
+  const { toneScore, charCount } = validateReviewContentWithSettings(reviewText, settings.prompt);
+
+  // 이미지 수집 (쿠팡 메인 + 스톡 + AI + 쿠팡 상세)
+  const media = await collectAllImages(product, settings);
 
   await db.collection("reviews").add({
     productId,
+    productName: product.productName || "",
     content: reviewText,
     status: "draft",
-    category: product.category,
+    category: product.categoryName || product.category || "",
+    affiliateUrl: product.affiliateUrl || "",
+    author: "auto-bot",
+    media,
     toneScore,
     charCount,
     createdAt: new Date(),
@@ -136,13 +159,23 @@ async function handleReviewGeneration({ productId, product, attempt, source }) {
       completion: completionTokens,
       toneScore,
       charCount,
+      provider,
+      model,
     },
   });
 
-  await notifySlack(
-    `후기 초안 생성 완료 (상품 ID: ${productId}, 시도: ${attempt}, 출처: ${source})`,
-    "success",
-  );
+  await notifySlack({
+    route: "generation",
+    level: "success",
+    title: "후기 초안 생성 완료",
+    text: `상품 ID: \`${productId}\``,
+    fields: [
+      { label: "시도", value: `${attempt}` },
+      { label: "출처", value: source },
+      { label: "톤 점수", value: toneScore.toFixed(2) },
+      { label: "글자 수", value: `${charCount}` },
+    ],
+  });
 }
 
 export const generateReview = onDocumentCreated("products/{productId}", async (event) => {
@@ -159,19 +192,31 @@ export const generateReview = onDocumentCreated("products/{productId}", async (e
 
   try {
     await handleReviewGeneration({ productId, product, attempt, source });
-    await db.collection(RETRY_COLLECTION).doc(productId).delete().catch(() => undefined);
   } catch (error) {
-    logger.error("후기 생성 중 오류 발생", { productId, error: error.message });
+    logger.error("후기 생성 중 오류 발생 (재시도 없음)", { productId, error: error.message });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
     await logGeneration({
       productId,
       attempt,
       source,
       level: "error",
-      message: error.message,
+      message: `후기 생성 실패 (재시도 없음): ${errorMessage}`,
       usage: {},
     });
-    await enqueueRetry({ productId, attempt, reason: error.message });
-    throw error;
+
+    await notifySlack({
+      route: "generation",
+      level: "error",
+      title: "후기 생성 실패",
+      text: `상품 ID: \`${productId}\` - 재시도 없이 종료됨`,
+      fields: [
+        { label: "출처", value: source },
+        { label: "오류", value: errorMessage },
+      ],
+    });
+
+    // 재시도 큐에 추가하지 않음 - 에러만 기록하고 종료
   }
 });
 
@@ -219,17 +264,101 @@ export const processReviewRetryQueue = onSchedule(
       } catch (error) {
         logger.error("재시도 작업 실패", { productId, attempt, error: error.message });
 
+        const errorMessage = error instanceof Error ? error.message : String(error);
         await logGeneration({
           productId,
           attempt,
           source: "retry",
           level: "error",
-          message: error.message,
+          message: errorMessage,
           usage: {},
         });
 
-        await enqueueRetry({ productId, attempt, reason: error.message });
+        await notifySlack({
+          route: "generation",
+          level: "error",
+          title: "재시도 작업 실패",
+          text: `상품 ID: \`${productId}\``,
+          fields: [
+            { label: "시도", value: `${attempt}` },
+            { label: "오류", value: errorMessage },
+          ],
+        });
+
+        await enqueueRetry({ productId, attempt, reason: errorMessage });
       }
+    }
+  },
+);
+
+/**
+ * 수동으로 리뷰 생성/재시도
+ * @param {Object} data - { productId: string }
+ */
+export const manualGenerateReview = onCall(
+  {
+    region: "asia-northeast3",
+    timeoutSeconds: 300,
+    memory: "512MiB",
+  },
+  async (request) => {
+    const { productId } = request.data;
+
+    if (!productId) {
+      throw new HttpsError("invalid-argument", "productId가 필요합니다.");
+    }
+
+    try {
+      // 상품 조회
+      const productSnap = await db.collection("products").doc(productId).get();
+
+      if (!productSnap.exists) {
+        throw new HttpsError("not-found", "상품을 찾을 수 없습니다.");
+      }
+
+      const product = productSnap.data();
+
+      // 리뷰 생성
+      await handleReviewGeneration({
+        productId,
+        product,
+        attempt: 1,
+        source: "manual",
+      });
+
+      // 상품 상태 업데이트
+      await productSnap.ref.update({
+        status: "completed",
+        updatedAt: new Date(),
+      });
+
+      logger.info(`수동 리뷰 생성 완료: ${productId}`);
+
+      return {
+        success: true,
+        message: "리뷰가 생성되었습니다.",
+      };
+    } catch (error) {
+      logger.error("수동 리뷰 생성 실패:", error);
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // 상품 상태를 실패로 업데이트
+      await db.collection("products").doc(productId).update({
+        status: "failed",
+        updatedAt: new Date(),
+      });
+
+      await logGeneration({
+        productId,
+        attempt: 1,
+        source: "manual",
+        level: "error",
+        message: errorMessage,
+        usage: {},
+      });
+
+      throw new HttpsError("internal", errorMessage);
     }
   },
 );

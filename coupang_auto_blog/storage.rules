@@ -1,0 +1,18 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // reviews 폴더: 이미지/동영상 업로드 허용
+    match /reviews/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.resource.size < 50 * 1024 * 1024  // 50MB 제한
+                   && request.resource.contentType.matches('image/.*|video/.*');
+    }
+
+    // 기본: 읽기만 허용
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

@@ -7,6 +7,7 @@ const MAX_AGE_SECONDS = 60 * 60 * 8; // 8 hours
 
 type LoginBody = {
   idToken?: string;
+  bypass?: boolean;
 };
 
 function createErrorResponse(message: string, status = 400) {
@@ -14,8 +15,19 @@ function createErrorResponse(message: string, status = 400) {
 }
 
 export async function POST(request: NextRequest) {
-  if (process.env.ADMIN_GUARD_BYPASS === "true") {
-    cookies().set(ADMIN_COOKIE, "bypass", {
+  const cookieStore = await cookies();
+
+  let body: LoginBody;
+  try {
+    body = await request.json();
+  } catch {
+    return createErrorResponse("잘못된 요청 본문입니다.", 400);
+  }
+
+  // Check for bypass request (from login page button or env variable)
+  // 프로덕션에서는 bypass 불가
+  if (process.env.NODE_ENV !== "production" && (body.bypass === true || process.env.ADMIN_GUARD_BYPASS === "true")) {
+    cookieStore.set(ADMIN_COOKIE, "bypass", {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
@@ -25,26 +37,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, bypass: true });
   }
 
-  let body: LoginBody;
-  try {
-    body = await request.json();
-  } catch {
-    return createErrorResponse("잘못된 요청 본문입니다.", 400);
-  }
-
   if (!body.idToken) {
     return createErrorResponse("idToken이 필요합니다.", 400);
   }
 
   try {
     const auth = getAdminAuth();
+
+    // ID 토큰 검증
     const decoded = await auth.verifyIdToken(body.idToken, true);
 
     if (!decoded.admin) {
       return createErrorResponse("관리자 권한이 없습니다.", 403);
     }
 
-    cookies().set(ADMIN_COOKIE, decoded.uid, {
+    // Firebase Session Cookie 생성 (더 안전)
+    const sessionCookie = await auth.createSessionCookie(body.idToken, {
+      expiresIn: MAX_AGE_SECONDS * 1000, // milliseconds
+    });
+
+    cookieStore.set(ADMIN_COOKIE, sessionCookie, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
@@ -62,6 +74,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE() {
-  cookies().delete(ADMIN_COOKIE);
+  const cookieStore = await cookies();
+  cookieStore.delete(ADMIN_COOKIE);
   return NextResponse.json({ success: true });
 }
