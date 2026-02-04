@@ -20,7 +20,8 @@
 | 문서 | 설명 | 대상 |
 |------|------|------|
 | [개발-배포-가이드](./개발-배포-가이드.md) | 로컬 개발 → 서버 배포 전체 플로우 | 개발 |
-| [Firebase 가이드](./Firebase-가이드.md) | Firebase Functions 배포 및 관리 | 개발 |
+| [Automation Server 가이드](./Automation-Server-가이드.md) | 자동화 서버 구축 및 운영 | 개발 |
+| [Firebase 가이드](./Firebase-가이드.md) | Firebase Functions 배포 및 관리 (레거시) | 개발 |
 
 ---
 

@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Web 앱 (Next.js)
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: coupang-blog-web
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./web/.env.production
+    environment:
+      - NODE_ENV=production
+    networks:
+      - coupang-network
+
+  # Automation Server
+  automation-server:
+    build:
+      context: ./automation-server
+      dockerfile: Dockerfile
+    container_name: coupang-automation
+    restart: always
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./automation-server/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - API_BASE_URL=http://automation-server:4000
+    networks:
+      - coupang-network
+    depends_on:
+      - web
+
+networks:
+  coupang-network:
+    driver: bridge
