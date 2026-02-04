@@ -1,15 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  subscribeCollection,
-  normalizeTimestamp,
-  type EarningsDoc,
-  type ReviewDoc,
-  type LogDoc,
-  fetchReviewPage,
-  fetchLogPage,
-} from "@/lib/firestore";
-import { useFirebase } from "@/components/FirebaseProvider";
-import type { QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
 
 export type EarningsMetric = {
   id?: string;
@@ -150,62 +140,6 @@ type ReviewStatus = (typeof REVIEW_STATUSES)[number];
 type LogLevel = (typeof LOG_LEVELS)[number];
 type DatePreset = "all" | "24h" | "7d" | "30d";
 
-// LogDoc를 LogEntry로 변환 (optional 필드에 기본값 제공)
-function toLogEntry(doc: LogDoc): LogEntry {
-  // payload가 없고 context가 JSON 문자열이면 파싱해서 payload로 사용
-  let payload = doc.payload;
-  const context = doc.context ?? "";
-
-  if (!payload && context.startsWith("{")) {
-    try {
-      payload = JSON.parse(context);
-    } catch {
-      // JSON 파싱 실패하면 그냥 넘어감
-    }
-  }
-
-  return {
-    id: doc.id,
-    level: doc.level ?? "info",
-    message: doc.message ?? "",
-    createdAt: doc.createdAt ?? "",
-    context,
-    payload,
-  };
-}
-
-const DATE_PRESET_TO_MS: Record<Exclude<DatePreset, "all">, number> = {
-  "24h": 24 * 60 * 60 * 1000,
-  "7d": 7 * 24 * 60 * 60 * 1000,
-  "30d": 30 * 24 * 60 * 60 * 1000,
-};
-
-function resolveSinceDate(filter: DatePreset): Date | null {
-  if (filter === "all") {
-    return null;
-  }
-  const now = Date.now();
-  const since = now - DATE_PRESET_TO_MS[filter];
-  return new Date(since);
-}
-
-function getActiveKeys<T extends string>(
-  map: Record<T, boolean> | undefined,
-  defaults: readonly T[],
-): T[] {
-  if (!map) {
-    return [...defaults];
-  }
-  return defaults.filter((key) => map[key] ?? false);
-}
-
-function createSignature<T extends string>(
-  map: Record<T, boolean> | undefined,
-  defaults: readonly T[],
-): string {
-  return defaults.map((key) => `${key}:${map?.[key] ? 1 : 0}`).join("|");
-}
-
 type DashboardOptions = {
   defaultReviewLimit?: number;
   onReviewPageChange?: (index: number) => void;
@@ -217,23 +151,13 @@ type DashboardOptions = {
 };
 
 export function useAdminDashboardData(options?: DashboardOptions): DashboardData {
-  const { status } = useFirebase();
-  const reviewStatusFilter = options?.reviewStatusFilter;
-  const reviewDateRange = options?.reviewDateRange ?? "all";
-  const logLevelFilter = options?.logLevelFilter;
-  const logDateRange = options?.logDateRange ?? "all";
-  const reviewStatusSignature = useMemo(
-    () => createSignature(reviewStatusFilter, REVIEW_STATUSES),
-    [reviewStatusFilter],
-  );
-  const logLevelSignature = useMemo(() => createSignature(logLevelFilter, LOG_LEVELS), [logLevelFilter]);
+  const { status } = useAuth();
 
   const [metrics, setMetrics] = useState<EarningsMetric[]>(FALLBACK_METRICS);
   const [workflow, setWorkflow] = useState<WorkflowItem[]>(FALLBACK_WORKFLOW);
   const [logs, setLogs] = useState<LogEntry[]>(FALLBACK_LOGS);
   const [isLoading, setIsLoading] = useState(false);
   const [reviewLimit, setReviewLimitState] = useState(options?.defaultReviewLimit ?? 12);
-  const onReviewPageChange = options?.onReviewPageChange;
   const [totalReviewCount, setTotalReviewCount] = useState<number | null>(null);
   const [hasNextReviewPage, setHasNextReviewPage] = useState(false);
   const [hasPrevReviewPage, setHasPrevReviewPage] = useState(false);
@@ -242,13 +166,6 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
   const [hasNextLogPage, setHasNextLogPage] = useState(false);
   const [hasPrevLogPage, setHasPrevLogPage] = useState(false);
   const [logPageIndex, setLogPageIndex] = useState(0);
-  const onLogPageChange = options?.onLogPageChange;
-
-  const cursorHistoryRef = useRef<QueryDocumentSnapshot<DocumentData>[]>([]);
-  const currentCursorRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const logCursorHistoryRef = useRef<QueryDocumentSnapshot<DocumentData>[]>([]);
-  const logCurrentCursorRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const LOG_LIMIT = 12;
 
   const setReviewLimit = useCallback((nextLimit: number) => {
     setReviewLimitState((prev) => {
@@ -259,256 +176,45 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
     });
   }, []);
 
+  // TODO: API 호출로 데이터 로드
+  // 현재는 Fallback 데이터만 사용
   useEffect(() => {
-    const unsubscribes: Array<() => void> = [];
-    if (status !== "ready") {
-      return () => {
-        unsubscribes.forEach((unsubscribe) => unsubscribe());
-      };
+    if (status === "authenticated") {
+      setMetrics(FALLBACK_METRICS);
+      setWorkflow(FALLBACK_WORKFLOW);
+      setLogs(FALLBACK_LOGS);
     }
-
-    async function hydrate() {
-      const unsubMetrics = await subscribeCollection<EarningsDoc>("earnings", 8, (documents) => {
-        setMetrics(
-          documents.length
-            ? documents.map((doc) => ({
-                id: doc.id,
-                label: doc.date ?? "N/A",
-                value: doc.value ?? `${doc.commission ?? 0}`,
-                trend: doc.trend,
-              }))
-            : FALLBACK_METRICS,
-        );
-      });
-      unsubscribes.push(unsubMetrics);
-    }
-
-    hydrate();
-
-    return () => {
-      unsubscribes.forEach((unsubscribe) => unsubscribe());
-    };
   }, [status]);
 
-  const loadReviewPage = useCallback(
-    async ({
-      cursor,
-      resetStack = false,
-    }: {
-      cursor?: QueryDocumentSnapshot<DocumentData> | null;
-      resetStack?: boolean;
-    } = {}) => {
-      if (status !== "ready") {
-        setWorkflow(FALLBACK_WORKFLOW);
-        setHasNextReviewPage(false);
-        setHasPrevReviewPage(false);
-        setReviewPageIndex(0);
-        onReviewPageChange?.(0);
-        return;
-      }
-
-      if (resetStack) {
-        cursorHistoryRef.current = [];
-        currentCursorRef.current = null;
-      }
-
-      const activeStatuses = getActiveKeys(reviewStatusFilter, REVIEW_STATUSES);
-      if (activeStatuses.length === 0) {
-        cursorHistoryRef.current = [];
-        currentCursorRef.current = null;
-        setWorkflow([]);
-        setTotalReviewCount(0);
-        setHasNextReviewPage(false);
-        setHasPrevReviewPage(false);
-        setReviewPageIndex(0);
-        onReviewPageChange?.(0);
-        return;
-      }
-
-      setIsLoading(true);
-
-      try {
-        const statusesForQuery =
-          activeStatuses.length === REVIEW_STATUSES.length ? undefined : (activeStatuses as ReviewStatus[]);
-        const updatedAfter = resolveSinceDate(reviewDateRange);
-        const result = await fetchReviewPage({
-          limit: reviewLimit,
-          startAfterDoc: cursor ?? null,
-          statuses: statusesForQuery,
-          updatedAfter,
-        });
-
-        setWorkflow(
-          result.documents.length
-            ? result.documents.map((doc) => ({
-                id: doc.id,
-                productId: doc.productId,
-                product: (doc.productName && doc.productName.trim()) || doc.productId || "미상",
-                author: doc.author ?? "auto-bot",
-                status: doc.status ?? "draft",
-                updatedAt: doc.updatedAt ?? "",
-                createdAt: doc.createdAt,
-                content: doc.content,
-                toneScore: doc.toneScore,
-                charCount: doc.charCount,
-                slug: (doc as any).slug,
-                publishedAt: (doc as any).publishedAt,
-                media: (doc as any).media,
-              }))
-            : FALLBACK_WORKFLOW,
-        );
-
-        setTotalReviewCount(result.totalCount ?? null);
-
-        currentCursorRef.current = result.lastSnapshot;
-        setHasNextReviewPage(result.hasMore);
-        setHasPrevReviewPage(cursorHistoryRef.current.length > 0);
-
-        const pageIndex = cursorHistoryRef.current.length;
-        setReviewPageIndex(pageIndex);
-        onReviewPageChange?.(pageIndex);
-      } catch (error) {
-        console.warn("[useAdminDashboardData] Failed to fetch review page", error);
-        setWorkflow(FALLBACK_WORKFLOW);
-        setTotalReviewCount(null);
-        setHasNextReviewPage(false);
-        setHasPrevReviewPage(cursorHistoryRef.current.length > 0);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [status, reviewLimit, reviewStatusFilter, reviewStatusSignature, reviewDateRange, onReviewPageChange],
-  );
-
-  useEffect(() => {
-    if (status !== "ready") {
-      return;
-    }
-    loadReviewPage({ cursor: null, resetStack: true }).catch((error) => {
-      console.warn("[useAdminDashboardData] Initial review page load failed", error);
-    });
-  }, [status, reviewLimit, loadReviewPage]);
-
   const goToNextReviewPage = useCallback(async () => {
-    if (!currentCursorRef.current || !hasNextReviewPage) {
-      return;
-    }
-
-    cursorHistoryRef.current = [...cursorHistoryRef.current, currentCursorRef.current];
-
-    await loadReviewPage({ cursor: currentCursorRef.current });
-  }, [hasNextReviewPage, loadReviewPage]);
+    // TODO: API 호출
+    console.log("다음 페이지로 이동 (미구현)");
+  }, []);
 
   const goToPrevReviewPage = useCallback(async () => {
-    if (cursorHistoryRef.current.length === 0) {
-      return;
-    }
-
-    cursorHistoryRef.current = cursorHistoryRef.current.slice(0, -1);
-    const previousCursor = cursorHistoryRef.current[cursorHistoryRef.current.length - 1] ?? null;
-
-    await loadReviewPage({ cursor: previousCursor ?? null });
-  }, [loadReviewPage]);
-
-  const loadLogPage = useCallback(
-    async ({
-      cursor,
-      resetStack = false,
-    }: {
-      cursor?: QueryDocumentSnapshot<DocumentData> | null;
-      resetStack?: boolean;
-    } = {}) => {
-      if (status !== "ready") {
-        setLogs(FALLBACK_LOGS);
-        setTotalLogCount(null);
-        setHasNextLogPage(false);
-        setHasPrevLogPage(false);
-        setLogPageIndex(0);
-        return;
-      }
-
-      if (resetStack) {
-        logCursorHistoryRef.current = [];
-        logCurrentCursorRef.current = null;
-      }
-
-      try {
-        const activeLevels = getActiveKeys(logLevelFilter, LOG_LEVELS);
-        if (activeLevels.length === 0) {
-          logCursorHistoryRef.current = [];
-          logCurrentCursorRef.current = null;
-          setLogs([]);
-          setTotalLogCount(0);
-          setHasNextLogPage(false);
-          setHasPrevLogPage(false);
-          setLogPageIndex(0);
-          onLogPageChange?.(0);
-          return;
-        }
-
-        const levelsForQuery =
-          activeLevels.length === LOG_LEVELS.length ? undefined : (activeLevels as LogLevel[]);
-        const createdAfter = resolveSinceDate(logDateRange);
-        const result = await fetchLogPage({
-          limit: LOG_LIMIT,
-          startAfterDoc: cursor ?? null,
-          levels: levelsForQuery,
-          createdAfter,
-        });
-
-        setLogs(result.documents.length ? result.documents.map(toLogEntry) : FALLBACK_LOGS);
-        setTotalLogCount(result.totalCount ?? null);
-        logCurrentCursorRef.current = result.lastSnapshot;
-        setHasNextLogPage(result.hasMore);
-        setHasPrevLogPage(logCursorHistoryRef.current.length > 0);
-        const index = logCursorHistoryRef.current.length;
-        setLogPageIndex(index);
-        onLogPageChange?.(index);
-      } catch (error) {
-        console.warn("[useAdminDashboardData] Failed to fetch log page", error);
-        setLogs(FALLBACK_LOGS);
-        setHasNextLogPage(false);
-        setHasPrevLogPage(logCursorHistoryRef.current.length > 0);
-      }
-    },
-    [status, logLevelFilter, logLevelSignature, logDateRange, onLogPageChange],
-  );
-
-  useEffect(() => {
-    if (status !== "ready") {
-      return;
-    }
-    loadLogPage({ cursor: null, resetStack: true }).catch((error) => {
-      console.warn("[useAdminDashboardData] Initial log page load failed", error);
-    });
-  }, [status, loadLogPage]);
+    // TODO: API 호출
+    console.log("이전 페이지로 이동 (미구현)");
+  }, []);
 
   const goToNextLogPage = useCallback(async () => {
-    if (!logCurrentCursorRef.current || !hasNextLogPage) {
-      return;
-    }
-
-    logCursorHistoryRef.current = [...logCursorHistoryRef.current, logCurrentCursorRef.current];
-    await loadLogPage({ cursor: logCurrentCursorRef.current });
-  }, [hasNextLogPage, loadLogPage]);
+    // TODO: API 호출
+    console.log("다음 로그 페이지로 이동 (미구현)");
+  }, []);
 
   const goToPrevLogPage = useCallback(async () => {
-    if (logCursorHistoryRef.current.length === 0) {
-      return;
-    }
-
-    logCursorHistoryRef.current = logCursorHistoryRef.current.slice(0, -1);
-    const previous = logCursorHistoryRef.current[logCursorHistoryRef.current.length - 1] ?? null;
-    await loadLogPage({ cursor: previous });
-  }, [loadLogPage]);
+    // TODO: API 호출
+    console.log("이전 로그 페이지로 이동 (미구현)");
+  }, []);
 
   const refreshReviews = useCallback(async () => {
-    await loadReviewPage({ cursor: null, resetStack: true });
-  }, [loadReviewPage]);
+    // TODO: API 호출
+    console.log("리뷰 새로고침 (미구현)");
+  }, []);
 
   const refreshLogs = useCallback(async () => {
-    await loadLogPage({ cursor: null, resetStack: true });
-  }, [loadLogPage]);
+    // TODO: API 호출
+    console.log("로그 새로고침 (미구현)");
+  }, []);
 
   return useMemo(
     () => ({
