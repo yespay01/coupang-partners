@@ -2,7 +2,7 @@
  * 쿠팡 딥링크 API
  */
 
-import { logger } from "firebase-functions";
+import { logger } from "../../utils/logger.js";
 import { coupangRequest } from "./client.js";
 
 /**

@@ -2,7 +2,7 @@
  * 쿠팡 리포트 API
  */
 
-import { logger } from "firebase-functions";
+import { logger } from "../../utils/logger.js";
 import { coupangRequest } from "./client.js";
 
 /**

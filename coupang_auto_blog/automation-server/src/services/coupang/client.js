@@ -2,7 +2,7 @@
  * 쿠팡 API HTTP 클라이언트
  */
 
-import { logger } from "firebase-functions";
+import { logger } from "../../utils/logger.js";
 import { createAuthHeader } from "./signature.js";
 
 const API_BASE_URL = "https://api-gateway.coupang.com";

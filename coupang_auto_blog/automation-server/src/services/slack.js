@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 import pRetry from "p-retry";
-import { logger } from "firebase-functions";
+import { logger } from "../utils/logger.js";
 
 const defaultWebhookUrl = (process.env.SLACK_WEBHOOK_URL ?? "").trim();
 

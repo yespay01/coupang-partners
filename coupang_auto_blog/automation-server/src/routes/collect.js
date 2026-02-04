@@ -1,40 +1,67 @@
 import express from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getDb } from '../config/database.js';
 import { createCoupangClient } from '../services/coupang/index.js';
 import { notifySlack } from '../services/slack.js';
-import { getSystemSettings } from '../services/settingsService.js';
 
 const router = express.Router();
-const db = getFirestore();
+
+/**
+ * 시스템 설정 조회
+ */
+async function getSystemSettings() {
+  const db = getDb();
+  const result = await db.query(
+    "SELECT value FROM settings WHERE key = 'system'"
+  );
+
+  return result.rows[0]?.value || {};
+}
 
 /**
  * 상품 저장
  */
 async function saveProduct(product, source) {
-  const productRef = db.collection('products').doc(product.productId);
-  const existing = await productRef.get();
+  const db = getDb();
 
-  if (existing.exists) {
-    console.debug(`상품 이미 존재: ${product.productId}`);
+  try {
+    // 중복 확인
+    const existing = await db.query(
+      'SELECT id FROM products WHERE product_id = $1',
+      [product.productId]
+    );
+
+    if (existing.rows.length > 0) {
+      console.debug(`상품 이미 존재: ${product.productId}`);
+      return false;
+    }
+
+    // 상품 저장
+    await db.query(
+      `INSERT INTO products (
+        product_id, product_name, product_price, product_image,
+        product_url, category_id, category_name, affiliate_url,
+        source, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        product.productId,
+        product.productName,
+        product.productPrice,
+        product.productImage,
+        product.productUrl,
+        product.categoryId,
+        product.categoryName,
+        product.affiliateUrl,
+        source,
+        'pending'
+      ]
+    );
+
+    console.info(`상품 저장: ${product.productName}`);
+    return true;
+  } catch (error) {
+    console.error('상품 저장 오류:', error);
     return false;
   }
-
-  await productRef.set({
-    productId: product.productId,
-    productName: product.productName,
-    productPrice: product.productPrice,
-    productImage: product.productImage,
-    productUrl: product.productUrl,
-    categoryId: product.categoryId,
-    categoryName: product.categoryName,
-    affiliateUrl: product.affiliateUrl,
-    source,
-    createdAt: new Date(),
-    status: 'pending',
-  });
-
-  console.info(`상품 저장: ${product.productName}`);
-  return true;
 }
 
 /**
@@ -67,9 +94,7 @@ async function collectByKeywords(client, keywords, maxProducts) {
       }
 
       const products = result.products.slice(0, maxProducts - collected);
-      if (products.length === 0) {
-        continue;
-      }
+      if (products.length === 0) continue;
 
       // 배치 딥링크 생성
       const productUrls = products.map((p) => p.productUrl);
@@ -116,9 +141,7 @@ async function collectGoldbox(client, maxProducts) {
     }
 
     const products = result.products.slice(0, maxProducts);
-    if (products.length === 0) {
-      return 0;
-    }
+    if (products.length === 0) return 0;
 
     const productUrls = products.map((p) => p.productUrl);
     const deeplinkResult = await client.createDeeplinks(productUrls);
@@ -171,9 +194,7 @@ async function collectCoupangPL(client, brands, maxProducts) {
       }
 
       const products = result.products.slice(0, maxProducts - collected);
-      if (products.length === 0) {
-        continue;
-      }
+      if (products.length === 0) continue;
 
       const productUrls = products.map((p) => p.productUrl);
       const deeplinkResult = await client.createDeeplinks(productUrls);
@@ -238,9 +259,7 @@ async function collectByCategories(client, categories, maxProducts) {
       }
 
       const products = result.products.slice(0, maxProducts - collected);
-      if (products.length === 0) {
-        continue;
-      }
+      if (products.length === 0) continue;
 
       const productUrls = products.map((p) => p.productUrl);
       const deeplinkResult = await client.createDeeplinks(productUrls);
@@ -279,8 +298,19 @@ async function collectByCategories(client, categories, maxProducts) {
 }
 
 /**
+ * 로그 저장
+ */
+async function saveLog(type, level, message, payload = {}) {
+  const db = getDb();
+  await db.query(
+    'INSERT INTO logs (type, level, message, payload) VALUES ($1, $2, $3, $4)',
+    [type, level, message, JSON.stringify(payload)]
+  );
+}
+
+/**
  * POST /api/collect/auto
- * 자동 상품 수집 (스케줄러 대체)
+ * 자동 상품 수집
  */
 router.post('/auto', async (req, res) => {
   try {
@@ -288,16 +318,7 @@ router.post('/auto', async (req, res) => {
 
     const settings = await getSystemSettings();
 
-    if (!settings) {
-      return res.status(400).json({
-        success: false,
-        message: '시스템 설정이 없습니다.',
-      });
-    }
-
-    const { automation, topics, coupang } = settings;
-
-    if (!automation?.enabled) {
+    if (!settings.automation?.enabled) {
       return res.json({
         success: true,
         message: '자동 수집이 비활성화되어 있습니다.',
@@ -305,7 +326,7 @@ router.post('/auto', async (req, res) => {
       });
     }
 
-    if (!coupang?.enabled || !coupang.accessKey || !coupang.secretKey) {
+    if (!settings.coupang?.enabled || !settings.coupang.accessKey || !settings.coupang.secretKey) {
       return res.status(400).json({
         success: false,
         message: '쿠팡 API가 설정되지 않았습니다.',
@@ -313,13 +334,13 @@ router.post('/auto', async (req, res) => {
     }
 
     const client = createCoupangClient(
-      coupang.accessKey,
-      coupang.secretKey,
-      coupang.partnerId,
-      coupang.subId
+      settings.coupang.accessKey,
+      settings.coupang.secretKey,
+      settings.coupang.partnerId,
+      settings.coupang.subId
     );
 
-    const maxProducts = automation.maxProductsPerRun || 10;
+    const maxProducts = settings.automation.maxProductsPerRun || 10;
     let totalCollected = 0;
     const collectionStats = {
       goldbox: 0,
@@ -328,16 +349,16 @@ router.post('/auto', async (req, res) => {
       coupangPL: 0,
     };
 
-    // 골드박스 수집
-    const goldboxEnabled = topics?.goldboxEnabled ?? true;
+    // 골드박스
+    const goldboxEnabled = settings.topics?.goldboxEnabled ?? true;
     if (goldboxEnabled) {
       const goldboxCount = await collectGoldbox(client, Math.floor(maxProducts * 0.2));
       totalCollected += goldboxCount;
       collectionStats.goldbox = goldboxCount;
     }
 
-    // 카테고리 베스트 수집
-    const categories = topics?.categories || [];
+    // 카테고리
+    const categories = settings.topics?.categories || [];
     if (categories.length > 0) {
       const categoryCollected = await collectByCategories(
         client,
@@ -348,8 +369,8 @@ router.post('/auto', async (req, res) => {
       collectionStats.categories = categoryCollected;
     }
 
-    // 키워드 검색 수집
-    const keywords = topics?.keywords || [];
+    // 키워드
+    const keywords = settings.topics?.keywords || [];
     if (keywords.length > 0) {
       const keywordCollected = await collectByKeywords(
         client,
@@ -360,8 +381,8 @@ router.post('/auto', async (req, res) => {
       collectionStats.keywords = keywordCollected;
     }
 
-    // 쿠팡 PL 수집
-    const coupangPLBrands = topics?.coupangPLBrands || [];
+    // 쿠팡 PL
+    const coupangPLBrands = settings.topics?.coupangPLBrands || [];
     const remaining = maxProducts - totalCollected;
     if (remaining > 0 && coupangPLBrands.length > 0) {
       const plCollected = await collectCoupangPL(client, coupangPLBrands, remaining);
@@ -370,16 +391,10 @@ router.post('/auto', async (req, res) => {
     }
 
     // 로그 저장
-    await db.collection('logs').add({
-      type: 'collection',
-      level: 'info',
-      message: `상품 자동 수집 완료: ${totalCollected}개`,
-      context: JSON.stringify({
-        totalCollected,
-        stats: collectionStats,
-        source: 'automation-server',
-      }),
-      createdAt: new Date(),
+    await saveLog('collection', 'info', `상품 자동 수집 완료: ${totalCollected}개`, {
+      totalCollected,
+      stats: collectionStats,
+      source: 'automation-server',
     });
 
     // Slack 알림
@@ -409,6 +424,8 @@ router.post('/auto', async (req, res) => {
   } catch (error) {
     console.error('상품 수집 중 오류:', error);
 
+    await saveLog('collection', 'error', `상품 수집 오류: ${error.message}`, {});
+
     await notifySlack({
       route: 'collection',
       level: 'error',
@@ -432,19 +449,9 @@ router.post('/manual', async (req, res) => {
     console.info('수동 상품 수집 시작');
 
     const { maxProducts = 10 } = req.body;
-
     const settings = await getSystemSettings();
 
-    if (!settings) {
-      return res.status(400).json({
-        success: false,
-        message: '시스템 설정이 없습니다.',
-      });
-    }
-
-    const { topics, coupang } = settings;
-
-    if (!coupang?.enabled || !coupang.accessKey || !coupang.secretKey) {
+    if (!settings.coupang?.enabled || !settings.coupang.accessKey || !settings.coupang.secretKey) {
       return res.status(400).json({
         success: false,
         message: '쿠팡 API가 설정되지 않았습니다.',
@@ -452,10 +459,10 @@ router.post('/manual', async (req, res) => {
     }
 
     const client = createCoupangClient(
-      coupang.accessKey,
-      coupang.secretKey,
-      coupang.partnerId,
-      coupang.subId
+      settings.coupang.accessKey,
+      settings.coupang.secretKey,
+      settings.coupang.partnerId,
+      settings.coupang.subId
     );
 
     let totalCollected = 0;
@@ -467,14 +474,14 @@ router.post('/manual', async (req, res) => {
     };
 
     // 동일한 수집 로직
-    const goldboxEnabled = topics?.goldboxEnabled ?? true;
+    const goldboxEnabled = settings.topics?.goldboxEnabled ?? true;
     if (goldboxEnabled) {
       const goldboxCount = await collectGoldbox(client, Math.floor(maxProducts * 0.2));
       totalCollected += goldboxCount;
       collectionStats.goldbox = goldboxCount;
     }
 
-    const categories = topics?.categories || [];
+    const categories = settings.topics?.categories || [];
     if (categories.length > 0) {
       const categoryCollected = await collectByCategories(
         client,
@@ -485,7 +492,7 @@ router.post('/manual', async (req, res) => {
       collectionStats.categories = categoryCollected;
     }
 
-    const keywords = topics?.keywords || [];
+    const keywords = settings.topics?.keywords || [];
     if (keywords.length > 0) {
       const keywordCollected = await collectByKeywords(
         client,
@@ -496,7 +503,7 @@ router.post('/manual', async (req, res) => {
       collectionStats.keywords = keywordCollected;
     }
 
-    const coupangPLBrands = topics?.coupangPLBrands || [];
+    const coupangPLBrands = settings.topics?.coupangPLBrands || [];
     const remaining = maxProducts - totalCollected;
     if (remaining > 0 && coupangPLBrands.length > 0) {
       const plCollected = await collectCoupangPL(client, coupangPLBrands, remaining);
@@ -504,20 +511,12 @@ router.post('/manual', async (req, res) => {
       collectionStats.coupangPL = plCollected;
     }
 
-    // 로그 저장
-    await db.collection('logs').add({
-      type: 'collection',
-      level: 'info',
-      message: `수동 상품 수집 완료: ${totalCollected}개`,
-      context: JSON.stringify({
-        totalCollected,
-        stats: collectionStats,
-        source: 'manual-automation-server',
-      }),
-      createdAt: new Date(),
+    await saveLog('collection', 'info', `수동 상품 수집 완료: ${totalCollected}개`, {
+      totalCollected,
+      stats: collectionStats,
+      source: 'manual-automation-server',
     });
 
-    // Slack 알림
     if (totalCollected > 0) {
       await notifySlack({
         route: 'collection',
@@ -543,6 +542,8 @@ router.post('/manual', async (req, res) => {
     });
   } catch (error) {
     console.error('수동 상품 수집 중 오류:', error);
+
+    await saveLog('collection', 'error', `수동 상품 수집 오류: ${error.message}`, {});
 
     await notifySlack({
       route: 'collection',

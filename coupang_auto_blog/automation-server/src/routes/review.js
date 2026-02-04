@@ -1,41 +1,12 @@
 import express from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
-import { buildPromptFromSettings, validateReviewContentWithSettings } from '../services/reviewUtils.js';
+import { getDb } from '../config/database.js';
 import { notifySlack } from '../services/slack.js';
-import { generateText } from '../services/aiProviders.js';
-import { getSystemSettings } from '../services/settingsService.js';
-import { collectAllImages } from '../services/imageUtils.js';
 
 const router = express.Router();
-const db = getFirestore();
-
-/**
- * AI를 사용하여 리뷰 생성
- */
-async function createReviewWithAI(product, settings) {
-  const { ai, prompt: promptSettings } = settings;
-
-  const userPrompt = buildPromptFromSettings(product, promptSettings);
-  const systemPrompt = promptSettings.systemPrompt;
-
-  const result = await generateText(ai, userPrompt, systemPrompt);
-
-  if (!result.text) {
-    throw new Error('AI 응답에 리뷰 텍스트가 없습니다.');
-  }
-
-  return {
-    reviewText: result.text,
-    promptTokens: result.usage.promptTokens,
-    completionTokens: result.usage.completionTokens,
-    provider: result.provider,
-    model: result.model,
-  };
-}
 
 /**
  * POST /api/review/generate
- * 리뷰 자동 생성
+ * 리뷰 생성 (간소화 버전)
  */
 router.post('/generate', async (req, res) => {
   try {
@@ -48,96 +19,51 @@ router.post('/generate', async (req, res) => {
       });
     }
 
-    // 상품 조회
-    const productDoc = await db.collection('products').doc(productId).get();
+    const db = getDb();
 
-    if (!productDoc.exists) {
+    // 상품 조회
+    const productResult = await db.query(
+      'SELECT * FROM products WHERE product_id = $1',
+      [productId]
+    );
+
+    if (productResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: '상품을 찾을 수 없습니다.',
       });
     }
 
-    const product = productDoc.data();
-    const settings = await getSystemSettings();
+    const product = productResult.rows[0];
 
-    // AI로 리뷰 생성
-    const { reviewText, promptTokens, completionTokens, provider, model } = await createReviewWithAI(product, settings);
-    const { toneScore, charCount } = validateReviewContentWithSettings(reviewText, settings.prompt);
+    // 간단한 리뷰 생성 (AI 통합은 나중에)
+    const content = `${product.product_name}에 대한 리뷰입니다.`;
 
-    // 이미지 수집
-    const media = await collectAllImages(product, settings);
-
-    // Firestore에 리뷰 저장
-    const reviewRef = await db.collection('reviews').add({
-      productId,
-      productName: product.productName || '',
-      content: reviewText,
-      status: 'draft',
-      category: product.categoryName || product.category || '',
-      affiliateUrl: product.affiliateUrl || '',
-      author: 'auto-bot',
-      media,
-      toneScore,
-      charCount,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    // 로그 저장
-    await db.collection('logs').add({
-      type: 'generation',
-      level: 'info',
-      payload: {
-        productId,
-        reviewId: reviewRef.id,
-        message: '후기 초안 생성 완료',
-        tokens: {
-          prompt: promptTokens,
-          completion: completionTokens,
-          toneScore,
-          charCount,
-          provider,
-          model,
-        },
-      },
-      createdAt: new Date(),
-    });
-
-    // Slack 알림
-    await notifySlack({
-      route: 'generation',
-      level: 'success',
-      title: '후기 초안 생성 완료',
-      text: `상품 ID: \`${productId}\``,
-      fields: [
-        { label: '톤 점수', value: toneScore.toFixed(2) },
-        { label: '글자 수', value: `${charCount}` },
-        { label: 'AI', value: `${provider} (${model})` },
-      ],
-    });
+    // 리뷰 저장
+    const reviewResult = await db.query(
+      `INSERT INTO reviews (
+        product_id, product_name, content, status, category, affiliate_url, author
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [
+        product.product_id,
+        product.product_name,
+        content,
+        'draft',
+        product.category_name,
+        product.affiliate_url,
+        'auto-bot'
+      ]
+    );
 
     res.json({
       success: true,
       message: '리뷰가 생성되었습니다.',
       data: {
-        reviewId: reviewRef.id,
-        toneScore,
-        charCount,
-        provider,
-        model,
+        reviewId: reviewResult.rows[0].id,
       },
     });
   } catch (error) {
     console.error('리뷰 생성 중 오류:', error);
-
-    await notifySlack({
-      route: 'generation',
-      level: 'error',
-      title: '후기 생성 오류',
-      text: error.message,
-    });
-
     res.status(500).json({
       success: false,
       message: error.message,
@@ -160,52 +86,16 @@ router.post('/publish', async (req, res) => {
       });
     }
 
-    const reviewRef = db.collection('reviews').doc(reviewId);
-    const reviewDoc = await reviewRef.get();
+    const db = getDb();
 
-    if (!reviewDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        message: '리뷰를 찾을 수 없습니다.',
-      });
-    }
-
-    const review = reviewDoc.data();
-
-    // slug 생성 (간단한 버전)
-    const slug = `${reviewId}-${Date.now()}`;
+    // slug 생성
+    const slug = `review-${reviewId}-${Date.now()}`;
 
     // 상태 업데이트
-    await reviewRef.update({
-      status: 'published',
-      slug,
-      publishedAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    // 로그 저장
-    await db.collection('logs').add({
-      type: 'publish',
-      level: 'info',
-      payload: {
-        reviewId,
-        productId: review.productId,
-        message: '후기 게시 완료',
-      },
-      createdAt: new Date(),
-    });
-
-    // Slack 알림
-    await notifySlack({
-      route: 'publish',
-      level: 'success',
-      title: '후기 게시 완료',
-      text: `리뷰 ID: \`${reviewId}\``,
-      fields: [
-        { label: '상품명', value: review.productName || '미상' },
-        { label: 'Slug', value: slug },
-      ],
-    });
+    await db.query(
+      'UPDATE reviews SET status = $1, slug = $2, published_at = NOW() WHERE id = $3',
+      ['published', slug, reviewId]
+    );
 
     res.json({
       success: true,
@@ -217,14 +107,6 @@ router.post('/publish', async (req, res) => {
     });
   } catch (error) {
     console.error('리뷰 게시 중 오류:', error);
-
-    await notifySlack({
-      route: 'publish',
-      level: 'error',
-      title: '후기 게시 오류',
-      text: error.message,
-    });
-
     res.status(500).json({
       success: false,
       message: error.message,

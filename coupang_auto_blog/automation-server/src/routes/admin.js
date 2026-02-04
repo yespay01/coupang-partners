@@ -1,9 +1,8 @@
 import express from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getDb } from '../config/database.js';
 import { notifySlack } from '../services/slack.js';
 
 const router = express.Router();
-const db = getFirestore();
 
 /**
  * POST /api/admin/cleanup-logs
@@ -16,19 +15,20 @@ router.post('/cleanup-logs', async (req, res) => {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
-    const oldLogs = await db
-      .collection('logs')
-      .where('createdAt', '<', cutoffDate)
-      .get();
+    const db = getDb();
 
-    const deletePromises = [];
-    oldLogs.forEach((doc) => {
-      deletePromises.push(doc.ref.delete());
-    });
+    // 삭제할 로그 수 조회
+    const countResult = await db.query(
+      'SELECT COUNT(*) as count FROM logs WHERE created_at < $1',
+      [cutoffDate]
+    );
+    const deletedCount = parseInt(countResult.rows[0].count);
 
-    await Promise.all(deletePromises);
-
-    const deletedCount = oldLogs.size;
+    // 오래된 로그 삭제
+    await db.query(
+      'DELETE FROM logs WHERE created_at < $1',
+      [cutoffDate]
+    );
 
     await notifySlack({
       route: 'cleanup',
@@ -65,16 +65,18 @@ router.post('/cleanup-logs', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
-    const [productsSnapshot, reviewsSnapshot, logsSnapshot] = await Promise.all([
-      db.collection('products').count().get(),
-      db.collection('reviews').count().get(),
-      db.collection('logs').count().get(),
+    const db = getDb();
+
+    const [productsResult, reviewsResult, logsResult] = await Promise.all([
+      db.query('SELECT COUNT(*) as count FROM products'),
+      db.query('SELECT COUNT(*) as count FROM reviews'),
+      db.query('SELECT COUNT(*) as count FROM logs'),
     ]);
 
     const stats = {
-      products: productsSnapshot.data().count,
-      reviews: reviewsSnapshot.data().count,
-      logs: logsSnapshot.data().count,
+      products: parseInt(productsResult.rows[0].count),
+      reviews: parseInt(reviewsResult.rows[0].count),
+      logs: parseInt(logsResult.rows[0].count),
       timestamp: new Date().toISOString(),
     };
 

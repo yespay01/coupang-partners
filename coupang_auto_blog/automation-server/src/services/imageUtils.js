@@ -5,7 +5,7 @@
  * 3단계: 쿠팡 상세 이미지 (Puppeteer)
  */
 
-import { logger } from "firebase-functions";
+import { logger } from "../utils/logger.js";
 import fetch from "node-fetch";
 
 // 카테고리 ID → 검색 키워드 매핑

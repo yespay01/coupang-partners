@@ -1,17 +1,16 @@
 /**
  * 시스템 설정 서비스
- * Firestore에서 설정을 로드하고 캐싱 관리
+ * PostgreSQL에서 설정을 로드하고 캐싱 관리
  */
 
-import { logger } from "firebase-functions";
-import { getFirestore } from "firebase-admin/firestore";
+import { getDb } from '../config/database.js';
 
 // 설정 캐시 (5분)
 let cachedSettings = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5분
 
-// 기본 설정 (Firestore에서 로드 실패 시 사용)
+// 기본 설정 (DB에서 로드 실패 시 사용)
 const DEFAULT_SETTINGS = {
   ai: {
     defaultProvider: "openai",
@@ -66,7 +65,7 @@ const DEFAULT_SETTINGS = {
 };
 
 /**
- * Firestore에서 시스템 설정 로드 (캐싱 적용)
+ * PostgreSQL에서 시스템 설정 로드 (캐싱 적용)
  * @returns {Promise<Object>} 시스템 설정
  */
 export async function getSystemSettings() {
@@ -78,37 +77,42 @@ export async function getSystemSettings() {
   }
 
   try {
-    const db = getFirestore();
-    const docRef = db.collection("system_settings").doc("global");
-    const docSnap = await docRef.get();
+    const db = getDb();
 
-    if (!docSnap.exists) {
-      logger.warn("시스템 설정이 없습니다. 기본값 사용.");
+    // settings 테이블에서 모든 설정 조회
+    const result = await db.query('SELECT key, value FROM settings');
+
+    if (result.rows.length === 0) {
+      console.warn('시스템 설정이 없습니다. 기본값 사용.');
       cachedSettings = DEFAULT_SETTINGS;
       cacheTimestamp = now;
       return DEFAULT_SETTINGS;
     }
 
-    const data = docSnap.data();
+    // 설정을 key-value 맵으로 변환
+    const settingsMap = {};
+    result.rows.forEach(row => {
+      settingsMap[row.key] = row.value;
+    });
 
     // 기본값과 병합
     cachedSettings = {
-      ai: { ...DEFAULT_SETTINGS.ai, ...(data.ai || {}) },
-      prompt: { ...DEFAULT_SETTINGS.prompt, ...(data.prompt || {}) },
+      ai: { ...DEFAULT_SETTINGS.ai, ...(settingsMap.ai || {}) },
+      prompt: { ...DEFAULT_SETTINGS.prompt, ...(settingsMap.prompt || {}) },
       images: {
-        stockImages: { ...DEFAULT_SETTINGS.images.stockImages, ...(data.images?.stockImages || {}) },
-        aiImages: { ...DEFAULT_SETTINGS.images.aiImages, ...(data.images?.aiImages || {}) },
-        coupangDetailImages: { ...DEFAULT_SETTINGS.images.coupangDetailImages, ...(data.images?.coupangDetailImages || {}) },
+        stockImages: { ...DEFAULT_SETTINGS.images.stockImages, ...(settingsMap.images?.stockImages || {}) },
+        aiImages: { ...DEFAULT_SETTINGS.images.aiImages, ...(settingsMap.images?.aiImages || {}) },
+        coupangDetailImages: { ...DEFAULT_SETTINGS.images.coupangDetailImages, ...(settingsMap.images?.coupangDetailImages || {}) },
       },
-      coupang: { ...DEFAULT_SETTINGS.coupang, ...(data.coupang || {}) },
-      topics: { ...DEFAULT_SETTINGS.topics, ...(data.topics || {}) },
-      automation: { ...DEFAULT_SETTINGS.automation, ...(data.automation || {}) },
+      coupang: { ...DEFAULT_SETTINGS.coupang, ...(settingsMap.coupang || {}) },
+      topics: { ...DEFAULT_SETTINGS.topics, ...(settingsMap.topics || {}) },
+      automation: { ...DEFAULT_SETTINGS.automation, ...(settingsMap.automation || {}) },
     };
     cacheTimestamp = now;
 
     return cachedSettings;
   } catch (error) {
-    logger.error("시스템 설정 로드 실패:", error);
+    console.error('시스템 설정 로드 실패:', error);
     // 에러 시 캐시가 있으면 캐시 반환, 없으면 기본값
     return cachedSettings || DEFAULT_SETTINGS;
   }
@@ -120,7 +124,7 @@ export async function getSystemSettings() {
 export function invalidateSettingsCache() {
   cachedSettings = null;
   cacheTimestamp = 0;
-  logger.info("설정 캐시가 무효화되었습니다.");
+  console.info('설정 캐시가 무효화되었습니다.');
 }
 
 /**

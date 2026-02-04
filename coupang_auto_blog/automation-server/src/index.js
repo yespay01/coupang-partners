@@ -1,23 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import cron from 'node-cron';
 
-// Firebase
-import { initializeFirebase } from './config/firebase.js';
-
-// Routes
-import collectRoutes from './routes/collect.js';
-import reviewRoutes from './routes/review.js';
-import adminRoutes from './routes/admin.js';
-
-// Cron jobs
-import { initCronJobs } from './cron/scheduler.js';
+// Database & Storage
+import { initializeDatabase, testConnection } from './config/database.js';
+import { initializeStorage, initializeBuckets } from './config/storage.js';
 
 dotenv.config();
-
-// Initialize Firebase
-initializeFirebase();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -35,10 +24,44 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Initialize database and storage
+async function initializeServices() {
+  try {
+    // Initialize database
+    console.log('🔄 Initializing database...');
+    initializeDatabase();
+    await testConnection();
+    console.log('✅ Database connected');
+
+    // Initialize storage
+    console.log('🔄 Initializing storage...');
+    initializeStorage();
+    await initializeBuckets();
+    console.log('✅ Storage initialized');
+
+    return true;
+  } catch (error) {
+    console.error('❌ Service initialization failed:', error);
+    return false;
+  }
+}
+
+// Initialize services and start server
+await initializeServices();
+
+// Dynamic import routes AFTER services initialization
+const routes = await Promise.all([
+  import('./routes/auth.js'),
+  import('./routes/collect.js'),
+  import('./routes/review.js'),
+  import('./routes/admin.js'),
+]);
+
 // Routes
-app.use('/api/collect', collectRoutes);
-app.use('/api/review', reviewRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/auth', routes[0].default);
+app.use('/api/collect', routes[1].default);
+app.use('/api/review', routes[2].default);
+app.use('/api/admin', routes[3].default);
 
 // Error handler
 app.use((err, req, res, next) => {
@@ -50,11 +73,12 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Automation Server running on port ${PORT}`);
   console.log(`📅 Time: ${new Date().toISOString()}`);
 
   // Initialize cron jobs
+  const { initCronJobs } = await import('./cron/scheduler.js');
   initCronJobs();
   console.log('✅ Cron jobs initialized');
 });
