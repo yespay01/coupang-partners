@@ -2,44 +2,23 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getDb, normalizeTimestamp, type ReviewDoc } from "@/lib/firestore";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-} from "firebase/firestore";
+import { apiClient } from "@/lib/apiClient";
+import { type ReviewDoc } from "@/lib/firestore";
 
 type PublishedReview = ReviewDoc & {
   id: string;
 };
 
 async function fetchPublishedReviews(maxCount: number): Promise<PublishedReview[]> {
-  const db = await getDb();
-  const q = query(
-    collection(db, "reviews"),
-    where("status", "==", "published"),
-    orderBy("createdAt", "desc"),
-    limit(maxCount)
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      productId: data.productId,
-      productName: data.productName,
-      author: data.author,
-      status: data.status,
-      content: data.content,
-      createdAt: normalizeTimestamp(data.createdAt),
-      updatedAt: normalizeTimestamp(data.updatedAt ?? data.createdAt),
-      toneScore: data.toneScore,
-      charCount: data.charCount,
-    };
-  });
+  try {
+    const data = await apiClient.get<{
+      success: boolean;
+      data: PublishedReview[];
+    }>(`/api/admin/reviews?limit=${maxCount}&statuses=published`);
+    return data.data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 function formatDate(dateString: string): string {
@@ -55,16 +34,15 @@ function formatDate(dateString: string): string {
 
 function stripHtmlTags(html: string): string {
   if (!html) return "";
-  // HTML 태그 제거
   return html
-    .replace(/<!--[\s\S]*?-->/g, "") // HTML 주석 제거
-    .replace(/<[^>]*>/g, "") // HTML 태그 제거
-    .replace(/&nbsp;/g, " ") // &nbsp; 를 공백으로
-    .replace(/&amp;/g, "&") // &amp; 를 &로
-    .replace(/&lt;/g, "<") // &lt; 를 <로
-    .replace(/&gt;/g, ">") // &gt; 를 >로
-    .replace(/&quot;/g, '"') // &quot; 를 "로
-    .replace(/\s+/g, " ") // 연속 공백을 하나로
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -174,12 +152,7 @@ export default function HomePage() {
         setIsLoading(true);
         setError(null);
         const reviews = await fetchPublishedReviews(12);
-
-        // 최신순으로 6개
         setLatestReviews(reviews.slice(0, 6));
-
-        // 인기 리뷰는 현재 조회수 데이터가 없으므로 나머지를 표시
-        // 실제로는 조회수/클릭수 기준으로 정렬
         setPopularReviews(reviews.slice(0, 6).reverse());
       } catch (err) {
         console.error("리뷰 로딩 실패:", err);
@@ -380,7 +353,7 @@ export default function HomePage() {
               </div>
               <span>쿠팡 파트너스 자동화 블로그</span>
             </div>
-            <p>© {new Date().getFullYear()} Coupang Partners Auto Blog. AI 기반 리뷰 시스템.</p>
+            <p>&copy; {new Date().getFullYear()} Coupang Partners Auto Blog. AI 기반 리뷰 시스템.</p>
           </div>
         </div>
       </footer>

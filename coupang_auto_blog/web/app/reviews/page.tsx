@@ -3,18 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { getDb, normalizeTimestamp, type ReviewDoc } from "@/lib/firestore";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-  startAfter,
-  type QueryDocumentSnapshot,
-  type DocumentData,
-} from "firebase/firestore";
+import { apiClient } from "@/lib/apiClient";
+import { type ReviewDoc } from "@/lib/firestore";
 
 type PublishedReview = ReviewDoc & {
   id: string;
@@ -28,55 +18,22 @@ const PAGE_SIZE = 12;
 
 async function fetchPublishedReviews(
   maxCount: number,
-  lastDoc?: QueryDocumentSnapshot<DocumentData>
-): Promise<{ reviews: PublishedReview[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }> {
-  const db = await getDb();
-
-  let q = query(
-    collection(db, "reviews"),
-    where("status", "==", "published"),
-    orderBy("createdAt", "desc"),
-    limit(maxCount + 1) // 다음 페이지 확인용
-  );
-
-  if (lastDoc) {
-    q = query(
-      collection(db, "reviews"),
-      where("status", "==", "published"),
-      orderBy("createdAt", "desc"),
-      startAfter(lastDoc),
-      limit(maxCount + 1)
-    );
-  }
-
-  const snapshot = await getDocs(q);
-  const docs = snapshot.docs.slice(0, maxCount);
-
-  const reviews = docs.map((doc) => {
-    const data = doc.data();
+  offset: number = 0
+): Promise<{ reviews: PublishedReview[]; hasMore: boolean }> {
+  try {
+    const data = await apiClient.get<{
+      success: boolean;
+      data: PublishedReview[];
+      total?: number;
+    }>(`/api/admin/reviews?limit=${maxCount + 1}&offset=${offset}&statuses=published`);
+    const all = data.data ?? [];
     return {
-      id: doc.id,
-      productId: data.productId,
-      productName: data.productName,
-      productImage: data.productImage,
-      productPrice: data.productPrice,
-      author: data.author,
-      status: data.status,
-      content: data.content,
-      category: data.category,
-      createdAt: normalizeTimestamp(data.createdAt),
-      updatedAt: normalizeTimestamp(data.updatedAt ?? data.createdAt),
-      publishedAt: normalizeTimestamp(data.publishedAt),
-      toneScore: data.toneScore,
-      charCount: data.charCount,
-      slug: data.slug,
+      reviews: all.slice(0, maxCount),
+      hasMore: all.length > maxCount,
     };
-  });
-
-  return {
-    reviews,
-    lastDoc: docs[docs.length - 1] ?? null,
-  };
+  } catch {
+    return { reviews: [], hasMore: false };
+  }
 }
 
 function formatDate(dateString: string): string {
@@ -92,16 +49,15 @@ function formatDate(dateString: string): string {
 
 function stripHtmlTags(html: string): string {
   if (!html) return "";
-  // HTML 태그 제거
   return html
-    .replace(/<!--[\s\S]*?-->/g, "") // HTML 주석 제거
-    .replace(/<[^>]*>/g, "") // HTML 태그 제거
-    .replace(/&nbsp;/g, " ") // &nbsp; 를 공백으로
-    .replace(/&amp;/g, "&") // &amp; 를 &로
-    .replace(/&lt;/g, "<") // &lt; 를 <로
-    .replace(/&gt;/g, ">") // &gt; 를 >로
-    .replace(/&quot;/g, '"') // &quot; 를 "로
-    .replace(/\s+/g, " ") // 연속 공백을 하나로
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -113,8 +69,7 @@ function truncateContent(content: string, maxLength: number = 120): string {
 }
 
 function ReviewCard({ review }: { review: PublishedReview }) {
-  // slug가 있으면 slug로, 없으면 ID로 링크
-  const reviewUrl = (review as any).slug ? `/reviews/${(review as any).slug}` : `/review/${review.id}`;
+  const reviewUrl = review.slug ? `/reviews/${review.slug}` : `/review/${review.id}`;
 
   return (
     <Link href={reviewUrl}>
@@ -213,7 +168,6 @@ function ReviewsPageContent() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [lastDocSnapshot, setLastDocSnapshot] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   useEffect(() => {
     async function loadReviews() {
@@ -222,8 +176,7 @@ function ReviewsPageContent() {
         setError(null);
         const result = await fetchPublishedReviews(PAGE_SIZE);
         setReviews(result.reviews);
-        setLastDocSnapshot(result.lastDoc);
-        setHasMore(result.reviews.length === PAGE_SIZE);
+        setHasMore(result.hasMore);
       } catch (err) {
         console.error("리뷰 로딩 실패:", err);
         setError("리뷰를 불러오는 중 오류가 발생했습니다.");
@@ -231,19 +184,16 @@ function ReviewsPageContent() {
         setIsLoading(false);
       }
     }
-
     loadReviews();
   }, []);
 
   const loadMore = async () => {
-    if (!lastDocSnapshot || isLoadingMore) return;
-
+    if (isLoadingMore) return;
     try {
       setIsLoadingMore(true);
-      const result = await fetchPublishedReviews(PAGE_SIZE, lastDocSnapshot);
+      const result = await fetchPublishedReviews(PAGE_SIZE, reviews.length);
       setReviews((prev) => [...prev, ...result.reviews]);
-      setLastDocSnapshot(result.lastDoc);
-      setHasMore(result.reviews.length === PAGE_SIZE);
+      setHasMore(result.hasMore);
     } catch (err) {
       console.error("추가 로딩 실패:", err);
     } finally {
@@ -251,14 +201,12 @@ function ReviewsPageContent() {
     }
   };
 
-  // 카테고리 필터링
   const filteredReviews = activeCategory === "all"
     ? reviews
     : reviews.filter((r) => r.category === activeCategory);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-slate-50/50 to-white">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-lg">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex h-16 items-center justify-between">
@@ -268,17 +216,13 @@ function ReviewsPageContent() {
               </div>
               <span className="font-bold text-slate-900">쿠팡 리뷰</span>
             </Link>
-            <Link
-              href="/admin"
-              className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition"
-            >
+            <Link href="/admin" className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition">
               관리자
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Page Header */}
       <div className="bg-white border-b border-slate-100">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
           <nav className="flex items-center gap-2 text-sm text-slate-500 mb-4">
@@ -297,7 +241,6 @@ function ReviewsPageContent() {
         </div>
       </div>
 
-      {/* Category Filter */}
       <div className="border-b border-slate-100 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6">
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
@@ -342,7 +285,6 @@ function ReviewsPageContent() {
               ))}
             </div>
 
-            {/* Load More */}
             {hasMore && activeCategory === "all" && (
               <div className="mt-10 text-center">
                 <button
@@ -372,7 +314,6 @@ function ReviewsPageContent() {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-slate-200 bg-white mt-12">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
@@ -382,7 +323,7 @@ function ReviewsPageContent() {
               </div>
               <span>쿠팡 파트너스 자동화 블로그</span>
             </div>
-            <p>© {new Date().getFullYear()} Coupang Partners Auto Blog</p>
+            <p>&copy; {new Date().getFullYear()} Coupang Partners Auto Blog</p>
           </div>
         </div>
       </footer>

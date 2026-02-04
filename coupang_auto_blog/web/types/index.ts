@@ -211,5 +211,6 @@ export const queryKeys = {
     lists: () => [...queryKeys.products.all, "list"] as const,
     list: (filters: Partial<ProductFilters>) =>
       [...queryKeys.products.lists(), filters] as const,
+    stats: () => [...queryKeys.products.all, "stats"] as const,
   },
 } as const;

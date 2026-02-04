@@ -18,29 +18,16 @@ function formatDate(dateString: string): string {
   }).format(date);
 }
 
-// 콘텐츠 파싱 - HTML 또는 마크다운 지원
 function parseContent(content: string): string {
   if (!content) return "";
-
-  // HTML 태그가 포함되어 있으면 HTML로 간주
   const isHtml = /<[a-z][\s\S]*>/i.test(content);
+  if (isHtml) return content;
 
-  if (isHtml) {
-    // HTML 콘텐츠: 그대로 반환 (보안상 신뢰할 수 있는 소스에서만)
-    return content;
-  }
-
-  // 마크다운 콘텐츠: 기존 파싱 로직 (하위 호환성)
   const html = content
-    // 이미지: ![alt](url)
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="rounded-xl max-w-full my-4" />')
-    // 영상 링크: [영상: name](url)
     .replace(/\[영상:\s*([^\]]*)\]\(([^)]+)\)/g, '<video src="$2" controls class="rounded-xl max-w-full my-4"><a href="$2">$1</a></video>')
-    // 일반 링크: [text](url)
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>')
-    // 굵은 글씨: **text**
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    // 줄바꿈
     .replace(/\n/g, '<br />');
 
   return html;
@@ -57,10 +44,8 @@ export default function ReviewDetailPage() {
   useEffect(() => {
     async function loadReview() {
       if (!reviewId) return;
-
       setIsLoading(true);
       setError(null);
-
       try {
         const data = await getReviewById(reviewId);
         if (data) {
@@ -75,7 +60,6 @@ export default function ReviewDetailPage() {
         setIsLoading(false);
       }
     }
-
     loadReview();
   }, [reviewId]);
 
@@ -120,7 +104,6 @@ export default function ReviewDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-slate-50/50 to-white">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-lg">
         <div className="mx-auto max-w-4xl px-4 sm:px-6">
           <div className="flex h-16 items-center justify-between">
@@ -130,17 +113,13 @@ export default function ReviewDetailPage() {
               </div>
               <span className="font-bold text-slate-900">쿠팡 리뷰</span>
             </Link>
-            <Link
-              href="/admin"
-              className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition"
-            >
+            <Link href="/admin" className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition">
               관리자
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Breadcrumb */}
       <div className="border-b border-slate-100 bg-white">
         <div className="mx-auto max-w-4xl px-4 py-3 sm:px-6">
           <nav className="flex items-center gap-2 text-sm text-slate-500">
@@ -155,10 +134,8 @@ export default function ReviewDetailPage() {
         </div>
       </div>
 
-      {/* Content */}
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
         <article className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-10 shadow-sm">
-          {/* Header */}
           <header className="mb-8">
             <div className="flex flex-wrap items-center gap-2 mb-4">
               {review.category && (
@@ -167,18 +144,14 @@ export default function ReviewDetailPage() {
                 </span>
               )}
               <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-                review.status === "published"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-slate-100 text-slate-600"
+                review.status === "published" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
               }`}>
                 {review.status === "published" ? "게시됨" : review.status}
               </span>
             </div>
-
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-4">
-              {review.productName || `상품 리뷰`}
+              {review.productName || "상품 리뷰"}
             </h1>
-
             <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
               <span className="flex items-center gap-1.5">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -203,24 +176,15 @@ export default function ReviewDetailPage() {
             </div>
           </header>
 
-          {/* 미디어 갤러리 */}
           {review.media && review.media.length > 0 && (
             <div className="mb-8">
               <div className="grid gap-4 sm:grid-cols-2">
                 {review.media.map((item, index) => (
                   <div key={index} className="rounded-xl overflow-hidden border border-slate-100">
                     {item.type === "image" ? (
-                      <img
-                        src={item.url}
-                        alt={item.name}
-                        className="w-full h-64 object-cover"
-                      />
+                      <img src={item.url} alt={item.name} className="w-full h-64 object-cover" />
                     ) : (
-                      <video
-                        src={item.url}
-                        controls
-                        className="w-full h-64 object-cover bg-black"
-                      />
+                      <video src={item.url} controls className="w-full h-64 object-cover bg-black" />
                     )}
                   </div>
                 ))}
@@ -228,13 +192,11 @@ export default function ReviewDetailPage() {
             </div>
           )}
 
-          {/* 본문 */}
           <div
             className="max-w-none text-slate-700 leading-relaxed review-content"
             dangerouslySetInnerHTML={{ __html: parseContent(review.content || "") }}
           />
 
-          {/* CTA - 쿠팡 링크 */}
           {review.affiliateUrl && (
             <div className="mt-10 p-6 rounded-2xl bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -261,7 +223,6 @@ export default function ReviewDetailPage() {
           )}
         </article>
 
-        {/* 하단 네비게이션 */}
         <div className="mt-8 flex items-center justify-between">
           <Link
             href="/"
@@ -275,7 +236,6 @@ export default function ReviewDetailPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-slate-200 bg-white mt-12">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
@@ -285,7 +245,7 @@ export default function ReviewDetailPage() {
               </div>
               <span>쿠팡 파트너스 자동화 블로그</span>
             </div>
-            <p>© {new Date().getFullYear()} Coupang Partners Auto Blog</p>
+            <p>&copy; {new Date().getFullYear()} Coupang Partners Auto Blog</p>
           </div>
         </div>
       </footer>

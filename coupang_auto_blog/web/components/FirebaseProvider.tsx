@@ -1,77 +1,59 @@
+"use client";
+
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
-import { getAuth, onAuthStateChanged, type User } from "firebase/auth";
-import { getFirebaseClients } from "@/lib/firebaseClient";
+import { useAuth } from "./AuthProvider";
+
+/**
+ * Firebase 호환 레이어
+ * 기존 코드에서 useFirebase()를 사용하는 곳을 위한 어댑터입니다.
+ * 실제로는 JWT AuthProvider의 상태를 반환합니다.
+ */
 
 type FirebaseContextValue = {
   status: "idle" | "initializing" | "ready" | "error";
-  user: User | null;
+  user: { email: string | null; uid: string } | null;
   error: Error | null;
 };
 
 const FirebaseContext = createContext<FirebaseContextValue | undefined>(undefined);
-
-function useFirebaseInternal(): FirebaseContextValue {
-  const [value, setValue] = useState<FirebaseContextValue>({
-    status: "initializing",
-    user: null,
-    error: null,
-  });
-
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    let mounted = true;
-
-    async function bootstrap() {
-      try {
-        const { app } = await getFirebaseClients();
-        const auth = getAuth(app);
-
-        unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-          if (!mounted) return;
-          setValue({
-            status: "ready",
-            user: nextUser,
-            error: null,
-          });
-        });
-      } catch (error) {
-        if (!mounted) return;
-        setValue({
-          status: "error",
-          user: null,
-          error: error instanceof Error ? error : new Error("Firebase 초기화 실패"),
-        });
-      }
-    }
-
-    bootstrap();
-
-    return () => {
-      mounted = false;
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
-
-  return value;
-}
 
 type FirebaseProviderProps = {
   children: ReactNode;
 };
 
 export function FirebaseProvider({ children }: FirebaseProviderProps) {
-  const value = useFirebaseInternal();
-  const memoizedValue = useMemo(() => value, [value]);
-  return <FirebaseContext.Provider value={memoizedValue}>{children}</FirebaseContext.Provider>;
+  const auth = useAuth();
+
+  const value = useMemo<FirebaseContextValue>(() => {
+    switch (auth.status) {
+      case "authenticated":
+        return {
+          status: "ready",
+          user: auth.user
+            ? { email: auth.user.email, uid: String(auth.user.id) }
+            : null,
+          error: null,
+        };
+      case "loading":
+      case "idle":
+        return { status: "initializing", user: null, error: null };
+      case "error":
+        return { status: "error", user: null, error: auth.error };
+      default:
+        return { status: "ready", user: null, error: null };
+    }
+  }, [auth.status, auth.user, auth.error]);
+
+  return (
+    <FirebaseContext.Provider value={value}>
+      {children}
+    </FirebaseContext.Provider>
+  );
 }
 
 export function useFirebase(): FirebaseContextValue {
