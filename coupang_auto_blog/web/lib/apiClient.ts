@@ -63,6 +63,11 @@ export const apiClient = {
     });
     if (data.token) {
       localStorage.setItem(TOKEN_KEY, data.token);
+      // Next.js middleware용 쿠키도 설정 (웹 앱 도메인에 설정)
+      if (typeof document !== "undefined") {
+        const maxAge = 24 * 60 * 60; // 24시간
+        document.cookie = `admin_session=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+      }
     }
     return data;
   },
@@ -77,6 +82,8 @@ export const apiClient = {
   logout(): void {
     if (typeof window !== "undefined") {
       localStorage.removeItem(TOKEN_KEY);
+      // 쿠키도 삭제
+      document.cookie = "admin_session=; path=/; max-age=0";
     }
   },
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { getAuth, signOut } from "firebase/auth";
+import { apiClient } from "@/lib/apiClient";
 
 export function DashboardNav() {
   const router = useRouter();
@@ -14,14 +14,13 @@ export function DashboardNav() {
 
     setIsLoggingOut(true);
     try {
-      // Firebase 로그아웃
-      const auth = getAuth();
-      await signOut(auth);
+      // JWT 로그아웃 (로컬 토큰 삭제 + 서버 쿠키 삭제)
+      apiClient.logout();
 
-      // 세션 쿠키 삭제
-      await fetch("/api/admin/session", {
-        method: "DELETE",
-        credentials: "same-origin",
+      // 서버 쿠키도 삭제
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
       });
 
       // 로그인 페이지로 이동

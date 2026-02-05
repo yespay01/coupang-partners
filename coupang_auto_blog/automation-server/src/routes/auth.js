@@ -24,6 +24,14 @@ router.post('/login', async (req, res) => {
       return res.status(401).json(result);
     }
 
+    // 쿠키에도 토큰 설정 (Next.js middleware용)
+    res.cookie('admin_session', result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24시간
+    });
+
     res.json(result);
   } catch (error) {
     console.error('로그인 오류:', error);
@@ -103,6 +111,15 @@ router.get('/me', authenticateToken, async (req, res) => {
       message: error.message,
     });
   }
+});
+
+/**
+ * POST /api/auth/logout
+ * 로그아웃 - 쿠키 삭제
+ */
+router.post('/logout', (req, res) => {
+  res.clearCookie('admin_session');
+  res.json({ success: true, message: '로그아웃 되었습니다.' });
 });
 
 export default router;
