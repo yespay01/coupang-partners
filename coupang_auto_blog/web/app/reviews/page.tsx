@@ -23,10 +23,14 @@ async function fetchPublishedReviews(
   try {
     const data = await apiClient.get<{
       success: boolean;
-      data: PublishedReview[];
+      data: { reviews: PublishedReview[]; totalCount: number; hasMore: boolean } | PublishedReview[];
       total?: number;
     }>(`/api/admin/reviews?limit=${maxCount + 1}&offset=${offset}&statuses=published`);
-    const all = Array.isArray(data.data) ? data.data : [];
+    const all = Array.isArray(data.data)
+      ? data.data
+      : Array.isArray((data.data as any)?.reviews)
+        ? (data.data as any).reviews
+        : [];
     return {
       reviews: all.slice(0, maxCount),
       hasMore: all.length > maxCount,
