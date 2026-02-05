@@ -39,12 +39,12 @@ function AdminLoginContent() {
   useEffect(() => {
     if (status === "authenticated" && user && successMessage) {
       const timeout = setTimeout(() => {
-        router.replace(redirectPath);
+        window.location.href = redirectPath;
       }, 1200);
       return () => clearTimeout(timeout);
     }
     return undefined;
-  }, [status, user, successMessage, router, redirectPath]);
+  }, [status, user, successMessage, redirectPath]);
 
   const handleInputChange = useCallback((field: keyof FormState) => {
     return (event: ChangeEvent<HTMLInputElement>) => {
