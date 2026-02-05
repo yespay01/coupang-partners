@@ -31,6 +31,35 @@ const PROVIDERS: { id: AIProvider; name: string; logo: string }[] = [
 
 type ModelOption = { value: string; label: string };
 
+// DB 설정을 프론트엔드 구조로 변환하는 헬퍼
+function normalizeAISettings(ai: any) {
+  if (!ai) {
+    return {
+      defaultProvider: 'openai' as AIProvider,
+      openai: { apiKey: '', model: 'gpt-4o-mini' },
+      anthropic: { apiKey: '', model: 'claude-3-5-sonnet-20241022' },
+      google: { apiKey: '', model: 'gemini-2.5-flash' },
+      temperature: 0.7,
+      maxTokens: 2048,
+    };
+  }
+
+  // 이미 올바른 구조인 경우
+  if (ai.openai && ai.anthropic && ai.google) {
+    return ai;
+  }
+
+  // DB 간소화 구조인 경우 변환
+  return {
+    defaultProvider: (ai.defaultProvider || ai.provider || 'openai') as AIProvider,
+    openai: ai.openai || { apiKey: ai.provider === 'openai' ? (ai.apiKey || '') : '', model: 'gpt-4o-mini' },
+    anthropic: ai.anthropic || { apiKey: ai.provider === 'anthropic' ? (ai.apiKey || '') : '', model: 'claude-3-5-sonnet-20241022' },
+    google: ai.google || { apiKey: ai.provider === 'google' ? (ai.apiKey || '') : '', model: 'gemini-2.5-flash' },
+    temperature: ai.temperature ?? 0.7,
+    maxTokens: ai.maxTokens ?? 2048,
+  };
+}
+
 export function AISettings() {
   const {
     settings,
@@ -45,7 +74,7 @@ export function AISettings() {
     setMaxTokens,
   } = useSettingsStore();
 
-  const { ai } = settings;
+  const ai = normalizeAISettings(settings.ai);
   const [showApiKeys, setShowApiKeys] = useState<Record<AIProvider, boolean>>({
     openai: false,
     anthropic: false,

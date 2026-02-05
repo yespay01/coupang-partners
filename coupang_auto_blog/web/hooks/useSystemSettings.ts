@@ -178,13 +178,17 @@ export function useSettingsValidation() {
     const errors: string[] = [];
     const { automation } = settings;
 
-    if (automation.maxProductsPerRun < 1 || automation.maxProductsPerRun > 100) {
+    if (!automation) return errors;
+
+    if (typeof automation.maxProductsPerRun === 'number' && (automation.maxProductsPerRun < 1 || automation.maxProductsPerRun > 100)) {
       errors.push("1회 최대 수집 상품 수는 1~100 사이여야 합니다.");
     }
 
-    const scheduleRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!scheduleRegex.test(automation.collectSchedule)) {
-      errors.push("수집 스케줄 형식이 올바르지 않습니다. (HH:mm)");
+    if (automation.collectSchedule) {
+      const scheduleRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!scheduleRegex.test(automation.collectSchedule)) {
+        errors.push("수집 스케줄 형식이 올바르지 않습니다. (HH:mm)");
+      }
     }
 
     return errors;
@@ -194,18 +198,23 @@ export function useSettingsValidation() {
     const errors: string[] = [];
     const { ai } = settings;
 
-    if (ai.temperature < 0 || ai.temperature > 2) {
+    if (!ai) return errors;
+
+    if (typeof ai.temperature === 'number' && (ai.temperature < 0 || ai.temperature > 2)) {
       errors.push("Temperature는 0~2 사이여야 합니다.");
     }
 
-    if (ai.maxTokens < 100 || ai.maxTokens > 8192) {
+    if (typeof ai.maxTokens === 'number' && (ai.maxTokens < 100 || ai.maxTokens > 8192)) {
       errors.push("Max Tokens는 100~8192 사이여야 합니다.");
     }
 
     // 선택된 제공자의 API 키 확인 (경고 수준)
-    const providerConfig = ai[ai.defaultProvider];
-    if (!providerConfig.apiKey) {
-      errors.push(`(권장) ${ai.defaultProvider} API 키가 설정되지 않았습니다.`);
+    const provider = ai.defaultProvider || ai.provider;
+    const providerConfig = provider ? ai[provider as keyof typeof ai] : null;
+    if (providerConfig && typeof providerConfig === 'object' && 'apiKey' in providerConfig && !providerConfig.apiKey) {
+      errors.push(`(권장) ${provider} API 키가 설정되지 않았습니다.`);
+    } else if (ai.apiKey === '' && !providerConfig) {
+      errors.push(`(권장) AI API 키가 설정되지 않았습니다.`);
     }
 
     return errors;
@@ -215,23 +224,25 @@ export function useSettingsValidation() {
     const errors: string[] = [];
     const { prompt } = settings;
 
-    if (prompt.minLength < 10 || prompt.minLength > 500) {
+    if (!prompt) return errors;
+
+    if (typeof prompt.minLength === 'number' && (prompt.minLength < 10 || prompt.minLength > 500)) {
       errors.push("최소 글자 수는 10~500 사이여야 합니다.");
     }
 
-    if (prompt.maxLength < prompt.minLength || prompt.maxLength > 2000) {
+    if (typeof prompt.maxLength === 'number' && typeof prompt.minLength === 'number' && (prompt.maxLength < prompt.minLength || prompt.maxLength > 2000)) {
       errors.push("최대 글자 수는 최소값보다 크고 2000 이하여야 합니다.");
     }
 
-    if (prompt.toneScoreThreshold < 0 || prompt.toneScoreThreshold > 1) {
+    if (typeof prompt.toneScoreThreshold === 'number' && (prompt.toneScoreThreshold < 0 || prompt.toneScoreThreshold > 1)) {
       errors.push("톤 점수 임계값은 0~1 사이여야 합니다.");
     }
 
-    if (!prompt.systemPrompt.trim()) {
+    if (prompt.systemPrompt && !prompt.systemPrompt.trim()) {
       errors.push("시스템 프롬프트를 입력해주세요.");
     }
 
-    if (!prompt.reviewTemplate.trim()) {
+    if (prompt.reviewTemplate && !prompt.reviewTemplate.trim()) {
       errors.push("리뷰 템플릿을 입력해주세요.");
     }
 
@@ -241,6 +252,8 @@ export function useSettingsValidation() {
   const validateCoupang = useCallback(() => {
     const errors: string[] = [];
     const { coupang } = settings;
+
+    if (!coupang) return errors;
 
     // 활성화된 경우에만 필수 항목 체크 (경고 수준)
     if (coupang.enabled) {

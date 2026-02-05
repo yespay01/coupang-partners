@@ -54,11 +54,11 @@ export default function ProductsPage() {
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <div className="text-sm font-medium text-slate-600">총 상품</div>
               <div className="mt-1 text-2xl font-bold text-slate-900">
-                {stats.total.toLocaleString()}
+                {(stats.total ?? 0).toLocaleString()}
               </div>
             </div>
 
-            {Object.entries(stats.bySource).map(([source, count]) => {
+            {stats.bySource && Object.entries(stats.bySource).map(([source, count]) => {
               const sourceLabels: Record<string, string> = {
                 keyword: "키워드",
                 category: "카테고리",
@@ -75,7 +75,7 @@ export default function ProductsPage() {
                     {sourceLabels[source] || source}
                   </div>
                   <div className="mt-1 text-2xl font-bold text-slate-900">
-                    {count.toLocaleString()}
+                    {(count as number).toLocaleString()}
                   </div>
                 </div>
               );
