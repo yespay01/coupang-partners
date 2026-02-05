@@ -26,7 +26,7 @@ async function fetchPublishedReviews(
       data: PublishedReview[];
       total?: number;
     }>(`/api/admin/reviews?limit=${maxCount + 1}&offset=${offset}&statuses=published`);
-    const all = data.data ?? [];
+    const all = Array.isArray(data.data) ? data.data : [];
     return {
       reviews: all.slice(0, maxCount),
       hasMore: all.length > maxCount,
