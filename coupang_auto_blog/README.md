@@ -6,446 +6,595 @@
 AI가 자동으로 후기 콘텐츠를 작성하고 관리자가 검수한 뒤 게시하는 반자동 구조로,
 신뢰성 있는 정보를 전달하도록 설계합니다.
 
+**독립 서버 구조로 완전히 전환되어 Firebase 의존성 없이 운영 가능합니다.**
+
 ---
 
-## 빠른 시작
+## 🏗️ 아키텍처
 
-### 요구 사항
-- Node.js 18 이상
-- Firebase CLI
-- OpenAI API Key
-
-### 설치
-
-```bash
-# 의존성 설치
-cd web
-npm install
-
-cd ../functions
-npm install
 ```
-
-### 환경 변수 설정
-
-**web/.env.local** 생성:
-```env
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-# ... 기타 Firebase 설정
-```
-
-**functions/.env** 생성:
-```env
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4o-mini
-SLACK_WEBHOOK_URL=your_slack_webhook_url
-SLACK_WEBHOOK_ROUTES={"default":"https://hooks.slack.com/services/xxx","generation":"https://hooks.slack.com/services/yyy","admin":"https://hooks.slack.com/services/zzz"}
-SLACK_LEVEL_MENTIONS={"error":"<!here>","warn":""}
-```
-> `SLACK_WEBHOOK_ROUTES`/`SLACK_LEVEL_MENTIONS`는 선택 항목이며, 이벤트별 채널 라우팅과 심각도 기반 멘션 정책을 JSON 으로 선언합니다.
-
-### 실행
-
-**개발 서버 (프론트엔드)**:
-```bash
-cd web
-npm run dev
-```
-
-**Firebase Functions (로컬)**:
-```bash
-cd functions
-npm install
-npm run serve   # Firebase Functions Emulator (firebase-tools)
-```
-
-**배포**:
-```bash
-# Firebase에 배포
-firebase deploy
+┌─────────────────────────┐
+│   Web (Next.js)         │  포트 3000
+│   - 블로그 UI           │
+│   - 관리자 대시보드      │
+│   - API Routes          │
+└──────────┬──────────────┘
+           │ HTTP API 호출
+           ↓
+┌─────────────────────────┐
+│  Automation Server      │  포트 4000
+│  (Express.js)           │
+│  - 상품 수집 API        │
+│  - 리뷰 생성 API        │
+│  - 스케줄 작업 (cron)   │
+│  - JWT 인증             │
+└──────────┬──────────────┘
+           │
+    ┌──────┴──────┐
+    ↓             ↓
+┌──────────┐  ┌──────────┐
+│PostgreSQL│  │  MinIO   │
+│(포트 5433)│  │(포트 9000)│
+│  - 상품   │  │  - 이미지 │
+│  - 리뷰   │  │  - 문서   │
+│  - 로그   │  │  - 백업   │
+└──────────┘  └──────────┘
 ```
 
 ---
 
 ## 🛠 기술 스택
-- **Frontend:** Next.js (App Router) + TailwindCSS + Framer Motion  
-- **Backend:** Firebase (Firestore + Cloud Functions + Cloud Scheduler)  
-- **Auth:** Firebase Auth (Admin 전용)  
-- **Hosting:** Firebase Hosting (ISR/SSR)  
-- **AI:** OpenAI API (gpt-4o-mini or gpt-4o)  
+
+### Frontend
+- **Next.js 15** (App Router)
+- **TailwindCSS** - 스타일링
+- **React Query** - 서버 상태 관리
+- **Zustand** - 클라이언트 상태 관리
+
+### Backend
+- **Express.js** - REST API 서버
+- **PostgreSQL 16** - 메인 데이터베이스
+- **MinIO** - S3 호환 오브젝트 스토리지
+- **node-cron** - 스케줄 작업
+
+### Authentication
+- **JWT** (jsonwebtoken)
+- **bcrypt** - 비밀번호 해싱
+
+### AI
+- **OpenAI API** (GPT-4, GPT-4o-mini)
+- **Google Gemini API** (선택)
+- **Anthropic Claude API** (선택)
+
+### Infrastructure
+- **Docker** & **Docker Compose**
+- **Nginx** (프록시/리버스 프록시)
 
 ---
 
-## 📦 데이터베이스 구조 (Firestore)
-- `products`: `name`, `category`, `affiliateUrl`, `price`, `image`, `status(pending|reviewed|published)`, `createdAt`
-- `reviews`: `productId`, `content`, `status(draft|needs_revision|approved|published)`, `category`, `author`, `createdAt`, `publishedAt`, `toneScore`
-- `summaries`: `productId`, `metaTitle`, `metaDescription`, `keywords`, `summary`, `lastRefreshedAt`
-- `logs`: `type(ingestion|generation|publishing|earnings)`, `payload(JSON)`, `level(info|warn|error)`, `createdAt`
-- `earnings`: `date`, `productId`, `clicks`, `orders`, `commission`, `source`
-- `categories`: `slug`, `title`, `description`, `seo`, `sortOrder`
-- **Rules:** 관리자 전용 경로는 Firebase Auth 커스텀 클레임 `admin=true` 확인, 공개 경로(`/public/**`)는 읽기만 허용
-- **인덱스:** `reviews`의 `category+status`, `earnings`의 `date`, `products`의 `status`, `logs`의 `createdAt`
+## 📦 데이터베이스 구조 (PostgreSQL)
+
+### users
+관리자 계정 정보
+- `id` (SERIAL PRIMARY KEY)
+- `email` (VARCHAR, UNIQUE)
+- `password_hash` (VARCHAR)
+- `name` (VARCHAR)
+- `role` (VARCHAR: 'admin', 'user')
+- `created_at`, `updated_at`
+
+### products
+수집된 상품 정보
+- `id` (SERIAL PRIMARY KEY)
+- `product_id` (VARCHAR, UNIQUE)
+- `product_name`, `product_price`, `product_image`, `product_url`
+- `category_id`, `category_name`
+- `affiliate_url`
+- `source` (goldbox, keyword, category, etc.)
+- `status` (pending, reviewed, published)
+- `created_at`, `updated_at`
+
+### reviews
+생성된 리뷰/후기
+- `id` (SERIAL PRIMARY KEY)
+- `product_id` (FK → products)
+- `title`, `content`, `slug`
+- `status` (draft, needs_revision, approved, published)
+- `category`, `affiliate_url`
+- `author`, `media` (JSONB)
+- `tone_score`, `char_count`, `view_count`
+- `created_at`, `updated_at`, `published_at`
+
+### settings
+시스템 설정 (JSONB)
+- `id` (SERIAL PRIMARY KEY)
+- `key` (VARCHAR, UNIQUE)
+- `value` (JSONB)
+- `description`
+
+### logs
+시스템 로그
+- `id` (SERIAL PRIMARY KEY)
+- `type` (ingestion, generation, publishing, etc.)
+- `level` (info, warn, error)
+- `message`, `payload` (JSONB)
+- `created_at`
 
 ---
 
-## ⚙ Cloud Functions & AI 후기 생성 예시
-```js
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { onSchedule } from "firebase-functions/v2/scheduler";
-import { logger } from "firebase-functions";
-import { initializeApp, getApps } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import OpenAI from "openai";
-import fetch from "node-fetch";
-import { buildPrompt, validateReviewContent, computeNextRunAt } from "./reviewUtils.js";
+## 🚀 빠른 시작
 
-if (!getApps().length) {
-  initializeApp();
-}
+### 요구 사항
+- **Docker** 24.0 이상
+- **Docker Compose** 2.20 이상
+- **Node.js 18+** (로컬 개발 시)
 
-const db = getFirestore();
-const RETRY_COLLECTION = "review_retry_queue";
-const MAX_ATTEMPTS = Number(process.env.REVIEW_MAX_ATTEMPTS ?? 3);
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+### 1. 저장소 클론
 
-async function notifySlack(message, level = "info") {
-  if (!process.env.SLACK_WEBHOOK_URL) return;
-  const emoji = { error: "🚨", warn: "⚠️", info: "ℹ️", success: "✅" }[level] ?? "ℹ️";
-  await fetch(process.env.SLACK_WEBHOOK_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: `${emoji} ${message}` }),
-  });
-}
-
-async function createReviewWithAI(product) {
-  if (!openai) throw new Error("OpenAI 클라이언트가 초기화되지 않았습니다.");
-
-  const response = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-    temperature: 0.7,
-    messages: [{ role: "user", content: buildPrompt(product) }],
-  });
-
-  const reviewText = response.choices?.[0]?.message?.content?.trim();
-  if (!reviewText) throw new Error("OpenAI 응답에 리뷰 텍스트가 없습니다.");
-
-  return {
-    reviewText,
-    usage: {
-      prompt: response.usage?.prompt_tokens ?? 0,
-      completion: response.usage?.completion_tokens ?? 0,
-    },
-  };
-}
-
-async function enqueueRetry({ productId, attempt, reason }) {
-  if (attempt >= MAX_ATTEMPTS) {
-    await notifySlack(`후기 생성에 ${MAX_ATTEMPTS}회 실패했습니다. 상품 ID: ${productId}`, "error");
-    return;
-  }
-
-  const jobRef = db.collection(RETRY_COLLECTION).doc(productId);
-  const now = new Date();
-
-  const { nextAttempt, nextRunAt } = await db.runTransaction(async (tx) => {
-    const snapshot = await tx.get(jobRef);
-    const existingAttempt = snapshot.exists ? Number(snapshot.data().attempt ?? attempt) : attempt;
-    const computedAttempt = Math.max(existingAttempt, attempt) + 1;
-    const nextAttemptAt = computeNextRunAt(computedAttempt);
-
-    tx.set(
-      jobRef,
-      {
-        productId,
-        attempt: computedAttempt,
-        nextAttemptAt,
-        reason,
-        status: "retry_pending",
-        updatedAt: now,
-        lastErrorMessage: reason,
-        lastErrorAt: now,
-      },
-      { merge: true },
-    );
-
-    return { nextAttempt: computedAttempt, nextRunAt: nextAttemptAt };
-  });
-
-  await notifySlack(
-    `후기 생성 실패. ${nextAttempt}번째 시도를 ${nextRunAt.toISOString()}에 재시도합니다. 상품 ID: ${productId}`,
-    "warn",
-  );
-}
-
-async function handleReviewGeneration({ productId, product, attempt, source }) {
-  const { reviewText, usage } = await createReviewWithAI(product);
-  const { toneScore, charCount } = validateReviewContent(reviewText);
-
-  await db.collection("reviews").add({
-    productId,
-    content: reviewText,
-    status: "draft",
-    category: product.category,
-    toneScore,
-    charCount,
-    createdAt: new Date(),
-  });
-
-  await db.collection("logs").add({
-    type: "generation",
-    level: "info",
-    payload: {
-      productId,
-      attempt,
-      source,
-      message: "후기 초안 생성 완료",
-      tokens: usage,
-      toneScore,
-      charCount,
-    },
-    createdAt: new Date(),
-  });
-}
-
-export const generateReview = onDocumentCreated("products/{productId}", async (event) => {
-  const productId = event.params.productId;
-  const product = event.data?.data();
-
-  if (!product) {
-    logger.warn("생성 트리거에 상품 데이터가 없습니다.", { productId });
-    return;
-  }
-
-  const attempt = 1;
-  const source = "trigger";
-
-  try {
-    await handleReviewGeneration({ productId, product, attempt, source });
-    await db.collection(RETRY_COLLECTION).doc(productId).delete().catch(() => undefined);
-  } catch (error) {
-    logger.error("후기 생성 중 오류 발생", { productId, error: error.message });
-    await enqueueRetry({ productId, attempt, reason: error.message });
-    throw error;
-  }
-});
-
-export const processReviewRetryQueue = onSchedule(
-  {
-    schedule: "every 5 minutes",
-    timeZone: "Asia/Seoul",
-  },
-  async () => {
-    const now = new Date();
-    const jobs = await db
-      .collection(RETRY_COLLECTION)
-      .where("nextAttemptAt", "<=", now)
-      .orderBy("nextAttemptAt", "asc")
-      .limit(20)
-      .get();
-
-    if (jobs.empty) {
-      logger.debug("대기 중인 재시도 작업이 없습니다.");
-      return;
-    }
-
-    for (const doc of jobs.docs) {
-      const data = doc.data();
-
-      try {
-        const productSnap = await db.collection("products").doc(data.productId).get();
-        if (!productSnap.exists) {
-          logger.warn("재시도할 상품을 찾을 수 없습니다.", { productId: data.productId });
-          await doc.ref.delete();
-          continue;
-        }
-
-        await handleReviewGeneration({
-          productId: data.productId,
-          product: productSnap.data(),
-          attempt: data.attempt,
-          source: "retry",
-        });
-
-        await doc.ref.delete();
-      } catch (error) {
-        logger.error("재시도 작업 실패", {
-          productId: data.productId,
-          attempt: data.attempt,
-          error: error.message,
-        });
-        await enqueueRetry({ productId: data.productId, attempt: data.attempt, reason: error.message });
-      }
-    }
-  },
-);
+```bash
+git clone https://github.com/yespay01/coupang-partners.git
+cd coupang-partners/coupang_auto_blog
 ```
-- OpenAI 오류 시 `functions.logger.error` 사용 + Slack 알림 Webhook 연동
-- 재시도 로직: Firestore Transaction으로 큐(`review_retry_queue`)에 `nextAttemptAt` 저장 및 `status=retry_pending` 설정, 최대 3회 후 운영자 알림
-- 토큰 사용량/비용: `logs`에 일자별 토큰 사용량 집계 (`payload.tokens.prompt/completion`)
 
----
+### 2. 환경변수 설정
 
-## 🌡 환경 변수 설정
-Firebase 환경변수 또는 `.env` 파일에 추가:
+#### automation-server/.env
+```bash
+cp automation-server/.env.example automation-server/.env
 ```
-OPENAI_API_KEY=sk-xxxxx
+
+```env
+# 서버 설정
+PORT=4000
+NODE_ENV=production
+
+# Database
+DATABASE_URL=postgresql://coupang_user:your-secure-password@postgres:5432/coupang_blog
+
+# MinIO Storage
+MINIO_ENDPOINT=minio:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin123
+MINIO_USE_SSL=false
+
+# JWT Auth
+JWT_SECRET=your-secret-key-change-in-production
+JWT_EXPIRES_IN=7d
+
+# Coupang Partners API
+COUPANG_ACCESS_KEY=your-access-key
+COUPANG_SECRET_KEY=your-secret-key
+COUPANG_PARTNER_ID=your-partner-id
+COUPANG_SUB_ID=blog
+
+# AI Provider (OpenAI 또는 Gemini)
+AI_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+# GEMINI_API_KEY=...
+# GEMINI_MODEL=gemini-2.5-flash
+
+# Slack Webhook (선택)
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
-PARTNERS_API_KEY=...
-REVIEW_MAX_ATTEMPTS=3
-REVIEW_RETRY_BASE_MINUTES=5
+```
+
+#### web/.env.production
+```bash
+cp web/.env.example web/.env.production
+```
+
+```env
+# API Base URL (Docker 내부)
+NEXT_PUBLIC_API_URL=http://automation-server:4000
+
+# 프로덕션 설정
+NODE_ENV=production
+```
+
+### 3. Docker Compose로 실행
+
+```bash
+# 빌드 및 실행
+docker compose up -d
+
+# 로그 확인
+docker compose logs -f
+
+# 특정 서비스 로그
+docker compose logs -f automation-server
+docker compose logs -f web
+```
+
+### 4. 접속
+
+- **블로그**: http://localhost:3000
+- **MinIO Console**: http://localhost:9001
+- **Automation Server Health Check**: http://localhost:4000/health
+
+### 5. 초기 관리자 계정
+
+기본 계정이 자동 생성됩니다:
+- **Email**: admin@coupang.com
+- **Password**: admin123
+
+> ⚠️ **보안**: 운영 환경에서는 반드시 비밀번호를 변경하세요!
+
+---
+
+## 🧑‍💻 로컬 개발 (Docker 없이)
+
+### 1. PostgreSQL 시작
+
+```bash
+docker run -d \
+  --name coupang-postgres \
+  -e POSTGRES_DB=coupang_blog \
+  -e POSTGRES_USER=coupang_user \
+  -e POSTGRES_PASSWORD=your-password \
+  -p 5433:5432 \
+  postgres:16-alpine
+```
+
+### 2. MinIO 시작
+
+```bash
+docker run -d \
+  --name coupang-minio \
+  -e MINIO_ROOT_USER=minioadmin \
+  -e MINIO_ROOT_PASSWORD=minioadmin123 \
+  -p 9000:9000 \
+  -p 9001:9001 \
+  minio/minio server /data --console-address ":9001"
+```
+
+### 3. Automation Server 실행
+
+```bash
+cd automation-server
+npm install
+cp .env.example .env
+# .env 파일 수정 (DATABASE_URL, MINIO_ENDPOINT 등)
+
+# 개발 모드
+npm run dev
+
+# 프로덕션 모드
+npm start
+```
+
+### 4. Web 앱 실행
+
+```bash
+cd web
+npm install
+
+# 개발 모드
+npm run dev
+
+# 프로덕션 빌드
+npm run build
+npm start
 ```
 
 ---
 
-## 🧰 운영 스크립트 모음
-- **Firebase 관리자 클레임 부여**
-  - 선행조건: `functions/.env` 또는 쉘 환경에 `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY` 설정
-  - 실행:
-    ```bash
-    cd functions
-    npm install
-    npm run set-admin -- --email admin@example.com --set   # 관리자 권한 부여
-    npm run set-admin -- --email admin@example.com --unset # 관리자 권한 해제
-    ```
-  - 스크립트는 필요한 인자가 없으면 인터랙티브하게 이메일과 동작을 물어봅니다.
+## ⏰ 자동화 스케줄
+
+Automation Server의 node-cron이 다음 작업을 자동 실행합니다:
+
+| 시간 (KST) | 작업 | 설명 |
+|-----------|------|------|
+| 매일 02:00 | 상품 수집 | 쿠팡 API에서 신규 상품 수집 |
+| 매일 03:00 | 리뷰 생성 | pending 상태 상품에 대해 AI 리뷰 생성 |
+| 매주 일요일 00:00 | 로그 정리 | 30일 이상 오래된 로그 삭제 |
+
+스케줄 설정 파일: `automation-server/src/cron/scheduler.js`
 
 ---
 
-## 🔁 자동화 루틴 요약
-| 시간 (Asia/Seoul) | 프로세스 | 방식 | 비고 |
-|-------------------|-----------|------|------|
-| 02:00 | 상품 자동 수집 | Cloud Scheduler + API | 실패 시 Slack/Webhook 알림 |
-| 02:10 | AI 후기 자동 생성 | Cloud Function + OpenAI API | 3회 재시도 후 `logs` 기록 |
-| 08:30 | SEO 메타데이터 갱신 | Batch Function | `summaries` 업데이트 후 캐시 무효화 |
-| 09:00 | 관리자 검수 | 자동 알림 | 미승인 시 `status=needs_revision` |
-| 09:10 | 승인 즉시 자동 게시 | Firestore Trigger + ISR | 게시 후 sitemap/rss 재생성 |
-| 18:00 | 수익 통계 갱신 | Function + Firestore | 환율 반영 시 `earnings` 업데이트 |
-| 상시 | 클릭 로그 수집 | Redirect API | 집계 지연 시 `logs` 경고 |
+## 🔌 API 엔드포인트
+
+### Health Check
+```bash
+GET /health
+```
+
+### 인증
+```bash
+POST /api/auth/login          # 로그인
+POST /api/auth/register        # 회원가입
+GET  /api/auth/me             # 현재 사용자 정보
+```
+
+### 상품 수집
+```bash
+POST /api/collect/auto         # 자동 수집 (스케줄러용)
+POST /api/collect/manual       # 수동 수집
+```
+
+### 리뷰 관리
+```bash
+POST /api/review/generate      # 리뷰 생성
+POST /api/review/publish       # 리뷰 게시
+```
+
+### 관리자
+```bash
+POST /api/admin/cleanup-logs   # 로그 정리
+GET  /api/admin/stats          # 시스템 통계
+```
+
+자세한 API 문서는 [docs/Automation-Server-가이드.md](./docs/Automation-Server-가이드.md)를 참조하세요.
+
+---
+
+## 📂 프로젝트 구조
+
+```
+coupang_auto_blog/
+├── automation-server/          # 자동화 서버
+│   ├── src/
+│   │   ├── config/            # DB, Storage, Auth 설정
+│   │   ├── routes/            # API 라우트
+│   │   ├── cron/              # 스케줄 작업
+│   │   ├── services/          # 비즈니스 로직
+│   │   └── index.js           # 서버 진입점
+│   ├── db/schema.sql          # PostgreSQL 스키마
+│   ├── Dockerfile
+│   └── package.json
+│
+├── web/                        # Next.js 웹 앱
+│   ├── app/                   # App Router
+│   │   ├── (dashboard)/      # 관리자 페이지
+│   │   ├── api/               # API Routes (프록시)
+│   │   └── page.tsx           # 메인 페이지
+│   ├── components/            # React 컴포넌트
+│   ├── hooks/                 # React Query hooks
+│   ├── lib/                   # 유틸리티
+│   ├── Dockerfile
+│   └── package.json
+│
+├── docs/                       # 문서
+│   ├── README.md              # 문서 인덱스
+│   ├── Automation-Server-가이드.md
+│   ├── 개발-배포-가이드.md
+│   └── 환경변수-가이드.md
+│
+├── docker-compose.yml          # Docker Compose 설정
+└── README.md                   # 이 파일
+```
+
+---
+
+## 🐳 Docker 명령어
+
+### 서비스 제어
+```bash
+# 전체 시작
+docker compose up -d
+
+# 전체 중지
+docker compose down
+
+# 특정 서비스 재시작
+docker compose restart automation-server
+docker compose restart web
+
+# 로그 확인
+docker compose logs -f automation-server
+docker compose logs -f web
+
+# 서비스 상태 확인
+docker compose ps
+```
+
+### 데이터베이스 관리
+```bash
+# PostgreSQL 접속
+docker exec -it coupang-postgres psql -U coupang_user -d coupang_blog
+
+# 스키마 재생성
+docker exec -i coupang-postgres psql -U coupang_user -d coupang_blog < automation-server/db/schema.sql
+
+# 백업
+docker exec coupang-postgres pg_dump -U coupang_user coupang_blog > backup.sql
+
+# 복원
+docker exec -i coupang-postgres psql -U coupang_user -d coupang_blog < backup.sql
+```
+
+### 컨테이너 초기화
+```bash
+# 모든 컨테이너 및 볼륨 삭제 (데이터 손실 주의!)
+docker compose down -v
+
+# 이미지 재빌드
+docker compose build --no-cache
+docker compose up -d
+```
+
+---
+
+## 🔧 환경변수 가이드
+
+자세한 환경변수 설명은 [docs/환경변수-가이드.md](./docs/환경변수-가이드.md)를 참조하세요.
+
+### 필수 환경변수
+
+#### Automation Server
+- `DATABASE_URL`: PostgreSQL 연결 문자열
+- `JWT_SECRET`: JWT 시크릿 키 (보안!)
+- `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY`: 쿠팡 API 키
+- `OPENAI_API_KEY`: OpenAI API 키
+
+#### Web
+- `NEXT_PUBLIC_API_URL`: Automation Server URL
+
+---
+
+## 📖 문서
+
+상세한 문서는 `docs/` 디렉토리를 참조하세요:
+
+| 문서 | 설명 |
+|------|------|
+| [README.md](./docs/README.md) | 문서 인덱스 |
+| [Automation-Server-가이드.md](./docs/Automation-Server-가이드.md) | 자동화 서버 구축 및 운영 |
+| [개발-배포-가이드.md](./docs/개발-배포-가이드.md) | 로컬 개발 → 배포 플로우 |
+| [환경변수-가이드.md](./docs/환경변수-가이드.md) | 환경변수 설정 및 관리 |
+| [문제해결-가이드.md](./docs/문제해결-가이드.md) | 트러블슈팅 가이드 |
+| [프로젝트-구조.md](./docs/프로젝트-구조.md) | 전체 프로젝트 구조 |
+
+---
+
+## 🧪 테스트
+
+```bash
+# Automation Server 테스트
+cd automation-server
+npm test
+
+# Web 앱 린트
+cd web
+npm run lint
+
+# 빌드 테스트
+npm run build
+```
+
+---
+
+## 🚀 배포
+
+### 서버 배포 (Docker Compose)
+
+1. **서버에 파일 전송**
+```bash
+# rsync로 전송
+rsync -avz --exclude node_modules --exclude .git \
+  . user@server:/home/user/coupang-blog/
+```
+
+2. **서버에서 실행**
+```bash
+ssh user@server
+cd /home/user/coupang-blog
+
+# 환경변수 설정
+cp automation-server/.env.example automation-server/.env
+cp web/.env.example web/.env.production
+# 파일 수정
+
+# Docker Compose 실행
+docker compose up -d
+
+# 로그 확인
+docker compose logs -f
+```
+
+3. **Nginx 설정 (선택)**
+
+```nginx
+# /etc/nginx/sites-available/coupang-blog
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+자세한 배포 가이드는 [docs/서버-배포-가이드.md](./docs/서버-배포-가이드.md)를 참조하세요.
+
+---
+
+## 🆘 문제 해결
+
+### 서버가 시작되지 않을 때
+
+1. **로그 확인**
+```bash
+docker compose logs automation-server
+docker compose logs postgres
+```
+
+2. **환경변수 확인**
+```bash
+# automation-server/.env 파일 확인
+cat automation-server/.env
+```
+
+3. **데이터베이스 연결 테스트**
+```bash
+docker exec coupang-postgres pg_isready -U coupang_user
+```
+
+### 더 많은 문제 해결
+
+[docs/문제해결-가이드.md](./docs/문제해결-가이드.md)를 참조하세요.
+
+---
+
+## 🔄 마이그레이션 (Firebase → 독립 서버)
+
+이 프로젝트는 Firebase에서 독립 서버로 완전히 전환되었습니다.
+
+### 변경 사항
+- ✅ **Firestore** → **PostgreSQL**
+- ✅ **Firebase Storage** → **MinIO**
+- ✅ **Firebase Auth** → **JWT + bcrypt**
+- ✅ **Cloud Functions** → **Express.js Automation Server**
+- ✅ **Cloud Scheduler** → **node-cron**
+- ✅ **Firebase Hosting** → **Docker + Nginx**
+
+### 레거시 파일
+`functions/` 디렉토리는 레거시 코드로, 더 이상 사용되지 않습니다.
 
 ---
 
 ## 🧭 UI 구조
-- 사용자 블로그 뷰 (정보성 콘텐츠 중심)
-- CTA와 쇼핑 링크를 자연스럽게 배치
-- 메인 페이지: 최신 후기 / 인기 후기 / 카테고리 미리보기
-- 후기 상세 페이지: 본문 + 관련 후기 섹션 + 아웃바운드 링크
-- 관리자 페이지: 수익 대시보드 / 후기 승인 워크플로 / 로그 뷰어
+
+### 사용자 블로그
+- 메인 페이지: 최신 후기 / 인기 후기 / 카테고리
+- 후기 상세 페이지: 본문 + 관련 후기 + 쿠팡 링크
+- 카테고리 페이지: 카테고리별 후기 목록
+
+### 관리자 대시보드
+- 수익 대시보드: 클릭/주문/커미션 통계
+- 상품 관리: 수집된 상품 목록 및 상태 관리
+- 후기 관리: 리뷰 검수 및 승인 워크플로
+- 설정: 쿠팡 API, AI Provider, 자동화 설정
+- 로그 뷰어: 시스템 로그 조회
 
 ---
 
-## 🛠 개발 작업 지침 (Claude / CodeX 등)
-```
-1. Next.js 프로젝트 생성
-2. Firebase + Firestore + Functions 설정
-3. 데이터 스키마에 맞춰 컬렉션/인덱스 구성
-4. AI 후기 자동화 Cloud Function 추가 (OpenAI API 연동)
-5. SSR/ISR SEO 세팅 (sitemap, RSS 자동 생성)
-6. TailwindCSS + 블로그형 레이아웃 구성
-7. 클릭 로그 및 수익 통계 모듈 구현
-8. Firebase Hosting으로 배포
-```
+## 🤝 기여
+
+이슈 및 PR은 언제든 환영합니다!
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
-## 🧑‍💻 로컬 개발 서버 실행
-1. 의존성 설치  
-   ```bash
-   cd web
-   npm install
-   ```
-2. 개발 서버 실행  
-   ```bash
-   npm run dev
-   ```
-3. 브라우저에서 <http://localhost:3000> 접속  
-   - 관리자 기능을 쓰려면 `.env.local`에 Firebase 웹 앱 키와 `ADMIN_GUARD_BYPASS=true` 등의 변수를 세팅합니다.  
-   - Functions 에뮬레이터는 `functions/` 디렉터리에서 `npm install` 후 `npm run serve` (firebase-tools 기반)로 실행합니다.
+## 📄 라이선스
+
+이 프로젝트는 MIT 라이선스를 따릅니다.
 
 ---
 
-## 📋 최근 작업 내역 (2024-07-14)
-- **Cloud Functions**
-  - AI 후기 생성 시 길이/금칙어/톤 스코어 검증 로직 추가 및 `reviewUtils` 모듈화
-  - Firestore 재시도 큐를 Transaction 기반으로 전환하고 `status=retry_pending` 메타데이터 저장
-  - `admin_actions` 컬렉션을 모니터링해 Slack 알림과 운영 로그를 자동 기록하는 트리거 추가
-- **운영 알림**
-  - Slack Webhook 알림에 공통 템플릿/필드/블록 포맷을 적용하고, 수준(`info/warn/error/success`)별 이모지 및 메시지를 일관되게 노출
-  - Slack 전송 실패 시 최대 3회 재시도(backoff)하도록 개선해 일시적 네트워크 오류에도 경보 누락을 방지
-  - `SLACK_WEBHOOK_ROUTES` / `SLACK_LEVEL_MENTIONS` 환경변수로 이벤트(Generation/Admin)별 채널 라우팅과 오류 시 `<!here>` 멘션 자동화를 지원
-- **프런트엔드 (Next.js)**
-  - `web/` 프로젝트 Scaffold + Tailwind 기반 랜딩/관리자 레이아웃 구성
-  - Firebase Client/Firestore 유틸을 통한 실시간 대시보드 스트리밍 훅 구현 (`useAdminDashboardData`)
-  - 관리자 대시보드에 승인 액션 버튼, 상태 필터, 로그 카드 등 운영 UI 추가
-  - 리뷰/로그 테이블에 커서 기반 페이지네이션, 일괄 액션(승인/재검수/게시) 및 상세 Drawer 도입
-  - 관리자 대시보드에 상품/작성자 검색과 기간 프리셋 필터를 추가하고 URL 쿼리로 동기화
-  - 필터 조건을 Firestore 쿼리에도 반영해 서버/클라이언트 목록이 일관되게 노출되도록 개선
-  - 로그 뷰어에 기간 필터·검색 초기화 버튼·레벨 쿼리 공유를 도입해 탐색 편의성 강화
-- **인증 & 보안**
-  - Firebase Auth 기반 관리자 로그인 페이지 작성 + `/api/admin/session`으로 `admin_session` 쿠키 발급
-  - Firebase Admin SDK로 ID 토큰의 `admin` 커스텀 클레임 검증
-  - Next.js Middleware로 `/admin` 라우트 접근 제어 (로컬 개발 시 `ADMIN_GUARD_BYPASS=true` 우회)
+## 📞 문의
+
+프로젝트 관련 문의는 GitHub Issues를 이용해주세요.
 
 ---
 
-## 🔜 다음 작업 제안
-1. GitHub Actions 배포 파이프라인에 프리뷰 채널/롤백 전략과 시크릿 관리 자동화를 추가
-2. 후기/로그 필터 상태를 Firestore 서버 쿼리로 연결해 SSR/CSR 일관성 확보
-
----
-
-## 🧪 품질 및 운영 체크리스트
-- OpenAI 출력 검수: 욕설/과장 광고/정책 위반 문구 필터링 → `status=needs_revision` 처리 후 알림
-- 후기 길이/톤 검사: 최소 90자, 최대 170자 · 감정 점수(`toneScore`)가 0.4 이하이면 재생성
-- 예외 모니터링: Cloud Function 실패는 Slack과 `logs(level=error)`에 기록 후 재시도 큐 투입
-- 백업 전략: `earnings`, `reviews` 컬렉션을 일 1회 `gs://` 버킷으로 Export
-- SEO 점검: 매일 `summaries` 기반 메타데이터 최신화 및 구조화 데이터 검사 자동화
-- 인코딩 확인 루틴: PowerShell `Get-FileEncoding` 함수로 작업 후 README UTF-8 상태 확인
-
----
-
-## 🔐 Firebase 관리자 커스텀 클레임 스크립트
-- 서비스 계정 키를 환경변수에 지정합니다.
-  ```
-  export FIREBASE_ADMIN_PROJECT_ID=your-project-id
-  export FIREBASE_ADMIN_CLIENT_EMAIL=service-account@your-project-id.iam.gserviceaccount.com
-  export FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-  ```
-- Functions 패키지에서 아래 명령으로 특정 계정에 `admin=true` 클레임을 부여합니다.
-  ```bash
-  cd functions
-  npm install   # 최초 1회
-  npm run set-admin -- --email admin@example.com
-  # 또는 UID로 지정
-  npm run set-admin -- --uid <firebase-uid>
-  ```
-- 실행이 완료되면 해당 계정의 기존 세션은 곧 만료되므로, 관리자 로그인 페이지에서 재로그인해야 새 쿠키가 발급됩니다.
-
----
-
-## 🚀 CI/CD 파이프라인 (GitHub Actions + Firebase)
-- 기본 구조  
-  - `.github/workflows/firebase-deploy.yml`가 `main` 브랜치의 PR에서 lint/test/build를 수행하고, 병합 시 Functions/Hosting을 동시에 배포합니다.  
-  - `build` 잡: Next.js 앱(`web/`) 빌드 및 함수 테스트.  
-  - `preview` 잡: PR에서 동일 저장소로 올라온 변경만 대상이며, 번호 기반 채널(`preview-<PR번호>`)에 7일짜리 프리뷰 URL을 발급합니다.  
-  - `deploy` 잡: `main` 병합 시 Firebase CLI로 `firebase deploy --only hosting,functions` 실행.
-  - `rollback` 잡: `workflow_dispatch` 입력을 받아 Hosting 릴리스를 되돌립니다.
-- 선행 설정  
-  1. `.firebaserc`의 `your-firebase-project-id`를 실제 프로젝트 ID로 교체합니다.  
-  2. `firebase.json`의 `your-hosting-site-id`와 `frameworksBackend.region`을 환경에 맞게 수정합니다.  
-  3. GitHub Secrets 설정  
-     - `FIREBASE_PROJECT_ID`: Firebase 프로젝트 ID  
-     - `FIREBASE_SERVICE_ACCOUNT`: 배포 권한이 있는 서비스 계정 JSON (전체 값을 한 줄로 등록)  
-     - 필요 시 `ADMIN_GUARD_BYPASS`, `SLACK_WEBHOOK_URL` 등 런타임 환경 변수도 Actions Variables/Secrets에 추가합니다.
-- 배포 흐름  
-  1. PR 생성 → CI가 자동으로 lint/test/run build  
-  2. 동일 저장소 PR이라면 `preview` 잡이 프리뷰 URL을 생성해 `Actions` 실행 요약에 기록합니다 (포크 PR은 보안상 비활성화).
-  3. `main` 브랜치에 머지 → `deploy` 잡이 서비스 계정으로 인증 후 자동 배포  
-  4. 문제가 생기면 `Actions` > `firebase-deploy` 워크플로의 **Run workflow** 버튼을 눌러 `site`/`release` 입력과 함께 `rollback` 잡을 실행합니다 (`release` ID는 `firebase hosting:releases:list`로 조회).  
-  5. 함수/호스팅 로그는 Firebase 콘솔 혹은 Slack 알림으로 확인 가능
-- 시크릿 관리 팁  
-  - 서비스 계정 키는 필요 시 `google-workspace` 정책에 따라 주기적으로 재발급하고, 새 JSON을 `FIREBASE_SERVICE_ACCOUNT` 시크릿에 업데이트합니다.  
-  - 프리뷰/배포에 동일 키를 쓰므로, 갱신 시 `preview`와 `deploy` 잡 모두 새 키를 읽도록 즉시 교체해야 합니다.  
-  - 필요한 경우 [Workload Identity Federation](https://firebase.google.com/docs/hosting/github-integration)으로 전환해 키 보관을 피할 수 있습니다.
+**마지막 업데이트**: 2026-02-05
+**버전**: 2.0.0 (독립 서버 전환 완료)
