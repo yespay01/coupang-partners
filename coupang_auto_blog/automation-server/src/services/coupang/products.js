@@ -26,7 +26,7 @@ export async function searchProducts(params, credentials) {
   try {
     const result = await coupangRequest("GET", path, accessKey, secretKey);
 
-    if (result.rCode !== 0) {
+    if (result.rCode != 0) {
       logger.warn("Coupang search failed:", result.rMessage);
       return { success: false, message: result.rMessage, products: [] };
     }
@@ -68,7 +68,16 @@ export async function getGoldboxProducts(params, credentials) {
   try {
     const result = await coupangRequest("GET", path, accessKey, secretKey);
 
-    if (result.rCode !== 0) {
+    // 디버깅용 로그
+    logger.info("Goldbox API response:", {
+      rCode: result.rCode,
+      rMessage: result.rMessage,
+      hasData: !!result.data,
+      dataLength: result.data?.length
+    });
+
+    // rCode는 문자열 '0' 또는 숫자 0일 수 있으므로 느슨한 비교 사용
+    if (result.rCode != 0) {
       logger.warn("Coupang goldbox failed:", result.rMessage);
       return { success: false, message: result.rMessage, products: [] };
     }
@@ -107,7 +116,7 @@ export async function getBestProducts(params, credentials) {
   try {
     const result = await coupangRequest("GET", path, accessKey, secretKey);
 
-    if (result.rCode !== 0) {
+    if (result.rCode != 0) {
       logger.warn("Coupang best products failed:", result.rMessage);
       return { success: false, message: result.rMessage, products: [] };
     }
@@ -150,7 +159,7 @@ export async function getCoupangPLProducts(params, credentials) {
   try {
     const result = await coupangRequest("GET", path, accessKey, secretKey);
 
-    if (result.rCode !== 0) {
+    if (result.rCode != 0) {
       logger.warn("Coupang PL products failed:", result.rMessage);
       return { success: false, message: result.rMessage, products: [] };
     }
@@ -193,7 +202,7 @@ export async function getCoupangPLBrandProducts(params, credentials) {
   try {
     const result = await coupangRequest("GET", path, accessKey, secretKey);
 
-    if (result.rCode !== 0) {
+    if (result.rCode != 0) {
       logger.warn(`Coupang PL brand ${brandId} failed:`, result.rMessage);
       return { success: false, message: result.rMessage, products: [] };
     }
@@ -229,7 +238,7 @@ export async function recommendCategory(params, credentials) {
   try {
     const result = await coupangRequest("GET", path, accessKey, secretKey);
 
-    if (result.rCode !== 0) {
+    if (result.rCode != 0) {
       logger.warn("Coupang category recommend failed:", result.rMessage);
       return { success: false, message: result.rMessage, categories: [] };
     }
