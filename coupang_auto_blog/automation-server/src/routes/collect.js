@@ -559,4 +559,115 @@ router.post('/manual', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/collect/test
+ * API 연결 테스트 (저장 안 함)
+ */
+router.post('/test', async (req, res) => {
+  try {
+    const { source, limit = 5, categoryId, brandId, keyword } = req.body;
+
+    const settings = await getSystemSettings();
+
+    if (!settings.coupang?.enabled || !settings.coupang.accessKey || !settings.coupang.secretKey) {
+      return res.status(400).json({
+        success: false,
+        message: '쿠팡 API가 설정되지 않았습니다.',
+      });
+    }
+
+    const client = createCoupangClient(
+      settings.coupang.accessKey,
+      settings.coupang.secretKey,
+      settings.coupang.partnerId,
+      settings.coupang.subId
+    );
+
+    let products = [];
+    let sourceName = '';
+
+    switch (source) {
+      case 'goldbox':
+        sourceName = '골드박스';
+        const goldboxResult = await client.getGoldboxProducts();
+        if (goldboxResult.success) {
+          products = goldboxResult.products.slice(0, limit);
+        } else {
+          throw new Error(goldboxResult.message);
+        }
+        break;
+
+      case 'coupangPL':
+        if (!brandId) {
+          return res.status(400).json({
+            success: false,
+            message: 'brandId가 필요합니다.',
+          });
+        }
+        sourceName = `쿠팡 PL (브랜드 ${brandId})`;
+        const plResult = await client.getCoupangPLBrandProducts(brandId, limit);
+        if (plResult.success) {
+          products = plResult.products;
+        } else {
+          throw new Error(plResult.message);
+        }
+        break;
+
+      case 'category':
+        if (!categoryId) {
+          return res.status(400).json({
+            success: false,
+            message: 'categoryId가 필요합니다.',
+          });
+        }
+        sourceName = `카테고리 ${categoryId}`;
+        const categoryResult = await client.getBestProducts(categoryId, limit);
+        if (categoryResult.success) {
+          products = categoryResult.products;
+        } else {
+          throw new Error(categoryResult.message);
+        }
+        break;
+
+      case 'keyword':
+        if (!keyword) {
+          return res.status(400).json({
+            success: false,
+            message: 'keyword가 필요합니다.',
+          });
+        }
+        sourceName = `키워드: ${keyword}`;
+        const keywordResult = await client.searchProducts(keyword, limit);
+        if (keywordResult.success) {
+          products = keywordResult.products;
+        } else {
+          throw new Error(keywordResult.message);
+        }
+        break;
+
+      default:
+        return res.status(400).json({
+          success: false,
+          message: '지원하지 않는 소스입니다.',
+        });
+    }
+
+    console.info(`${sourceName} 테스트 성공: ${products.length}개`);
+
+    res.json({
+      success: true,
+      message: `${sourceName} 수집 테스트 성공`,
+      source: sourceName,
+      count: products.length,
+      products: products,
+    });
+  } catch (error) {
+    console.error('수집 테스트 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : '수집 중 오류 발생',
+    });
+  }
+});
+
 export default router;
