@@ -593,7 +593,10 @@ router.post('/test', async (req, res) => {
         if (goldboxResult.success) {
           products = goldboxResult.products.slice(0, limit);
         } else {
-          throw new Error(goldboxResult.message);
+          return res.status(400).json({
+            success: false,
+            message: `골드박스 조회 실패: ${goldboxResult.message}`,
+          });
         }
         break;
 
@@ -609,7 +612,10 @@ router.post('/test', async (req, res) => {
         if (plResult.success) {
           products = plResult.products;
         } else {
-          throw new Error(plResult.message);
+          return res.status(400).json({
+            success: false,
+            message: `쿠팡 PL 조회 실패: ${plResult.message}`,
+          });
         }
         break;
 
@@ -625,7 +631,10 @@ router.post('/test', async (req, res) => {
         if (categoryResult.success) {
           products = categoryResult.products;
         } else {
-          throw new Error(categoryResult.message);
+          return res.status(400).json({
+            success: false,
+            message: `카테고리 조회 실패: ${categoryResult.message}`,
+          });
         }
         break;
 
@@ -641,7 +650,10 @@ router.post('/test', async (req, res) => {
         if (keywordResult.success) {
           products = keywordResult.products;
         } else {
-          throw new Error(keywordResult.message);
+          return res.status(400).json({
+            success: false,
+            message: `키워드 검색 실패: ${keywordResult.message}`,
+          });
         }
         break;
 
