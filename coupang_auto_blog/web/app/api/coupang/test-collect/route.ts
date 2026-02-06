@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+// 서버 사이드에서는 Docker 네트워크 내부 URL 사용
+const API_BASE = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export async function POST(request: NextRequest) {
   try {
