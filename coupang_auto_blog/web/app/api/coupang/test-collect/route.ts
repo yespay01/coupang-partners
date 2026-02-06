@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
 import {
   getGoldboxProducts,
   searchProducts,
@@ -10,35 +8,36 @@ import {
   type CoupangProduct,
 } from "@/lib/coupang";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
-
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app);
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export async function POST(request: NextRequest) {
   try {
     const { source, limit = 5, categoryId, brandId, keyword } = await request.json();
 
-    // 1. 시스템 설정 조회
-    const settingsRef = doc(db, "system_settings", "global");
-    const settingsDoc = await getDoc(settingsRef);
+    // 1. automation-server에서 시스템 설정 조회
+    const settingsRes = await fetch(`${API_BASE}/api/admin/settings`, {
+      headers: {
+        Authorization: request.headers.get("Authorization") || "",
+      },
+    });
 
-    if (!settingsDoc.exists()) {
+    if (!settingsRes.ok) {
+      return NextResponse.json(
+        { success: false, message: "시스템 설정 조회 실패" },
+        { status: 500 }
+      );
+    }
+
+    const settingsData = await settingsRes.json();
+
+    if (!settingsData.success || !settingsData.data) {
       return NextResponse.json(
         { success: false, message: "시스템 설정이 없습니다." },
         { status: 400 }
       );
     }
 
-    const settings = settingsDoc.data();
-    const { coupang } = settings as any;
+    const { coupang } = settingsData.data;
 
     if (!coupang?.enabled || !coupang.accessKey || !coupang.secretKey) {
       return NextResponse.json(
