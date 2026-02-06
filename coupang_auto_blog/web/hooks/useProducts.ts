@@ -34,12 +34,55 @@ export function useProducts(filters: Partial<ProductFilters> = {}) {
   const queryResult = useQuery({
     queryKey: [...queryKeys.products.list(filters), pageIndex],
     queryFn: async (): Promise<ProductPageResult & { lastDoc: null }> => {
-      // TODO: API 호출로 교체
-      // 현재는 빈 데이터 반환
+      const limit = filters.limit || 50;
+      const offset = pageIndex * limit;
+
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+      });
+
+      if (filters.statuses) {
+        const statusArray = Object.entries(filters.statuses)
+          .filter(([_, enabled]) => enabled)
+          .map(([status]) => status);
+        if (statusArray.length > 0) {
+          params.append('statuses', statusArray.join(','));
+        }
+      }
+
+      if (filters.search) {
+        params.append('search', filters.search);
+      }
+
+      if (filters.source && filters.source !== 'all') {
+        params.append('source', filters.source);
+      }
+
+      if (filters.dateRange && filters.dateRange !== 'all') {
+        const startDate = getDateFromPreset(filters.dateRange);
+        if (startDate) {
+          params.append('startDate', startDate.toISOString());
+          params.append('endDate', new Date().toISOString());
+        }
+      }
+
+      const response = await fetch(`/api/admin/products?${params.toString()}`);
+
+      if (!response.ok) {
+        throw new Error('상품 목록 조회 실패');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.message || '상품 목록 조회 실패');
+      }
+
       return {
-        products: [],
-        totalCount: 0,
-        hasMore: false,
+        products: result.data.products || [],
+        totalCount: result.data.totalCount || 0,
+        hasMore: result.data.hasMore || false,
         lastDoc: null,
       };
     },
@@ -79,13 +122,19 @@ export function useProductStats() {
   return useQuery({
     queryKey: queryKeys.products.stats(),
     queryFn: async () => {
-      // TODO: API 호출로 교체
-      return {
-        total: 0,
-        pending: 0,
-        collected: 0,
-        failed: 0,
-      };
+      const response = await fetch('/api/admin/products/stats');
+
+      if (!response.ok) {
+        throw new Error('상품 통계 조회 실패');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.message || '상품 통계 조회 실패');
+      }
+
+      return result.data;
     },
     enabled: authStatus === "authenticated",
     staleTime: 1000 * 60 * 5,
