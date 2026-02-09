@@ -67,7 +67,9 @@ export function useProducts(filters: Partial<ProductFilters> = {}) {
         }
       }
 
-      const response = await fetch(`/api/admin/products?${params.toString()}`);
+      const response = await fetch(`/api/admin/products?${params.toString()}`, {
+        credentials: 'include',
+      });
 
       if (!response.ok) {
         throw new Error('상품 목록 조회 실패');
@@ -122,7 +124,9 @@ export function useProductStats() {
   return useQuery({
     queryKey: queryKeys.products.stats(),
     queryFn: async () => {
-      const response = await fetch('/api/admin/products/stats');
+      const response = await fetch('/api/admin/products/stats', {
+        credentials: 'include',
+      });
 
       if (!response.ok) {
         throw new Error('상품 통계 조회 실패');
