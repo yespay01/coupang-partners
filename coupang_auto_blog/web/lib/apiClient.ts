@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+// 클라이언트에서는 항상 상대 경로 사용 (web 서버를 통한 프록시)
 const TOKEN_KEY = "auth_token";
 
 export class ApiError extends Error {
@@ -26,9 +26,10 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(path, {
     ...options,
     headers,
+    credentials: 'include', // 쿠키 포함
   });
 
   if (!res.ok) {
