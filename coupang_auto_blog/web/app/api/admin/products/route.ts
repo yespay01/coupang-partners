@@ -3,12 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 const API_BASE = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 /**
- * GET /api/admin/products/stats
- * 상품 통계 조회
+ * GET /api/admin/products
+ * 상품 목록 조회
  */
 export async function GET(request: NextRequest) {
   try {
-    const response = await fetch(`${API_BASE}/api/admin/products/stats`, {
+    const { searchParams } = new URL(request.url);
+
+    const response = await fetch(`${API_BASE}/api/admin/products?${searchParams.toString()}`, {
       headers: {
         Authorization: request.headers.get("Authorization") || "",
         Cookie: request.headers.get("Cookie") || "",
@@ -23,11 +25,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error("상품 통계 조회 오류:", error);
+    console.error("상품 목록 조회 오류:", error);
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : "통계 조회 중 오류 발생",
+        message: error instanceof Error ? error.message : "목록 조회 중 오류 발생",
       },
       { status: 500 }
     );
