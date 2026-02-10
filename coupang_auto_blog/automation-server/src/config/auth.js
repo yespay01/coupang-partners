@@ -114,11 +114,31 @@ export async function login(email, password) {
 }
 
 /**
+ * 쿠키 헤더에서 특정 쿠키 값 추출
+ */
+function parseCookie(cookieHeader, cookieName) {
+  if (!cookieHeader) return null;
+
+  const cookies = cookieHeader.split(';').map(c => c.trim());
+  const cookie = cookies.find(c => c.startsWith(`${cookieName}=`));
+
+  return cookie ? cookie.substring(cookieName.length + 1) : null;
+}
+
+/**
  * 인증 미들웨어
+ * Authorization 헤더 또는 admin_session 쿠키에서 토큰 확인
  */
 export function authenticateToken(req, res, next) {
+  // 1. Authorization 헤더에서 토큰 확인 (Bearer TOKEN)
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  let token = authHeader && authHeader.split(' ')[1];
+
+  // 2. Authorization 헤더가 없으면 Cookie 헤더에서 토큰 확인
+  if (!token) {
+    const cookieHeader = req.headers['cookie'];
+    token = parseCookie(cookieHeader, 'admin_session');
+  }
 
   if (!token) {
     return res.status(401).json({ error: '인증 토큰이 필요합니다.' });
