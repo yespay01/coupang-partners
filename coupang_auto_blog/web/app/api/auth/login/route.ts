@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const AUTOMATION_SERVER_URL =
+  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
 /**
  * POST /api/auth/login
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE}/api/auth/login`, {
+    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
