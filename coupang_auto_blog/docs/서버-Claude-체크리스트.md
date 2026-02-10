@@ -1,256 +1,328 @@
-# 서버 측 Claude 실행 체크리스트
+# 서버 측 Claude 실행 체크리스트 (Git 기반)
 
-서버 쪽 Claude에게 이 문서를 전달하고 단계별로 실행하도록 요청하세요.
+> 최종 업데이트: 2026-02-10
+> 서버 쪽 Claude에게 이 문서를 전달하고 단계별로 실행하도록 요청하세요.
 
 ---
 
-## ✅ 사전 확인
+## ⚠️ 시작 전 확인
 
-파일이 서버에 업로드되었는지 확인:
-
+**당신이 서버 컴퓨터에 있는지 확인:**
 ```bash
-ls -la /home/insuk/blog/
+pwd
 ```
+**예상 출력:** `/home/insuk/blog`
 
-**필수 파일:**
-- `Dockerfile`
-- `docker-compose.yml`
-- `.dockerignore`
-- `.env.production`
-- `nginx-semolink.conf`
-- `deploy-server.sh`
-- `package.json`
-- `next.config.ts`
-- `app/`, `components/`, `hooks/`, `stores/`, `types/`, `public/` 디렉토리
+**OS 확인:**
+```bash
+uname -a
+```
+**예상 출력:** `Linux` 포함
 
 ---
 
-## 📝 단계별 실행
+## 📋 표준 배포 절차
 
-### 1단계: 프로젝트 디렉토리 확인
+### 1단계: Git Pull (최신 코드 받기)
 
 ```bash
 cd /home/insuk/blog
-pwd
-ls -la
+
+# 현재 브랜치 확인
+git branch
+
+# 원격 저장소 최신 정보 가져오기
+git fetch
+
+# 원격과 로컬 비교
+git status
+
+# 최신 코드 받기
+git pull
 ```
 
-**예상 출력:** `/home/insuk/blog`
+**예상 출력:**
+```
+Updating 326e234..06ae06c
+Fast-forward
+ ...파일 목록...
+```
+
+**충돌 발생 시:**
+```bash
+# ❌ 절대 코드 수정하지 말 것!
+# ✅ 개발쪽에 보고:
+"Git pull 중 충돌 발생. 서버에서 수정된 파일: [파일명]"
+```
 
 ---
 
-### 2단계: Firebase Admin SDK 키 설정
+### 2단계: 환경변수 확인
 
-`.env.production` 파일 편집:
+```bash
+# .env.production 파일 존재 확인
+ls -la .env.production
 
+# 필수 환경변수 확인
+grep "FIREBASE_ADMIN_CLIENT_EMAIL" .env.production
+grep "NODE_ENV" .env.production
+```
+
+**필요 시 .env.production 수정:**
 ```bash
 nano .env.production
 ```
-
-**수정할 항목:**
-```bash
-# 실제 값으로 교체 필요
-FIREBASE_ADMIN_CLIENT_EMAIL=firebase-adminsdk-xxxxx@blog-automation-23092.iam.gserviceaccount.com
-FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n실제키내용\n-----END PRIVATE KEY-----\n"
-```
-
 **저장:** `Ctrl+O`, `Enter`, `Ctrl+X`
 
-**확인:**
-```bash
-grep "FIREBASE_ADMIN_CLIENT_EMAIL" .env.production
-```
-
 ---
 
-### 3단계: 배포 스크립트 실행 권한 부여
+### 3단계: Docker 이미지 빌드
 
 ```bash
-chmod +x deploy-server.sh
+# 기존 컨테이너 중지 및 삭제
+docker-compose down
+
+# 이미지 재빌드 (캐시 없이)
+docker-compose build --no-cache
 ```
 
----
-
-### 4단계: 배포 실행
-
-```bash
-./deploy-server.sh
-```
+**예상 소요 시간:** 3-5분
 
 **예상 출력:**
 ```
-==========================================
-쿠팡 자동 블로그 배포 시작
-==========================================
-
-[1/6] 기존 컨테이너 중지 중...
-[2/6] 환경변수 파일 확인...
-✅ .env.production 파일 확인됨
-[3/6] Docker 이미지 빌드 중...
-[4/6] 컨테이너 시작 중...
-[5/6] 컨테이너 상태 확인...
-[6/6] 헬스체크...
-✅ Next.js 앱이 정상적으로 실행 중입니다!
-
-==========================================
-✅ 배포 완료!
-==========================================
-```
-
-**에러 발생 시:**
-```bash
-# 로그 확인
-docker logs coupang-blog
-
-# 컨테이너 상태 확인
-docker ps -a | grep coupang-blog
-
-# 환경변수 확인
-docker exec coupang-blog env | grep FIREBASE
-```
-
----
-
-### 5단계: Nginx 설정 업데이트
-
-```bash
-# Nginx 설정 파일 복사
-sudo cp nginx-semolink.conf /etc/nginx/sites-available/semolink-blog
-
-# 기존 설정 백업 (선택사항)
-sudo cp /etc/nginx/sites-available/semolink-blog /etc/nginx/sites-available/semolink-blog.backup.$(date +%Y%m%d)
-
-# Nginx 설정 테스트
-sudo nginx -t
-```
-
-**예상 출력:**
-```
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-```
-
-```bash
-# Nginx 재시작
-sudo systemctl reload nginx
-```
-
----
-
-### 6단계: 배포 확인
-
-#### 6-1. 로컬 테스트
-```bash
-curl http://127.0.0.1:3000
-```
-
-**예상 출력:** HTML 응답 (Next.js 페이지)
-
-#### 6-2. HTTPS 테스트
-```bash
-curl -I https://semolink.store
-```
-
-**예상 출력:**
-```
-HTTP/2 200
-server: nginx/1.18.0
+Building web...
+Step 1/10 : FROM node:18-alpine
 ...
+Successfully built xxxxx
+Successfully tagged coupang_auto_blog_web:latest
 ```
 
-#### 6-3. Docker 로그 확인
+---
+
+### 4단계: 서비스 실행
+
 ```bash
-docker logs -f coupang-blog
+# 백그라운드로 서비스 시작
+docker-compose up -d
 ```
 
 **예상 출력:**
+```
+Creating coupang-blog ... done
+```
+
+---
+
+### 5단계: 배포 확인
+
+#### 5-1. 컨테이너 상태 확인
+```bash
+docker ps
+```
+
+**예상 출력:** `coupang-blog` 컨테이너가 `Up` 상태
+
+#### 5-2. 로그 확인
+```bash
+docker-compose logs -f
+```
+
+**정상 출력 예시:**
 ```
 > coupang-blog@0.1.0 start
 > next start
 
   ▲ Next.js 15.x.x
   - Local:        http://localhost:3000
-  - Network:      http://0.0.0.0:3000
 
  ✓ Ready in XXXms
 ```
 
-#### 6-4. Nginx 로그 확인
+**에러 있는 경우:** `Ctrl+C`로 종료 후 개발쪽에 에러 로그 전달
+
+#### 5-3. 서비스 응답 확인
 ```bash
-sudo tail -f /var/log/nginx/semolink-blog-access.log
+# 로컬 접속 테스트
+curl -I http://127.0.0.1:3000
+
+# HTTPS 접속 테스트
+curl -I https://semolink.store
+```
+
+**예상 출력:**
+```
+HTTP/2 200
+server: nginx
+...
 ```
 
 ---
 
-## 🎉 최종 확인
+## ✅ 배포 완료 보고
 
-브라우저에서 접속:
-- ✅ https://semolink.store
-- ✅ https://semolink.store/admin
+모든 단계가 성공하면 다음 형식으로 보고:
 
----
-
-## 🔧 문제 해결
-
-### 컨테이너가 시작되지 않을 때
-
-```bash
-# 1. 로그 확인
-docker logs coupang-blog
-
-# 2. 환경변수 확인
-docker exec coupang-blog env
-
-# 3. 컨테이너 재시작
-docker-compose restart
-
-# 4. 완전히 재배포
-docker-compose down
-docker-compose up -d --build
-```
-
-### Nginx 502 Bad Gateway
-
-```bash
-# 1. Next.js 앱 동작 확인
-curl http://127.0.0.1:3000
-
-# 2. 컨테이너 상태 확인
-docker ps | grep coupang-blog
-
-# 3. Nginx 설정 확인
-sudo nginx -t
-
-# 4. Nginx 재시작
-sudo systemctl restart nginx
-```
-
-### 환경변수 문제
-
-```bash
-# .env.production 파일 확인
-cat .env.production
-
-# Firebase Admin SDK 키 형식 확인
-# - PRIVATE_KEY는 따옴표로 감싸야 함
-# - \n은 실제 줄바꿈이 아니라 문자열 \n 그대로
-```
-
----
-
-## 📞 완료 보고
-
-모든 단계가 완료되면 다음 정보를 보고:
-
-1. ✅ 배포 성공 여부
-2. ✅ https://semolink.store 접속 가능 여부
-3. ✅ Docker 컨테이너 상태
-4. ✅ 에러 로그 (있다면)
-
-**예시:**
 ```
 ✅ 배포 완료!
-- https://semolink.store 정상 접속됨
-- Docker 컨테이너 실행 중 (Up 5 minutes)
-- 에러 없음
+
+- Git pull: 성공 (XX개 파일 업데이트)
+- Docker build: 성공
+- 서비스 실행: 정상
+- https://semolink.store 접속: 정상
+
+컨테이너 상태: Up XX minutes
+메모리 사용량: XXX MB
 ```
+
+---
+
+## ❌ 배포 실패 시
+
+### Git Pull 실패
+```bash
+# 현재 상태 확인
+git status
+
+# 개발쪽에 보고
+"Git pull 실패: [에러 메시지]"
+```
+
+### Docker Build 실패
+```bash
+# 로그 전체 복사
+docker-compose build 2>&1 | tee build.log
+
+# 개발쪽에 build.log 내용 전달
+cat build.log
+```
+
+### 서비스 실행 실패
+```bash
+# 로그 확인
+docker-compose logs
+
+# 환경변수 확인
+docker-compose config
+
+# 개발쪽에 로그 전달
+```
+
+---
+
+## 🔧 추가 작업
+
+### 환경변수 변경 요청 시
+
+```bash
+# .env.production 수정
+nano .env.production
+
+# 변경 후 재배포 (위 3-5단계 다시 실행)
+docker-compose down
+docker-compose up -d
+```
+
+### 로그 확인 요청 시
+
+```bash
+# 전체 로그
+docker-compose logs
+
+# 최근 100줄
+docker-compose logs --tail 100
+
+# 실시간 로그
+docker-compose logs -f
+```
+
+### 긴급 재시작 요청 시
+
+```bash
+# 재시작 (코드 변경 없음)
+docker-compose restart
+
+# 완전 재시작 (재빌드 없음)
+docker-compose down
+docker-compose up -d
+```
+
+---
+
+## 🚨 절대 금지 사항
+
+**❌ 다음 작업은 절대 하지 마세요:**
+
+1. **코드 파일 수정**
+   - `nano app/page.tsx` ← 금지!
+   - `vim components/*.tsx` ← 금지!
+   - 모든 소스 코드 수정 금지
+
+2. **Git 커밋**
+   - `git add .` ← 금지!
+   - `git commit` ← 금지!
+   - `git push` ← 금지!
+
+3. **설정 파일 수정 (환경변수 제외)**
+   - `Dockerfile` 수정 금지
+   - `docker-compose.yml` 수정 금지
+   - `next.config.ts` 수정 금지
+
+**✅ 유일하게 수정 가능:**
+- `.env.production` (환경변수만)
+
+---
+
+## 📞 커뮤니케이션
+
+### 정상 배포
+```
+✅ 배포 완료
+- Git: 최신 코드 반영 (커밋 06ae06c)
+- 서비스: 정상 실행 중
+- 접속: https://semolink.store 정상
+```
+
+### 에러 발생
+```
+❌ [단계명] 실패
+- 에러: [에러 메시지]
+- 로그: [관련 로그]
+- 시도: [해결 시도 내용]
+```
+
+### 확인 필요
+```
+⚠️ [상황 설명]
+- 현재 상태: [상태]
+- 질문: [확인 필요한 내용]
+```
+
+---
+
+## 🎯 빠른 참조
+
+```bash
+# 표준 배포 (한 번에 실행)
+cd /home/insuk/blog && \
+git pull && \
+docker-compose down && \
+docker-compose build --no-cache && \
+docker-compose up -d && \
+docker-compose logs -f
+
+# 상태 확인
+docker ps && curl -I http://127.0.0.1:3000
+
+# 로그 확인
+docker-compose logs --tail 100
+
+# 재시작
+docker-compose restart
+```
+
+---
+
+**기억하세요:**
+- 서버 = Git Pull + 빌드 + 실행만!
+- 코드 수정 = 개발 컴퓨터에서만!
+- 문제 발생 = 개발쪽에 보고!
