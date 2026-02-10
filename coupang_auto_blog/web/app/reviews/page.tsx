@@ -21,21 +21,22 @@ async function fetchPublishedReviews(
   offset: number = 0
 ): Promise<{ reviews: PublishedReview[]; hasMore: boolean }> {
   try {
+    // Use public reviews endpoint (no auth required)
     const data = await apiClient.get<{
       success: boolean;
-      data: { reviews: PublishedReview[]; totalCount: number; hasMore: boolean } | PublishedReview[];
-      total?: number;
-    }>(`/api/admin/reviews?limit=${maxCount + 1}&offset=${offset}&statuses=published`);
-    const all = Array.isArray(data.data)
-      ? data.data
-      : Array.isArray((data.data as any)?.reviews)
-        ? (data.data as any).reviews
-        : [];
-    return {
-      reviews: all.slice(0, maxCount),
-      hasMore: all.length > maxCount,
-    };
-  } catch {
+      data: { reviews: PublishedReview[]; totalCount: number; hasMore: boolean };
+    }>(`/api/reviews?limit=${maxCount}&offset=${offset}`);
+
+    // Handle the response structure from automation-server
+    if (data.success && data.data) {
+      return {
+        reviews: data.data.reviews || [],
+        hasMore: data.data.hasMore || false,
+      };
+    }
+    return { reviews: [], hasMore: false };
+  } catch (err) {
+    console.error("Failed to fetch reviews:", err);
     return { reviews: [], hasMore: false };
   }
 }
