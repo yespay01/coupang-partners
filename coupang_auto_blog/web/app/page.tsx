@@ -14,11 +14,12 @@ async function fetchPublishedReviews(maxCount: number): Promise<PublishedReview[
     const data = await apiClient.get<{
       success: boolean;
       data: { reviews: PublishedReview[]; totalCount: number; hasMore: boolean } | PublishedReview[];
-    }>(`/api/admin/reviews?limit=${maxCount}&statuses=published`);
+    }>(`/api/reviews?limit=${maxCount}&statuses=published`);
     if (Array.isArray(data.data)) return data.data;
     if (Array.isArray((data.data as any)?.reviews)) return (data.data as any).reviews;
     return [];
-  } catch {
+  } catch (error) {
+    console.error("리뷰 로딩 실패:", error);
     return [];
   }
 }
