@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
-const API_BASE = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const AUTOMATION_SERVER_URL =
+  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
 /**
  * GET /api/admin/products
@@ -8,13 +10,24 @@ const API_BASE = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http
  */
 export async function GET(request: NextRequest) {
   try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("admin_session");
+
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
-    const response = await fetch(`${API_BASE}/api/admin/products?${searchParams.toString()}`, {
+    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/admin/products?${searchParams.toString()}`, {
       headers: {
-        Authorization: request.headers.get("Authorization") || "",
-        Cookie: request.headers.get("Cookie") || "",
+        "Content-Type": "application/json",
+        Cookie: `admin_session=${sessionCookie.value}`,
       },
+      credentials: "include",
     });
 
     const data = await response.json();

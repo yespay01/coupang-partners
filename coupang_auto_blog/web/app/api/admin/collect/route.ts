@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
-// 서버 사이드에서는 Docker 네트워크 내부 URL 사용
-const API_BASE = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const AUTOMATION_SERVER_URL =
+  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
 /**
  * 수동 상품 수집 API
@@ -10,15 +11,26 @@ const API_BASE = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http
  */
 export async function POST(request: NextRequest) {
   try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("admin_session");
+
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
 
     // automation-server의 manual collect endpoint로 프록시
-    const response = await fetch(`${API_BASE}/api/collect/manual`, {
+    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/collect/manual`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: request.headers.get("Authorization") || "",
+        Cookie: `admin_session=${sessionCookie.value}`,
       },
+      credentials: "include",
       body: JSON.stringify(body),
     });
 
@@ -47,11 +59,23 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("admin_session");
+
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     // automation-server로부터 수집 상태 조회
-    const response = await fetch(`${API_BASE}/api/admin/products?limit=10`, {
+    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/admin/products?limit=10`, {
       headers: {
-        Authorization: request.headers.get("Authorization") || "",
+        "Content-Type": "application/json",
+        Cookie: `admin_session=${sessionCookie.value}`,
       },
+      credentials: "include",
     });
 
     const data = await response.json();
