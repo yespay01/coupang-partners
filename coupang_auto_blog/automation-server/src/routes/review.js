@@ -5,6 +5,69 @@ import { notifySlack } from '../services/slack.js';
 const router = express.Router();
 
 /**
+ * GET /api/reviews
+ * 공개 리뷰 목록 조회 (published만)
+ */
+router.get('/reviews', async (req, res) => {
+  try {
+    const db = getDb();
+    const { limit = 12, offset = 0 } = req.query;
+
+    // published 상태의 리뷰만 조회
+    const query = `
+      SELECT * FROM reviews
+      WHERE status = 'published'
+      ORDER BY published_at DESC, created_at DESC
+      LIMIT $1 OFFSET $2
+    `;
+
+    const countQuery = `
+      SELECT COUNT(*) as count FROM reviews
+      WHERE status = 'published'
+    `;
+
+    const [reviewsResult, countResult] = await Promise.all([
+      db.query(query, [parseInt(limit), parseInt(offset)]),
+      db.query(countQuery),
+    ]);
+
+    const reviews = reviewsResult.rows.map(row => ({
+      id: String(row.id),
+      productId: row.product_id,
+      productName: row.product_name,
+      title: row.title,
+      content: row.content,
+      slug: row.slug,
+      status: row.status,
+      category: row.category,
+      affiliateUrl: row.affiliate_url,
+      author: row.author,
+      media: row.media,
+      charCount: row.char_count,
+      viewCount: row.view_count,
+      createdAt: row.created_at?.toISOString(),
+      updatedAt: row.updated_at?.toISOString(),
+      publishedAt: row.published_at?.toISOString(),
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        reviews,
+        totalCount: parseInt(countResult.rows[0].count),
+        hasMore: parseInt(offset) + reviews.length < parseInt(countResult.rows[0].count),
+      },
+    });
+  } catch (error) {
+    console.error('공개 리뷰 목록 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
  * POST /api/review/generate
  * 리뷰 생성 (간소화 버전)
  */

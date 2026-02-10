@@ -61,6 +61,7 @@ const routes = await Promise.all([
 app.use('/api/auth', routes[0].default);
 app.use('/api/collect', routes[1].default);
 app.use('/api/review', routes[2].default);
+app.use('/api', routes[2].default); // public reviews API
 app.use('/api/admin', routes[3].default);
 
 // Error handler
