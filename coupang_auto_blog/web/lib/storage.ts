@@ -18,12 +18,12 @@ export async function uploadFile(
       ? localStorage.getItem("auth_token")
       : null;
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
-  const res = await fetch(`${API_BASE}/api/admin/upload`, {
+  // web 서버의 API 프록시 사용 (상대 경로)
+  const res = await fetch("/api/admin/upload", {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
+    credentials: "include",
   });
 
   if (!res.ok) throw new Error("파일 업로드 실패");
@@ -36,7 +36,8 @@ export async function deleteFile(path: string): Promise<void> {
 }
 
 export async function getFileUrl(path: string): Promise<string> {
-  return `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/files/${path}`;
+  // web 서버를 통해 파일 접근 (상대 경로)
+  return `/files/${path}`;
 }
 
 export function getStorageRef(_path: string) {

@@ -14,14 +14,8 @@ export function DashboardNav() {
 
     setIsLoggingOut(true);
     try {
-      // JWT 로그아웃 (로컬 토큰 삭제 + 서버 쿠키 삭제)
-      apiClient.logout();
-
-      // 서버 쿠키도 삭제
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
+      // 로그아웃 API 호출 (로컬 토큰 삭제 + 서버 쿠키 삭제)
+      await apiClient.logout();
 
       // 로그인 페이지로 이동
       router.push("/admin/login");

@@ -23,7 +23,7 @@ type AuthContextValue = {
   user: User | null;
   error: Error | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 };
 
@@ -89,8 +89,8 @@ function useAuthInternal(): AuthContextValue {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    apiClient.logout();
+  const logout = useCallback(async () => {
+    await apiClient.logout();
     setUser(null);
     setStatus("unauthenticated");
     setError(null);

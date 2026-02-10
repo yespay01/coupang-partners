@@ -80,11 +80,21 @@ export const apiClient = {
     return request("/api/auth/me");
   },
 
-  logout(): void {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(TOKEN_KEY);
-      // 쿠키도 삭제
-      document.cookie = "admin_session=; path=/; max-age=0";
+  async logout(): Promise<void> {
+    try {
+      // 서버에 로그아웃 요청
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (error) {
+      console.error("Logout API error:", error);
+    } finally {
+      // 로컬 상태 정리
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(TOKEN_KEY);
+        document.cookie = "admin_session=; path=/; max-age=0";
+      }
     }
   },
 
