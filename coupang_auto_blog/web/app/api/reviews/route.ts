@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const AUTOMATION_SERVER_URL =
+  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
+
 /**
  * Public API: Published 리뷰 조회
  * 인증 없이 접근 가능
@@ -7,29 +10,29 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get("limit") || "12", 10);
-    const status = searchParams.get("statuses") || "published";
 
-    // published 상태의 리뷰만 허용
-    if (status !== "published") {
+    // automation-server의 /api/reviews 호출
+    const response = await fetch(
+      `${AUTOMATION_SERVER_URL}/api/reviews?${searchParams.toString()}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Public reviews fetch failed:", error);
       return NextResponse.json(
-        { success: false, error: "Only published reviews are available" },
-        { status: 403 }
+        { success: false, error: "Failed to fetch reviews" },
+        { status: response.status }
       );
     }
 
-    // TODO: 실제 데이터베이스나 automation-server에서 리뷰 가져오기
-    // 지금은 빈 배열 반환
-    const reviews: any[] = [];
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        reviews,
-        totalCount: reviews.length,
-        hasMore: false,
-      },
-    });
+    const data = await response.json();
+    return NextResponse.json(data);
   } catch (error) {
     console.error("Error fetching published reviews:", error);
     return NextResponse.json(
