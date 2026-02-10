@@ -176,15 +176,84 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
     });
   }, []);
 
-  // TODO: API 호출로 데이터 로드
-  // 현재는 Fallback 데이터만 사용
-  useEffect(() => {
-    if (status === "authenticated") {
-      setMetrics(FALLBACK_METRICS);
+  // API 호출로 리뷰 데이터 로드
+  const loadReviews = useCallback(async () => {
+    if (status !== "authenticated") return;
+
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/admin/reviews?limit=100&statuses=draft,needs_revision,approved,published");
+      if (!response.ok) throw new Error("Failed to fetch reviews");
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        // automation-server는 { data: { reviews: [...], totalCount: ... } } 형식으로 반환
+        const reviewsData = result.data.reviews || result.data;
+        const reviews: WorkflowItem[] = (Array.isArray(reviewsData) ? reviewsData : []).map((item: any) => ({
+          id: item.id,
+          productId: item.productId,
+          product: item.productName || item.product || "Unknown Product",
+          author: item.author || "auto-bot",
+          status: item.status || "draft",
+          updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
+          createdAt: item.createdAt,
+          content: item.content,
+          toneScore: item.toneScore,
+          charCount: item.charCount,
+          slug: item.slug,
+          publishedAt: item.publishedAt,
+          media: item.media,
+        }));
+        setWorkflow(reviews);
+        setTotalReviewCount(result.data.totalCount || reviews.length);
+      } else {
+        console.warn("No review data found, using fallback");
+        setWorkflow(FALLBACK_WORKFLOW);
+      }
+    } catch (error) {
+      console.error("Failed to load reviews:", error);
       setWorkflow(FALLBACK_WORKFLOW);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [status]);
+
+  // API 호출로 로그 데이터 로드
+  const loadLogs = useCallback(async () => {
+    if (status !== "authenticated") return;
+
+    try {
+      const response = await fetch("/api/admin/logs?limit=50");
+      if (!response.ok) {
+        console.warn("Logs API not available, using fallback");
+        setLogs(FALLBACK_LOGS);
+        return;
+      }
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        // automation-server는 { data: { logs: [...], totalCount: ... } } 형식으로 반환
+        const logsData = result.data.logs || result.data;
+        setLogs(Array.isArray(logsData) ? logsData : FALLBACK_LOGS);
+        setTotalLogCount(result.data.totalCount || logsData.length);
+      } else {
+        console.warn("No log data found, using fallback");
+        setLogs(FALLBACK_LOGS);
+      }
+    } catch (error) {
+      console.warn("Failed to load logs, using fallback:", error);
       setLogs(FALLBACK_LOGS);
     }
   }, [status]);
+
+  // 초기 데이터 로드
+  useEffect(() => {
+    if (status === "authenticated") {
+      setMetrics(FALLBACK_METRICS);
+      loadReviews();
+      loadLogs();
+    }
+  }, [status, loadReviews, loadLogs]);
 
   const goToNextReviewPage = useCallback(async () => {
     // TODO: API 호출
@@ -207,14 +276,12 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
   }, []);
 
   const refreshReviews = useCallback(async () => {
-    // TODO: API 호출
-    console.log("리뷰 새로고침 (미구현)");
-  }, []);
+    await loadReviews();
+  }, [loadReviews]);
 
   const refreshLogs = useCallback(async () => {
-    // TODO: API 호출
-    console.log("로그 새로고침 (미구현)");
-  }, []);
+    await loadLogs();
+  }, [loadLogs]);
 
   return useMemo(
     () => ({

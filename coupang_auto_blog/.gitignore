@@ -125,8 +125,11 @@ downloads/
 
 # 로그 파일
 *.log
-logs/
+/logs/
+automation-server/logs/
 *.log.*
+# API route는 허용
+!web/app/api/**/logs/
 
 # 임시 파일
 tmp/
