@@ -124,14 +124,14 @@ export function ImageSettings() {
 
             <div className="sm:col-span-2 space-y-2">
               <label htmlFor="stockApiKey" className="block text-sm font-medium text-slate-700">
-                API 키
+                {images.stockImages.provider === "unsplash" ? "Unsplash Access Key" : "Pexels API Key"}
                 <a
                   href={images.stockImages.provider === "unsplash" ? "https://unsplash.com/developers" : "https://www.pexels.com/api/"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ml-2 text-xs text-blue-600 hover:text-blue-800"
                 >
-                  API 키 발급받기 →
+                  {images.stockImages.provider === "unsplash" ? "Unsplash 키 발급 →" : "Pexels 키 발급 →"}
                 </a>
               </label>
               <input
@@ -139,9 +139,16 @@ export function ImageSettings() {
                 type="text"
                 value={images.stockImages.apiKey}
                 onChange={(e) => updateStockImages({ apiKey: e.target.value })}
-                placeholder={images.stockImages.provider === "unsplash" ? "Access Key" : "API Key"}
+                placeholder={images.stockImages.provider === "unsplash"
+                  ? "Unsplash Access Key를 입력하세요"
+                  : "Pexels API Key를 입력하세요"}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
+              <p className="text-xs text-slate-500">
+                {images.stockImages.provider === "unsplash"
+                  ? "unsplash.com/developers에서 앱 등록 후 Access Key를 복사하세요"
+                  : "pexels.com/api에서 가입 후 API Key를 복사하세요"}
+              </p>
             </div>
           </div>
         )}
