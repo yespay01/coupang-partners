@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS reviews (
   tone_score DECIMAL(3,2),
   char_count INTEGER,
   view_count INTEGER DEFAULT 0,
+  product_price INTEGER,
+  product_image TEXT,
+  seo_meta JSONB,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   published_at TIMESTAMP

@@ -95,18 +95,21 @@ export async function getSystemSettings() {
       settingsMap[row.key] = row.value;
     });
 
-    // 기본값과 병합
+    // DB에 key='system'으로 하나의 JSONB blob으로 저장되므로
+    // settingsMap.system에서 추출하여 기본값과 deep merge
+    const systemData = settingsMap.system || {};
+
     cachedSettings = {
-      ai: { ...DEFAULT_SETTINGS.ai, ...(settingsMap.ai || {}) },
-      prompt: { ...DEFAULT_SETTINGS.prompt, ...(settingsMap.prompt || {}) },
+      ai: { ...DEFAULT_SETTINGS.ai, ...(systemData.ai || {}) },
+      prompt: { ...DEFAULT_SETTINGS.prompt, ...(systemData.prompt || {}) },
       images: {
-        stockImages: { ...DEFAULT_SETTINGS.images.stockImages, ...(settingsMap.images?.stockImages || {}) },
-        aiImages: { ...DEFAULT_SETTINGS.images.aiImages, ...(settingsMap.images?.aiImages || {}) },
-        coupangDetailImages: { ...DEFAULT_SETTINGS.images.coupangDetailImages, ...(settingsMap.images?.coupangDetailImages || {}) },
+        stockImages: { ...DEFAULT_SETTINGS.images.stockImages, ...(systemData.images?.stockImages || {}) },
+        aiImages: { ...DEFAULT_SETTINGS.images.aiImages, ...(systemData.images?.aiImages || {}) },
+        coupangDetailImages: { ...DEFAULT_SETTINGS.images.coupangDetailImages, ...(systemData.images?.coupangDetailImages || {}) },
       },
-      coupang: { ...DEFAULT_SETTINGS.coupang, ...(settingsMap.coupang || {}) },
-      topics: { ...DEFAULT_SETTINGS.topics, ...(settingsMap.topics || {}) },
-      automation: { ...DEFAULT_SETTINGS.automation, ...(settingsMap.automation || {}) },
+      coupang: { ...DEFAULT_SETTINGS.coupang, ...(systemData.coupang || {}) },
+      topics: { ...DEFAULT_SETTINGS.topics, ...(systemData.topics || {}) },
+      automation: { ...DEFAULT_SETTINGS.automation, ...(systemData.automation || {}) },
     };
     cacheTimestamp = now;
 
