@@ -13,13 +13,19 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("admin_session");
 
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const response = await fetch(`${AUTOMATION_SERVER_URL}/api/admin/settings`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Cookie: sessionCookie ? `admin_session=${sessionCookie.value}` : "",
+        Cookie: `admin_session=${sessionCookie.value}`,
       },
-      credentials: "include",
     });
 
     if (!response.ok) {
@@ -67,7 +73,6 @@ export async function PUT(request: NextRequest) {
         Cookie: `admin_session=${sessionCookie.value}`,
       },
       body: JSON.stringify(body),
-      credentials: "include",
     });
 
     if (!response.ok) {

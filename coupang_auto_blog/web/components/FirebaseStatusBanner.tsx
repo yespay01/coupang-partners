@@ -10,15 +10,15 @@ export function FirebaseStatusBanner() {
     switch (status) {
       case "initializing":
         return {
-          label: "Firebase 연결 중…",
-          description: "환경변수와 SDK 초기화를 확인하는 중입니다.",
+          label: "서버 연결 중…",
+          description: "서버 연결 상태를 확인하는 중입니다.",
           tone: "info",
         };
       case "ready":
         return user
           ? {
               label: `관리자 모드 활성화 (${user.email ?? "익명"})`,
-              description: "Firestore 및 Functions 데이터를 곧 불러옵니다.",
+              description: "데이터를 곧 불러옵니다.",
               tone: "success",
             }
           : {
@@ -28,7 +28,7 @@ export function FirebaseStatusBanner() {
             };
       case "error":
         return {
-          label: "Firebase 초기화 실패",
+          label: "서버 연결 실패",
           description: error?.message ?? "알 수 없는 오류가 발생했습니다.",
           tone: "error",
         };

@@ -2,14 +2,15 @@ import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import ReviewPost from "@/components/ReviewPost";
 import { Review } from "@/types";
-import { getFirestore, collection, query, where, getDocs, doc, getDoc, increment, updateDoc } from "firebase/firestore";
-import { app } from "@/lib/firebase";
 
 // ISR: 1시간마다 재생성
 export const revalidate = 3600;
 
 // 동적 경로 허용 (빌드 시 정적 생성 안 함)
 export const dynamicParams = true;
+
+const AUTOMATION_SERVER_URL =
+  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
 interface PageProps {
   params: {
@@ -18,52 +19,29 @@ interface PageProps {
 }
 
 /**
- * slug로 리뷰 조회
+ * slug로 리뷰 조회 (automation-server API)
  */
 async function getReviewBySlug(slug: string): Promise<Review | null> {
-  const db = getFirestore(app);
-  const reviewsRef = collection(db, "reviews");
-
-  // slug로 쿼리
-  const q = query(
-    reviewsRef,
-    where("slug", "==", slug),
-    where("status", "==", "published")
-  );
-
-  const snapshot = await getDocs(q);
-
-  if (snapshot.empty) {
-    return null;
-  }
-
-  const doc = snapshot.docs[0];
-  const data = doc.data();
-
-  return {
-    id: doc.id,
-    ...data,
-    createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
-    updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt,
-    publishedAt: data.publishedAt?.toDate?.()?.toISOString() || data.publishedAt,
-    lastViewedAt: data.lastViewedAt?.toDate?.()?.toISOString() || data.lastViewedAt,
-  } as Review;
-}
-
-/**
- * 조회수 증가 (클라이언트에서 호출)
- */
-async function incrementViewCount(reviewId: string) {
   try {
-    const db = getFirestore(app);
-    const reviewRef = doc(db, "reviews", reviewId);
+    const response = await fetch(
+      `${AUTOMATION_SERVER_URL}/api/reviews/${encodeURIComponent(slug)}`,
+      { next: { revalidate: 3600 } }
+    );
 
-    await updateDoc(reviewRef, {
-      viewCount: increment(1),
-      lastViewedAt: new Date(),
-    });
+    if (!response.ok) {
+      return null;
+    }
+
+    const result = await response.json();
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data as Review;
   } catch (error) {
-    console.error("Failed to increment view count:", error);
+    console.error("리뷰 조회 실패:", error);
+    return null;
   }
 }
 
@@ -165,9 +143,19 @@ export default async function ReviewPage({ params }: PageProps) {
 
 /**
  * 정적 경로 생성 (빌드 시에는 빈 배열 반환)
- * 실제 경로는 런타임에 동적으로 생성됨
  */
 export async function generateStaticParams() {
-  // 빌드 시에는 정적 생성하지 않고, 런타임에 동적으로 처리
-  return [];
+  try {
+    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/reviews?limit=100`);
+    if (!response.ok) return [];
+
+    const result = await response.json();
+    const reviews = result.data?.reviews || [];
+
+    return reviews
+      .filter((r: any) => r.slug)
+      .map((r: any) => ({ slug: r.slug }));
+  } catch {
+    return [];
+  }
 }

@@ -1,40 +1,53 @@
-import { NextResponse } from "next/server";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+
+const AUTOMATION_SERVER_URL =
+  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
 /**
  * GET /api/debug/settings
- * Firestore에 실제로 저장된 설정 확인 (디버깅용)
+ * 시스템 설정 확인 (디버깅용, automation-server 프록시)
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const docRef = doc(db, "system_settings", "global");
-    const docSnap = await getDoc(docRef);
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("admin_session");
 
-    if (!docSnap.exists()) {
-      return NextResponse.json({
-        success: false,
-        message: "설정 문서가 존재하지 않습니다.",
-      });
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
-    const data = docSnap.data();
+    const response = await fetch(
+      `${AUTOMATION_SERVER_URL}/api/admin/settings`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `admin_session=${sessionCookie.value}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
+    }
 
     return NextResponse.json({
       success: true,
-      data: {
-        ai: data.ai,
-        prompt: data.prompt,
-        googleModel: data.ai?.google?.model,
-        defaultProvider: data.ai?.defaultProvider,
-        updatedAt: data.updatedAt,
-        updatedBy: data.updatedBy,
-      },
+      data: data.data,
     });
   } catch (error: any) {
-    return NextResponse.json({
-      success: false,
-      message: error?.message || "조회 실패",
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        message: error?.message || "조회 실패",
+      },
+      { status: 500 }
+    );
   }
 }

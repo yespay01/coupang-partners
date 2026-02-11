@@ -110,9 +110,11 @@ export function AISettings() {
     setLoadingModels((prev) => ({ ...prev, [provider]: true }));
 
     try {
-      const response = await fetch(
-        `/api/ai/models?provider=${provider}&apiKey=${encodeURIComponent(apiKey)}`
-      );
+      const response = await fetch("/api/ai/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, apiKey }),
+      });
       const data = await response.json();
 
       if (!response.ok || !data.success) {

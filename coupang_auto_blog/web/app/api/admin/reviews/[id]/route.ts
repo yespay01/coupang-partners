@@ -17,15 +17,21 @@ export async function GET(
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("admin_session");
 
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const response = await fetch(
       `${AUTOMATION_SERVER_URL}/api/admin/reviews/${id}`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Cookie: sessionCookie ? `admin_session=${sessionCookie.value}` : "",
+          Cookie: `admin_session=${sessionCookie.value}`,
         },
-        credentials: "include",
       }
     );
 
@@ -80,7 +86,6 @@ export async function PUT(
           Cookie: `admin_session=${sessionCookie.value}`,
         },
         body: JSON.stringify(body),
-        credentials: "include",
       }
     );
 
@@ -132,7 +137,6 @@ export async function DELETE(
           "Content-Type": "application/json",
           Cookie: `admin_session=${sessionCookie.value}`,
         },
-        credentials: "include",
       }
     );
 

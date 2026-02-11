@@ -1,15 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import OpenAI from "openai";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
- * GET /api/ai/models?provider=openai&apiKey=xxx
+ * POST /api/ai/models
  * AI 제공자별 사용 가능한 모델 목록 조회
+ * body: { provider: string, apiKey: string }
  */
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const provider = searchParams.get("provider");
-  const apiKey = searchParams.get("apiKey");
+export async function POST(request: NextRequest) {
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get("admin_session");
+
+  if (!sessionCookie) {
+    return NextResponse.json(
+      { success: false, message: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  let body: { provider?: string; apiKey?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { success: false, message: "잘못된 요청 본문입니다." },
+      { status: 400 }
+    );
+  }
+
+  const { provider, apiKey } = body;
 
   if (!provider || !apiKey) {
     return NextResponse.json(
@@ -29,8 +48,6 @@ export async function GET(request: NextRequest) {
         models = await fetchGoogleModels(apiKey);
         break;
       case "anthropic":
-        // Anthropic은 모델 목록 API가 없으므로 문서 기반 목록 반환
-        // https://docs.anthropic.com/en/docs/about-claude/models
         models = [
           { value: "claude-3-5-sonnet-20241022", label: "claude-3-5-sonnet-20241022" },
           { value: "claude-3-opus-20240229", label: "claude-3-opus-20240229" },
@@ -63,14 +80,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * OpenAI 모델 목록 조회
- */
 async function fetchOpenAIModels(apiKey: string) {
   const client = new OpenAI({ apiKey });
   const response = await client.models.list();
 
-  // GPT 모델만 필터링 (채팅 완성용)
   const gptModels = response.data
     .filter((model) => {
       const id = model.id.toLowerCase();
@@ -83,10 +96,9 @@ async function fetchOpenAIModels(apiKey: string) {
     })
     .map((model) => ({
       value: model.id,
-      label: model.id, // 모델 ID 그대로 표시
+      label: model.id,
     }))
     .sort((a, b) => {
-      // GPT-4 모델을 먼저, 그 다음 GPT-3.5
       const priority: Record<string, number> = {
         "gpt-4o": 1,
         "gpt-4o-mini": 2,
@@ -94,11 +106,7 @@ async function fetchOpenAIModels(apiKey: string) {
         "gpt-4": 4,
         "gpt-3.5-turbo": 5,
       };
-
-      const priorityA = priority[a.value] || 999;
-      const priorityB = priority[b.value] || 999;
-
-      return priorityA - priorityB;
+      return (priority[a.value] || 999) - (priority[b.value] || 999);
     });
 
   if (gptModels.length === 0) {
@@ -108,11 +116,7 @@ async function fetchOpenAIModels(apiKey: string) {
   return gptModels;
 }
 
-/**
- * Google Gemini 모델 목록 조회 (REST API 직접 호출)
- */
 async function fetchGoogleModels(apiKey: string) {
-  // REST API로 직접 호출
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
   );
@@ -123,7 +127,6 @@ async function fetchGoogleModels(apiKey: string) {
 
   const data = await response.json();
 
-  // generateContent를 지원하는 gemini 모델만 필터링
   const geminiModels = (data.models || [])
     .filter((model: any) => {
       return (
@@ -135,7 +138,6 @@ async function fetchGoogleModels(apiKey: string) {
       );
     })
     .map((model: any) => {
-      // "models/gemini-2.5-flash" -> "gemini-2.5-flash"
       const modelId = model.name.replace("models/", "");
       return {
         value: modelId,
@@ -144,7 +146,6 @@ async function fetchGoogleModels(apiKey: string) {
       };
     })
     .sort((a: any, b: any) => {
-      // 최신 버전을 먼저 (2.5 > 2.0 > 1.5)
       const getVersion = (val: string) => {
         if (val.includes("2.5")) return 3;
         if (val.includes("2.0")) return 2;
@@ -160,4 +161,3 @@ async function fetchGoogleModels(apiKey: string) {
 
   return geminiModels;
 }
-

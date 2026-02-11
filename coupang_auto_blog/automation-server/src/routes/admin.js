@@ -313,6 +313,68 @@ router.get('/logs', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/logs/stats
+ * 로그 통계 조회
+ */
+router.get('/logs/stats', async (req, res) => {
+  try {
+    const db = getDb();
+
+    const [totalResult, byLevelResult, byTypeResult, byDateResult] = await Promise.all([
+      db.query('SELECT COUNT(*) as count FROM logs'),
+      db.query('SELECT level, COUNT(*) as count FROM logs GROUP BY level'),
+      db.query('SELECT type, COUNT(*) as count FROM logs GROUP BY type'),
+      db.query(`SELECT DATE(created_at) as date, COUNT(*) as count FROM logs
+                WHERE created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(created_at) ORDER BY date DESC`),
+    ]);
+
+    const byLevel = {};
+    byLevelResult.rows.forEach(row => { byLevel[row.level || 'unknown'] = parseInt(row.count); });
+
+    const byType = {};
+    byTypeResult.rows.forEach(row => { byType[row.type || 'unknown'] = parseInt(row.count); });
+
+    const byDate = {};
+    byDateResult.rows.forEach(row => { byDate[row.date.toISOString().split('T')[0]] = parseInt(row.count); });
+
+    res.json({
+      success: true,
+      data: {
+        total: parseInt(totalResult.rows[0].count),
+        byLevel,
+        byType,
+        byDate,
+      },
+    });
+  } catch (error) {
+    console.error('로그 통계 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/log
+ * 프론트엔드에서 보내는 로그를 DB에 저장
+ */
+router.post('/log', async (req, res) => {
+  try {
+    const { level = 'info', message, context, type } = req.body;
+    const db = getDb();
+
+    await db.query(
+      'INSERT INTO logs (level, message, type, payload) VALUES ($1, $2, $3, $4)',
+      [level, message || '', type || context || 'frontend', req.body.payload ? JSON.stringify(req.body.payload) : null]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('로그 저장 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ==================== Earnings ====================
 
 /**

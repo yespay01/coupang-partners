@@ -584,7 +584,7 @@ function AdminDashboardViewContent({
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 shadow-sm">
             <p className="font-semibold text-slate-700">현재 상태</p>
-            <p className="mt-1 text-xs">{status === "ready" ? "Firebase 연결 완료" : "Firebase 초기화 중"}</p>
+            <p className="mt-1 text-xs">{status === "ready" ? "서버 연결 완료" : "서버 초기화 중"}</p>
           </div>
         </header>
 
@@ -788,7 +788,7 @@ function AdminDashboardViewContent({
               <div>
                 <h2 className="text-xl font-semibold text-slate-900">자동화 로그 스트림</h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  Cloud Functions, Firestore Trigger, Slack 알림 결과를 요약합니다.
+                  자동화 서버, 스케줄러, Slack 알림 결과를 요약합니다.
                 </p>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-500">

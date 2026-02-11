@@ -58,7 +58,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://coupang_user:${POSTGRES_PASSWORD:-your-secure-password}@postgres:5432/coupang_blog
-      - API_URL=http://automation-server:4000
+      - AUTOMATION_SERVER_URL=http://automation-server:4000
     networks:
       - coupang-network
     depends_on:

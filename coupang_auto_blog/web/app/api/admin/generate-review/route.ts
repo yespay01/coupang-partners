@@ -1,41 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "@/lib/firebase";
+import { cookies } from "next/headers";
+
+const AUTOMATION_SERVER_URL =
+  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
 /**
  * POST /api/admin/generate-review
- * 상품 리뷰를 수동으로 생성/재시도
+ * 상품 리뷰를 수동으로 생성/재시도 (automation-server 프록시)
  */
 export async function POST(request: NextRequest) {
   try {
-    const { productId } = await request.json();
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("admin_session");
 
-    if (!productId) {
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+
+    if (!body.productId) {
       return NextResponse.json(
         { success: false, message: "productId가 필요합니다." },
         { status: 400 }
       );
     }
 
-    // Functions 호출
-    const functions = getFunctions(app, "asia-northeast3");
-    const manualGenerateReview = httpsCallable(functions, "manualGenerateReview");
+    const response = await fetch(
+      `${AUTOMATION_SERVER_URL}/api/review/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `admin_session=${sessionCookie.value}`,
+        },
+        body: JSON.stringify(body),
+      }
+    );
 
-    const result = await manualGenerateReview({ productId });
+    const data = await response.json();
 
-    return NextResponse.json({
-      success: true,
-      message: (result.data as any).message || "리뷰가 생성되었습니다.",
-    });
-  } catch (error: any) {
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
     console.error("리뷰 생성 오류:", error);
-
-    // Firebase Functions 에러 처리
-    const message = error?.message || "리뷰 생성 실패";
-    const code = error?.code || "internal";
-
     return NextResponse.json(
-      { success: false, message: `[${code}] ${message}` },
+      {
+        success: false,
+        message: error instanceof Error ? error.message : "리뷰 생성 실패",
+      },
       { status: 500 }
     );
   }

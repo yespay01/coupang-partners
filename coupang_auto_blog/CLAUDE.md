@@ -1,6 +1,6 @@
 # 쿠팡 자동 블로그 프로젝트 - Claude 작업 지침
 
-> **최종 업데이트**: 2026-02-10
+> **최종 업데이트**: 2026-02-11
 > **핵심 원칙**: Git 기반 워크플로우
 
 ---
@@ -209,11 +209,96 @@ git push
 
 1. **환경변수 노출 금지**
    - `.env.production` 내용을 로그나 응답에 포함하지 말 것
-   - Firebase 키, API 키 절대 노출 금지
+   - API 키 절대 노출 금지
 
 2. **프로덕션 환경에서 디버깅 금지**
    - `ADMIN_GUARD_BYPASS=false` 유지
    - `NODE_ENV=production` 유지
+
+---
+
+## 🏗️ 아키텍처
+
+```
+브라우저 → Web(Next.js :3000) → API Routes(프록시) → Automation-Server(Express :4000) → PostgreSQL / MinIO
+```
+
+- **Web**: Next.js App Router. 프론트엔드 + API 라우트(프록시 역할)
+- **Automation-Server**: Express.js. 비즈니스 로직, DB 접근, 크론잡
+- **PostgreSQL**: 모든 데이터 저장 (products, reviews, logs, settings)
+- **MinIO**: 이미지/파일 저장소
+
+---
+
+## 🔌 API 라우트 패턴
+
+**모든 admin API 라우트는 동일한 패턴을 따릅니다:**
+
+```typescript
+const AUTOMATION_SERVER_URL =
+  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
+
+// 1. admin_session 쿠키로 인증 확인
+const cookieStore = await cookies();
+const sessionCookie = cookieStore.get("admin_session");
+if (!sessionCookie) return 401;
+
+// 2. automation-server로 프록시
+const response = await fetch(`${AUTOMATION_SERVER_URL}/api/...`, {
+  headers: { Cookie: `admin_session=${sessionCookie.value}` },
+});
+
+// 3. 응답 전달
+return NextResponse.json(await response.json());
+```
+
+**절대 하지 말 것:**
+- ❌ `API_URL` 환경변수 사용 (→ `AUTOMATION_SERVER_URL` 사용)
+- ❌ `Authorization` 헤더로 인증 (→ `admin_session` 쿠키 사용)
+- ❌ Web에서 직접 DB/Firebase 접근 (→ automation-server 프록시)
+
+---
+
+## 🚫 Firebase 금지
+
+이 프로젝트는 **Firebase를 사용하지 않습니다.**
+
+- ❌ `firebase`, `firebase-admin` 패키지 설치 금지
+- ❌ Firestore, Firebase Functions, Firebase Auth 사용 금지
+- ❌ `@/lib/firebase*` 파일 생성 금지
+- ✅ 모든 데이터는 PostgreSQL + automation-server API를 통해 접근
+
+---
+
+## 🐳 배포 규칙
+
+코드 변경 후 반드시 **이미지를 재빌드**해야 합니다:
+
+```bash
+# ❌ 잘못된 방법 (코드 변경이 반영되지 않음)
+docker-compose restart
+
+# ✅ 올바른 방법
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+---
+
+## 📁 주요 파일 참조
+
+| 역할 | 파일 경로 |
+|------|----------|
+| Web API 라우트 | `web/app/api/admin/*/route.ts` |
+| 인증 (JWT) | `automation-server/src/config/auth.js` |
+| DB 설정 | `automation-server/src/config/database.js` |
+| Admin 엔드포인트 | `automation-server/src/routes/admin.js` |
+| 리뷰 엔드포인트 | `automation-server/src/routes/review.js` |
+| 인증 엔드포인트 | `automation-server/src/routes/auth.js` |
+| API 클라이언트 (프론트) | `web/lib/apiClient.ts` |
+| Firestore 대체 모듈 | `web/lib/firestore.ts` (API 클라이언트 래퍼) |
+| Docker 설정 | `docker-compose.yml` |
 
 ---
 
@@ -230,5 +315,5 @@ git push
 
 ---
 
-**현재 상태**: 두 컴퓨터 모두 Git 동기화 완료 (2026-02-10)
+**현재 상태**: Firebase 완전 제거, PostgreSQL/MinIO 기반 (2026-02-11)
 **다음 작업**: 이 지침을 따라 작업 분리 유지

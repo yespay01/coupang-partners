@@ -12,8 +12,23 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
 app.use(express.json());
+
+// 요청 로깅
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    if (req.path !== '/health') {
+      console.log(`${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+    }
+  });
+  next();
+});
 
 // Health check
 app.get('/health', (req, res) => {

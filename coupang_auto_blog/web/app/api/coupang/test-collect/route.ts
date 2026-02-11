@@ -1,26 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
-// 서버 사이드에서는 Docker 네트워크 내부 URL 사용
-const API_BASE = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const AUTOMATION_SERVER_URL =
+  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
 export async function POST(request: NextRequest) {
   try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("admin_session");
+
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
 
-    // automation-server의 test endpoint로 프록시
-    const testRes = await fetch(`${API_BASE}/api/collect/test`, {
+    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/collect/test`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: request.headers.get("Authorization") || "",
+        Cookie: `admin_session=${sessionCookie.value}`,
       },
       body: JSON.stringify(body),
     });
 
-    const data = await testRes.json();
+    const data = await response.json();
 
-    if (!testRes.ok) {
-      return NextResponse.json(data, { status: testRes.status });
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
     }
 
     return NextResponse.json(data);
