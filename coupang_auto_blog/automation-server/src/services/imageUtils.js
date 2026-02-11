@@ -139,11 +139,42 @@ export async function fetchUnsplashImages(product, settings) {
       throw new Error(`Unsplash API 오류: ${response.status}`);
     }
 
-    const data = await response.json();
+    let data = await response.json();
     logger.info(`Unsplash API 응답 데이터: total=${data.total}, results=${data.results?.length || 0}`);
 
+    // 한국어 키워드로 결과가 없으면 카테고리 영어 키워드로 재검색
+    if ((!data.results || data.results.length === 0) && product.categoryId) {
+      const fallbackKeyword = getKeywordForCategory(product.categoryId);
+      logger.info(`Unsplash 한국어 검색 결과 없음 → 카테고리 영어 키워드로 재검색: "${fallbackKeyword}"`);
+
+      const fallbackUrl = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(fallbackKeyword)}&per_page=${count}&orientation=landscape`;
+      const fallbackResponse = await fetch(fallbackUrl, {
+        headers: { Authorization: `Client-ID ${apiKey}` },
+      });
+
+      if (fallbackResponse.ok) {
+        data = await fallbackResponse.json();
+        logger.info(`Unsplash 카테고리 재검색 결과: total=${data.total}, results=${data.results?.length || 0}`);
+      }
+    }
+
+    // 그래도 없으면 상품명 첫 단어 + "product"로 최종 시도
     if (!data.results || data.results.length === 0) {
-      logger.warn(`Unsplash에서 "${keyword}" 이미지를 찾을 수 없습니다`);
+      const genericKeyword = "product shopping";
+      logger.info(`Unsplash 카테고리 검색도 실패 → 범용 키워드로 최종 시도: "${genericKeyword}"`);
+
+      const genericUrl = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(genericKeyword)}&per_page=${count}&orientation=landscape`;
+      const genericResponse = await fetch(genericUrl, {
+        headers: { Authorization: `Client-ID ${apiKey}` },
+      });
+
+      if (genericResponse.ok) {
+        data = await genericResponse.json();
+      }
+    }
+
+    if (!data.results || data.results.length === 0) {
+      logger.warn(`Unsplash에서 이미지를 찾을 수 없습니다 (모든 검색 실패)`);
       return [];
     }
 
@@ -195,10 +226,37 @@ export async function fetchPexelsImages(product, settings) {
       throw new Error(`Pexels API 오류: ${response.status}`);
     }
 
-    const data = await response.json();
+    let data = await response.json();
+
+    // 한국어 키워드로 결과가 없으면 카테고리 영어 키워드로 재검색
+    if ((!data.photos || data.photos.length === 0) && product.categoryId) {
+      const fallbackKeyword = getKeywordForCategory(product.categoryId);
+      logger.info(`Pexels 한국어 검색 결과 없음 → 카테고리 영어 키워드로 재검색: "${fallbackKeyword}"`);
+
+      const fallbackUrl = `https://api.pexels.com/v1/search?query=${encodeURIComponent(fallbackKeyword)}&per_page=${count}&orientation=landscape`;
+      const fallbackResponse = await fetch(fallbackUrl, {
+        headers: { Authorization: apiKey },
+      });
+
+      if (fallbackResponse.ok) {
+        data = await fallbackResponse.json();
+      }
+    }
+
+    // 그래도 없으면 범용 키워드로 최종 시도
+    if (!data.photos || data.photos.length === 0) {
+      const genericUrl = `https://api.pexels.com/v1/search?query=${encodeURIComponent("product shopping")}&per_page=${count}&orientation=landscape`;
+      const genericResponse = await fetch(genericUrl, {
+        headers: { Authorization: apiKey },
+      });
+
+      if (genericResponse.ok) {
+        data = await genericResponse.json();
+      }
+    }
 
     if (!data.photos || data.photos.length === 0) {
-      logger.warn(`Pexels에서 "${keyword}" 이미지를 찾을 수 없습니다`);
+      logger.warn(`Pexels에서 이미지를 찾을 수 없습니다 (모든 검색 실패)`);
       return [];
     }
 

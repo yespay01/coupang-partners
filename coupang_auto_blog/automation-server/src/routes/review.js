@@ -309,6 +309,7 @@ router.post('/generate', async (req, res) => {
       productName: product.product_name,
       category: product.category_name,
       categoryName: product.category_name,
+      categoryId: product.category_id,
       productImage: product.product_image,
       productUrl: product.product_url,
     };
