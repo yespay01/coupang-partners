@@ -128,8 +128,8 @@ downloads/
 /logs/
 automation-server/logs/
 *.log.*
-# API route는 허용
-!web/app/api/**/logs/
+# Web app 내 logs 라우트는 허용 (API route + 페이지)
+!web/app/**/logs/
 
 # 임시 파일
 tmp/

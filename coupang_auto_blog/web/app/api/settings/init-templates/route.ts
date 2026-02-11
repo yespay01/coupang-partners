@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { DEFAULT_TEMPLATES } from "@/types/promptTemplate";
+import { randomUUID } from "crypto";
 
 /**
  * POST /api/settings/init-templates
- * 기본 템플릿 초기화 (스텁 - settings에 포함됨)
+ * 기본 프롬프트 템플릿 초기화
  */
 export async function POST() {
   try {
@@ -17,10 +19,18 @@ export async function POST() {
       );
     }
 
+    const now = new Date().toISOString();
+    const templates = DEFAULT_TEMPLATES.map((t) => ({
+      ...t,
+      id: randomUUID(),
+      createdAt: now,
+      updatedAt: now,
+    }));
+
     return NextResponse.json({
       success: true,
-      message: "템플릿은 settings에 포함되어 있습니다.",
-      templates: [],
+      message: "기본 템플릿이 초기화되었습니다.",
+      templates,
     });
   } catch (error) {
     console.error("템플릿 초기화 실패:", error);

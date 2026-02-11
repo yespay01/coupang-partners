@@ -2,26 +2,32 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { apiClient } from "@/lib/apiClient";
 import { type ReviewDoc } from "@/lib/firestore";
 
 type PublishedReview = ReviewDoc & {
   id: string;
 };
 
-async function fetchPublishedReviews(maxCount: number): Promise<PublishedReview[]> {
-  try {
-    const data = await apiClient.get<{
-      success: boolean;
-      data: { reviews: PublishedReview[]; totalCount: number; hasMore: boolean } | PublishedReview[];
-    }>(`/api/reviews?limit=${maxCount}&statuses=published`);
-    if (Array.isArray(data.data)) return data.data;
-    if (Array.isArray((data.data as any)?.reviews)) return (data.data as any).reviews;
-    return [];
-  } catch (error) {
-    console.error("리뷰 로딩 실패:", error);
-    return [];
+async function fetchPublishedReviews(maxCount: number, retries = 2): Promise<PublishedReview[]> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`/api/reviews?limit=${maxCount}&statuses=published`, {
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (Array.isArray(data.data)) return data.data;
+      if (Array.isArray((data.data as any)?.reviews)) return (data.data as any).reviews;
+      return [];
+    } catch (error) {
+      console.error(`리뷰 로딩 실패 (시도 ${attempt + 1}/${retries + 1}):`, error);
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
+    }
   }
+  return [];
 }
 
 function formatDate(dateString: string): string {

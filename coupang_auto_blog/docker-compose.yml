@@ -66,6 +66,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      automation-server:
+        condition: service_healthy
 
   # Automation Server
   automation-server:
@@ -93,6 +95,12 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 networks:
   coupang-network:
