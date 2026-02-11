@@ -241,7 +241,28 @@ router.post('/generate', async (req, res) => {
 
     // 2. 시스템 설정 로드
     const settings = await getSystemSettings();
-    logger.info('시스템 설정 로드 완료', { provider: settings.ai.defaultProvider });
+    logger.info('=== 적용된 설정 ===', {
+      ai: {
+        provider: settings.ai.defaultProvider,
+        model: settings.ai[settings.ai.defaultProvider]?.model,
+        hasApiKey: !!settings.ai[settings.ai.defaultProvider]?.apiKey,
+        temperature: settings.ai.temperature,
+        maxTokens: settings.ai.maxTokens,
+      },
+      prompt: {
+        systemPrompt: settings.prompt.systemPrompt?.substring(0, 50) + '...',
+        reviewTemplate: settings.prompt.reviewTemplate?.substring(0, 50) + '...',
+        minLength: settings.prompt.minLength,
+        maxLength: settings.prompt.maxLength,
+        toneScoreThreshold: settings.prompt.toneScoreThreshold,
+      },
+      images: {
+        stockEnabled: settings.images?.stockImages?.enabled,
+        stockProvider: settings.images?.stockImages?.provider,
+        aiEnabled: settings.images?.aiImages?.enabled,
+        coupangDetailEnabled: settings.images?.coupangDetailImages?.enabled,
+      },
+    });
 
     // 3. 프롬프트 빌드
     const productForPrompt = {
@@ -251,7 +272,7 @@ router.post('/generate', async (req, res) => {
       categoryName: product.category_name,
     };
     const userPrompt = buildPromptFromSettings(productForPrompt, settings.prompt);
-    logger.info('프롬프트 빌드 완료', { promptLength: userPrompt.length });
+    logger.info('빌드된 프롬프트:', userPrompt);
 
     // 4. AI 리뷰 생성
     const aiResult = await generateText(settings.ai, userPrompt, settings.prompt.systemPrompt);
@@ -334,7 +355,13 @@ router.post('/generate', async (req, res) => {
       charCount,
       toneScore,
       imageCount: media.length,
+      imageSources: media.map(m => m.credit || 'unknown'),
       usage: aiResult.usage,
+      appliedSettings: {
+        promptMinLength: settings.prompt.minLength,
+        promptMaxLength: settings.prompt.maxLength,
+        reviewTemplate: settings.prompt.reviewTemplate?.substring(0, 80),
+      },
     });
 
     res.json({

@@ -2,6 +2,7 @@ import express from 'express';
 import { getDb } from '../config/database.js';
 import { notifySlack } from '../services/slack.js';
 import { authenticateToken, requireAdmin } from '../config/auth.js';
+import { invalidateSettingsCache } from '../services/settingsService.js';
 
 const router = express.Router();
 
@@ -461,6 +462,9 @@ router.put('/settings', requireAdmin, async (req, res) => {
        ON CONFLICT (key) DO UPDATE SET value = settings.value || $1::jsonb, updated_at = NOW()`,
       [JSON.stringify(settings)]
     );
+
+    // 설정 캐시 즉시 무효화 (다음 조회 시 DB에서 새로 로드)
+    invalidateSettingsCache();
 
     res.json({ success: true, message: '설정이 업데이트되었습니다.' });
   } catch (error) {
