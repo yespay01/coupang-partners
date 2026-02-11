@@ -78,18 +78,19 @@ export function ProductList({
     });
   };
 
-  const handleGenerateReview = async (productId: string) => {
-    if (generatingReviews.has(productId)) {
+  const handleGenerateReview = async (product: Product) => {
+    if (generatingReviews.has(product.id)) {
       return; // 이미 생성 중
     }
 
-    setGeneratingReviews((prev) => new Set(prev).add(productId));
+    setGeneratingReviews((prev) => new Set(prev).add(product.id));
 
     try {
+      // automation-server는 product_id (쿠팡 상품 ID)로 검색하므로 productId 전송
       const response = await fetch("/api/admin/generate-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({ productId: product.productId }),
       });
 
       const data = await response.json();
@@ -105,7 +106,7 @@ export function ProductList({
     } finally {
       setGeneratingReviews((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(productId);
+        newSet.delete(product.id);
         return newSet;
       });
     }
@@ -326,7 +327,7 @@ export function ProductList({
                     {/* 대기중 또는 실패 상태일 때 리뷰 생성/재시도 버튼 */}
                     {(product.status === "pending" || product.status === "failed") && (
                       <button
-                        onClick={() => handleGenerateReview(product.id)}
+                        onClick={() => handleGenerateReview(product)}
                         disabled={generatingReviews.has(product.id)}
                         className="rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >

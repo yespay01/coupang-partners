@@ -228,14 +228,39 @@ router.get('/products', async (req, res) => {
 router.get('/products/stats', async (req, res) => {
   try {
     const db = getDb();
-    const result = await db.query(`
-      SELECT status, COUNT(*) as count FROM products GROUP BY status
-    `);
 
-    const stats = {};
-    result.rows.forEach(row => { stats[row.status] = parseInt(row.count); });
+    const [totalResult, sourceResult, statusResult] = await Promise.all([
+      db.query('SELECT COUNT(*) as count FROM products'),
+      db.query(`
+        SELECT
+          CASE
+            WHEN source LIKE 'keyword:%' THEN 'keyword'
+            WHEN source LIKE 'category:%' THEN 'category'
+            WHEN source LIKE 'coupangPL:%' THEN 'coupangPL'
+            WHEN source = 'goldbox' THEN 'goldbox'
+            ELSE 'other'
+          END as source_group,
+          COUNT(*) as count
+        FROM products
+        GROUP BY source_group
+      `),
+      db.query('SELECT status, COUNT(*) as count FROM products GROUP BY status'),
+    ]);
 
-    res.json({ success: true, data: stats });
+    const bySource = {};
+    sourceResult.rows.forEach(row => { bySource[row.source_group] = parseInt(row.count); });
+
+    const byStatus = {};
+    statusResult.rows.forEach(row => { byStatus[row.status] = parseInt(row.count); });
+
+    res.json({
+      success: true,
+      data: {
+        total: parseInt(totalResult.rows[0].count),
+        bySource,
+        byStatus,
+      },
+    });
   } catch (error) {
     console.error('상품 통계 조회 오류:', error);
     res.status(500).json({ success: false, message: error.message });
