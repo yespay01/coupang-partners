@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 해당 template의 prompt 설정을 시스템 설정에 적용
+    // 기존 templates 배열을 유지하면서 prompt 설정만 업데이트
     const updateRes = await fetch(
       `${AUTOMATION_SERVER_URL}/api/admin/settings`,
       {
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           prompt: {
+            templates,
             systemPrompt: template.systemPrompt,
             reviewTemplate: template.reviewTemplate,
             additionalGuidelines: template.additionalGuidelines,

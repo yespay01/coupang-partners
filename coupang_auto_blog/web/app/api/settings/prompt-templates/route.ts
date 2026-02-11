@@ -9,6 +9,38 @@ async function getSessionCookie() {
   return cookieStore.get("admin_session");
 }
 
+/** 현재 저장된 템플릿 배열을 가져온다 */
+async function fetchCurrentTemplates(cookieValue: string): Promise<any[]> {
+  const response = await fetch(
+    `${AUTOMATION_SERVER_URL}/api/admin/settings`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `admin_session=${cookieValue}`,
+      },
+    }
+  );
+
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.data?.prompt?.templates || [];
+}
+
+/** 전체 템플릿 배열을 저장한다 */
+async function saveTemplates(cookieValue: string, templates: any[]) {
+  return fetch(`${AUTOMATION_SERVER_URL}/api/admin/settings`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `admin_session=${cookieValue}`,
+    },
+    body: JSON.stringify({
+      prompt: { templates },
+    }),
+  });
+}
+
 /**
  * GET /api/settings/prompt-templates
  * 프롬프트 템플릿 조회 (settings의 templates 필드)
@@ -24,26 +56,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const response = await fetch(
-      `${AUTOMATION_SERVER_URL}/api/admin/settings`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: `admin_session=${sessionCookie.value}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: "설정 조회 실패" },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    const templates = data.data?.prompt?.templates || [];
+    const templates = await fetchCurrentTemplates(sessionCookie.value);
 
     const { searchParams } = new URL(request.url);
     const templateId = searchParams.get("id");
@@ -76,7 +89,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/settings/prompt-templates
- * 새 프롬프트 템플릿 생성 (settings에 저장)
+ * 새 프롬프트 템플릿 생성 (기존 배열에 추가)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -98,22 +111,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // settings에 template 추가
-    const response = await fetch(
-      `${AUTOMATION_SERVER_URL}/api/admin/settings`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: `admin_session=${sessionCookie.value}`,
-        },
-        body: JSON.stringify({
-          prompt: {
-            templates: [{ ...input, id: `tpl_${Date.now()}` }],
-          },
-        }),
-      }
-    );
+    // 현재 템플릿 목록을 가져와서 새 템플릿을 추가
+    const currentTemplates = await fetchCurrentTemplates(sessionCookie.value);
+    const newTemplate = {
+      ...input,
+      id: `tpl_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const updatedTemplates = [...currentTemplates, newTemplate];
+
+    const response = await saveTemplates(sessionCookie.value, updatedTemplates);
 
     if (!response.ok) {
       return NextResponse.json(
@@ -167,21 +175,32 @@ export async function PUT(request: NextRequest) {
 
     const input = await request.json();
 
-    const response = await fetch(
-      `${AUTOMATION_SERVER_URL}/api/admin/settings`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: `admin_session=${sessionCookie.value}`,
-        },
-        body: JSON.stringify({
-          prompt: {
-            templates: [{ ...input, id: templateId }],
-          },
-        }),
+    // 현재 템플릿 목록을 가져와서 대상 템플릿만 수정
+    const currentTemplates = await fetchCurrentTemplates(sessionCookie.value);
+    const index = currentTemplates.findIndex((t: any) => t.id === templateId);
+
+    if (index === -1) {
+      return NextResponse.json(
+        { error: "템플릿을 찾을 수 없습니다." },
+        { status: 404 }
+      );
+    }
+
+    // isDefault 변경 시: 다른 템플릿의 isDefault를 해제
+    if (input.isDefault) {
+      for (const t of currentTemplates) {
+        t.isDefault = false;
       }
-    );
+    }
+
+    currentTemplates[index] = {
+      ...currentTemplates[index],
+      ...input,
+      id: templateId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const response = await saveTemplates(sessionCookie.value, currentTemplates);
 
     if (!response.ok) {
       return NextResponse.json(
@@ -233,22 +252,18 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // settings에서 해당 template 제거를 위해 현재 settings 조회 후 업데이트
-    const response = await fetch(
-      `${AUTOMATION_SERVER_URL}/api/admin/settings`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: `admin_session=${sessionCookie.value}`,
-        },
-        body: JSON.stringify({
-          prompt: {
-            deleteTemplateId: templateId,
-          },
-        }),
-      }
-    );
+    // 현재 템플릿 목록에서 대상 제거
+    const currentTemplates = await fetchCurrentTemplates(sessionCookie.value);
+    const updatedTemplates = currentTemplates.filter((t: any) => t.id !== templateId);
+
+    if (updatedTemplates.length === currentTemplates.length) {
+      return NextResponse.json(
+        { error: "템플릿을 찾을 수 없습니다." },
+        { status: 404 }
+      );
+    }
+
+    const response = await saveTemplates(sessionCookie.value, updatedTemplates);
 
     if (!response.ok) {
       return NextResponse.json(
