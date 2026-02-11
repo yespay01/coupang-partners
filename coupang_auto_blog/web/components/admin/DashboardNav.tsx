@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiClient } from "@/lib/apiClient";
 
 export function DashboardNav() {
-  const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -14,14 +12,11 @@ export function DashboardNav() {
 
     setIsLoggingOut(true);
     try {
-      // 로그아웃 API 호출 (로컬 토큰 삭제 + 서버 쿠키 삭제)
       await apiClient.logout();
-
-      // 로그인 페이지로 이동
-      router.push("/admin/login");
+      // 전체 페이지 리로드로 모든 상태 초기화
+      window.location.href = "/admin/login";
     } catch (error) {
       console.error("로그아웃 오류:", error);
-      alert("로그아웃 중 오류가 발생했습니다.");
       setIsLoggingOut(false);
     }
   };

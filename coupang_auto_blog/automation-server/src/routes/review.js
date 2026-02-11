@@ -68,6 +68,68 @@ router.get('/reviews', async (req, res) => {
 });
 
 /**
+ * GET /api/reviews/id/:id
+ * 공개 리뷰 상세 조회 (ID 기반) + 조회수 증가
+ * 반드시 /reviews/:slug 보다 먼저 등록해야 함
+ */
+router.get('/reviews/id/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const { id } = req.params;
+
+    const result = await db.query(
+      `SELECT * FROM reviews WHERE id = $1 AND status = 'published'`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '리뷰를 찾을 수 없습니다.',
+      });
+    }
+
+    const row = result.rows[0];
+
+    // 조회수 증가 (비동기, 실패해도 무시)
+    db.query(
+      'UPDATE reviews SET view_count = COALESCE(view_count, 0) + 1 WHERE id = $1',
+      [row.id]
+    ).catch(err => console.error('조회수 증가 실패:', err));
+
+    const review = {
+      id: String(row.id),
+      productId: row.product_id,
+      productName: row.product_name,
+      productPrice: row.product_price,
+      productImage: row.product_image,
+      title: row.title,
+      content: row.content,
+      slug: row.slug,
+      status: row.status,
+      category: row.category,
+      affiliateUrl: row.affiliate_url,
+      author: row.author,
+      media: row.media,
+      charCount: row.char_count,
+      viewCount: (row.view_count || 0) + 1,
+      seoMeta: row.seo_meta,
+      createdAt: row.created_at?.toISOString(),
+      updatedAt: row.updated_at?.toISOString(),
+      publishedAt: row.published_at?.toISOString(),
+    };
+
+    res.json({ success: true, data: review });
+  } catch (error) {
+    console.error('리뷰 ID 상세 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/reviews/:slug
  * 공개 리뷰 상세 조회 (slug 기반) + 조회수 증가
  */

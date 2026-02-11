@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getReviewById, type ReviewDoc } from "@/lib/firestore";
+import { type ReviewDoc } from "@/lib/firestore";
 
 function formatDate(dateString: string): string {
   if (!dateString) return "";
@@ -47,9 +47,11 @@ export default function ReviewDetailPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await getReviewById(reviewId);
-        if (data) {
-          setReview(data);
+        const res = await fetch(`/api/reviews/${reviewId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          setReview(json.data);
         } else {
           setError("리뷰를 찾을 수 없습니다.");
         }
