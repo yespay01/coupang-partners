@@ -241,6 +241,27 @@ router.post('/generate', async (req, res) => {
 
     // 2. 시스템 설정 로드
     const settings = await getSystemSettings();
+
+    // 3. 프롬프트 설정 결정: 기본 템플릿이 있으면 템플릿 값 사용
+    let promptSettings = settings.prompt;
+    let templateSource = '시스템 설정';
+
+    if (settings.prompt?.templates?.length > 0) {
+      const defaultTemplate = settings.prompt.templates.find(t => t.isDefault);
+      if (defaultTemplate) {
+        promptSettings = {
+          ...settings.prompt,
+          systemPrompt: defaultTemplate.systemPrompt || settings.prompt.systemPrompt,
+          reviewTemplate: defaultTemplate.reviewTemplate || settings.prompt.reviewTemplate,
+          additionalGuidelines: defaultTemplate.additionalGuidelines || settings.prompt.additionalGuidelines,
+          minLength: defaultTemplate.minLength ?? settings.prompt.minLength,
+          maxLength: defaultTemplate.maxLength ?? settings.prompt.maxLength,
+          toneScoreThreshold: defaultTemplate.toneScoreThreshold ?? settings.prompt.toneScoreThreshold,
+        };
+        templateSource = `템플릿: ${defaultTemplate.name}`;
+      }
+    }
+
     logger.info('=== 적용된 설정 ===', {
       ai: {
         provider: settings.ai.defaultProvider,
@@ -250,11 +271,12 @@ router.post('/generate', async (req, res) => {
         maxTokens: settings.ai.maxTokens,
       },
       prompt: {
-        systemPrompt: settings.prompt.systemPrompt?.substring(0, 50) + '...',
-        reviewTemplate: settings.prompt.reviewTemplate?.substring(0, 50) + '...',
-        minLength: settings.prompt.minLength,
-        maxLength: settings.prompt.maxLength,
-        toneScoreThreshold: settings.prompt.toneScoreThreshold,
+        source: templateSource,
+        systemPrompt: promptSettings.systemPrompt?.substring(0, 50) + '...',
+        reviewTemplate: promptSettings.reviewTemplate?.substring(0, 50) + '...',
+        minLength: promptSettings.minLength,
+        maxLength: promptSettings.maxLength,
+        toneScoreThreshold: promptSettings.toneScoreThreshold,
       },
       images: {
         stockEnabled: settings.images?.stockImages?.enabled,
@@ -264,18 +286,18 @@ router.post('/generate', async (req, res) => {
       },
     });
 
-    // 3. 프롬프트 빌드
+    // 4. 프롬프트 빌드
     const productForPrompt = {
       name: product.product_name,
       productName: product.product_name,
       category: product.category_name,
       categoryName: product.category_name,
     };
-    const userPrompt = buildPromptFromSettings(productForPrompt, settings.prompt);
+    const userPrompt = buildPromptFromSettings(productForPrompt, promptSettings);
     logger.info('빌드된 프롬프트:', userPrompt);
 
-    // 4. AI 리뷰 생성
-    const aiResult = await generateText(settings.ai, userPrompt, settings.prompt.systemPrompt);
+    // 5. AI 리뷰 생성
+    const aiResult = await generateText(settings.ai, userPrompt, promptSettings.systemPrompt);
     const reviewText = aiResult.text;
     logger.info('AI 리뷰 생성 완료', {
       provider: aiResult.provider,
@@ -284,10 +306,10 @@ router.post('/generate', async (req, res) => {
       usage: aiResult.usage,
     });
 
-    // 5. 품질 검증 (실패 시 에러 throw)
+    // 6. 품질 검증 (실패 시 에러 throw)
     let toneScore, charCount;
     try {
-      const validation = validateReviewContentWithSettings(reviewText, settings.prompt);
+      const validation = validateReviewContentWithSettings(reviewText, promptSettings);
       toneScore = validation.toneScore;
       charCount = validation.charCount;
     } catch (validationError) {
@@ -359,9 +381,10 @@ router.post('/generate', async (req, res) => {
       imageSources: media.map(m => m.credit || 'unknown'),
       usage: aiResult.usage,
       appliedSettings: {
-        promptMinLength: settings.prompt.minLength,
-        promptMaxLength: settings.prompt.maxLength,
-        reviewTemplate: settings.prompt.reviewTemplate?.substring(0, 80),
+        templateSource,
+        promptMinLength: promptSettings.minLength,
+        promptMaxLength: promptSettings.maxLength,
+        reviewTemplate: promptSettings.reviewTemplate?.substring(0, 80),
       },
     });
 
