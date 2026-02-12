@@ -622,9 +622,12 @@ function AdminDashboardViewContent({
           </>
         )}
 
+        {/* 수익 차트 (대시보드에만 표시) */}
+        {showMetrics && <EarningsChart />}
+
         {/* 리뷰 섹션 */}
         {showReviews && (
-          <section className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+          <section>
             <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               {/* 헤더 */}
               <div className="flex items-center justify-between">
@@ -775,9 +778,6 @@ function AdminDashboardViewContent({
                 <ReviewDetail review={selectedReview} />
               </div>
             </article>
-
-            {/* 수익 차트 (대시보드에만 표시) */}
-            {resolvedView === "overview" && <EarningsChart />}
           </section>
         )}
 
