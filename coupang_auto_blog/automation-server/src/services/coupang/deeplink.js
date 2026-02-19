@@ -14,7 +14,7 @@ export async function createDeeplinks(params, credentials) {
   const { urls, subId } = params;
   const { accessKey, secretKey } = credentials;
 
-  const path = `/v2/providers/affiliate_open_api/apis/openapi/deeplink`;
+  const path = `/v2/providers/affiliate_open_api/apis/openapi/v1/deeplink`;
 
   const body = {
     coupangUrls: Array.isArray(urls) ? urls : [urls],
@@ -31,7 +31,7 @@ export async function createDeeplinks(params, credentials) {
       dataCount: result.data?.length || 0,
     });
 
-    if (result.rCode !== 0) {
+    if (result.rCode != 0) {
       logger.warn("Coupang deeplink failed:", result.rMessage);
       return { success: false, message: result.rMessage, deeplinks: [] };
     }
