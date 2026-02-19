@@ -7,6 +7,7 @@
 
 import { logger } from "../utils/logger.js";
 import fetch from "node-fetch";
+import { generateText } from "./aiProviders.js";
 
 // 카테고리 ID → 검색 키워드 매핑
 const CATEGORY_KEYWORDS = {
@@ -142,49 +143,59 @@ const BRAND_NAMES = [
 ];
 
 /**
- * 한국어 상품명에서 영어 검색 키워드 추출
- * 1) KO_TO_EN_KEYWORDS 사전으로 핵심 단어 변환 시도
- * 2) 없으면 브랜드/수량 제거 후 한국어 단어 반환 (카테고리 폴백용)
+ * AI를 활용해 한국어 상품명에서 영어 이미지 검색 키워드 추출
+ * maxTokens: 30으로 API 비용 최소화
+ */
+async function extractKeywordWithAI(productName, aiSettings) {
+  if (!productName || !aiSettings) return null;
+
+  try {
+    const prompt = `다음 한국어 상품명을 보고 Unsplash/Pexels 이미지 검색에 쓸 영어 키워드 2~3개만 출력하세요.
+상품명: "${productName}"
+규칙: 영어 단어만, 공백 구분, 브랜드명/수량 제외, 상품의 핵심 특성 위주
+예시 출력: bluetooth earphone wireless`;
+
+    const result = await generateText(
+      { ...aiSettings, maxTokens: 30, temperature: 0.1 },
+      prompt,
+      ""
+    );
+
+    // 영어/숫자/공백만 남기고 정제
+    const keyword = result.text
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (keyword && keyword.length > 2) {
+      logger.info(`AI 키워드 추출 성공: "${productName}" → "${keyword}"`);
+      return keyword;
+    }
+    return null;
+  } catch (error) {
+    logger.warn(`AI 키워드 추출 실패 (${productName}): ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * 사전 기반 폴백: 한국어 상품명에서 영어 키워드 추출
+ * AI 실패 시에만 사용
  */
 function extractKeywordFromProductName(productName) {
   if (!productName) return null;
 
-  // 1. KO_TO_EN_KEYWORDS 사전에서 매칭되는 영어 키워드 검색
+  // KO_TO_EN_KEYWORDS 사전에서 매칭
   for (const [koWord, enKeyword] of Object.entries(KO_TO_EN_KEYWORDS)) {
     if (productName.includes(koWord)) {
-      logger.info(`한→영 키워드 변환: "${koWord}" → "${enKeyword}" (상품명: "${productName}")`);
+      logger.info(`사전 키워드 변환: "${koWord}" → "${enKeyword}"`);
       return enKeyword;
     }
   }
 
-  // 2. 사전에 없으면 브랜드/불필요 부분 제거 후 정제
-  let keyword = productName;
-
-  for (const brand of BRAND_NAMES) {
-    const regex = new RegExp(brand, "gi");
-    keyword = keyword.replace(regex, "");
-  }
-
-  keyword = keyword
-    .replace(/\[[^\]]*\]/g, "")
-    .replace(/\([^)]*\)/g, "")
-    .replace(/\d+[gkmlL개입팩병캔포장]/g, "")
-    .replace(/[0-9]+/g, "")
-    .replace(/(실속형|특가|대용량|프리미엄|고급|한정판|신제품|베스트)/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  // 3. 한국어만 남은 경우 null 반환 → 카테고리 폴백으로 처리
-  if (/^[가-힣\s]+$/.test(keyword)) {
-    return null;
-  }
-
-  const words = keyword.split(/\s+/).filter((w) => w.length > 0);
-  if (words.length > 2) {
-    keyword = words.slice(0, 2).join(" ");
-  }
-
-  return keyword || null;
+  return null;
 }
 
 // 카테고리 이름(한국어) → 영어 키워드 매핑
@@ -250,29 +261,31 @@ export async function fetchUnsplashImages(product, settings) {
     const categoryId = product.categoryId;
     const categoryName = product.category || product.categoryName || "";
 
-    // 1차: 상품명에서 영어 키워드 추출 (한→영 변환 사전 활용)
-    let keyword = extractKeywordFromProductName(productName);
+    // 1순위: AI로 상품명 분석 → 영어 키워드 추출
+    let keyword = await extractKeywordWithAI(productName, settings.ai);
 
-    // 2차: 상품명에서 추출 실패 시 카테고리 기반 키워드
+    // 2순위: AI 실패 시 사전 기반 폴백
     if (!keyword) {
-      keyword = getKeywordForCategory(categoryId, categoryName);
-      logger.info(`상품명 키워드 추출 실패 → 카테고리 폴백: "${keyword}" (categoryId: ${categoryId}, categoryName: ${categoryName})`);
+      keyword = extractKeywordFromProductName(productName);
     }
 
-    // 카테고리도 없으면 이미지 수집 포기
+    // 3순위: 사전도 없으면 카테고리 기반 폴백
     if (!keyword) {
-      logger.warn(`Unsplash: 키워드를 찾을 수 없습니다. 이미지 수집 스킵 (상품: "${productName}")`);
+      keyword = getKeywordForCategory(categoryId, categoryName);
+      if (keyword) logger.info(`카테고리 폴백 사용: "${keyword}"`);
+    }
+
+    if (!keyword) {
+      logger.warn(`Unsplash: 키워드 없음, 이미지 수집 스킵 (상품: "${productName}")`);
       return [];
     }
 
-    logger.info(`Unsplash 이미지 검색: "${keyword}" (원본: "${productName}") (${count}장)`);
+    logger.info(`Unsplash 이미지 검색: "${keyword}" (상품: "${productName}") (${count}장)`);
 
     const response = await fetch(
       `https://api.unsplash.com/search/photos?query=${encodeURIComponent(keyword)}&per_page=${count}&orientation=landscape`,
       { headers: { Authorization: `Client-ID ${apiKey}` } }
     );
-
-    logger.info(`Unsplash API 응답 상태: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -280,34 +293,18 @@ export async function fetchUnsplashImages(product, settings) {
       throw new Error(`Unsplash API 오류: ${response.status}`);
     }
 
-    let data = await response.json();
+    const data = await response.json();
     logger.info(`Unsplash 결과: total=${data.total}, results=${data.results?.length || 0}`);
 
-    // 결과 없으면 카테고리 폴백 (아직 시도 안 한 경우)
-    if ((!data.results || data.results.length === 0)) {
-      const fallbackKeyword = getKeywordForCategory(categoryId, categoryName);
-      if (fallbackKeyword && fallbackKeyword !== keyword) {
-        logger.info(`Unsplash 결과 없음 → 카테고리 폴백 재검색: "${fallbackKeyword}"`);
-        const fallbackResponse = await fetch(
-          `https://api.unsplash.com/search/photos?query=${encodeURIComponent(fallbackKeyword)}&per_page=${count}&orientation=landscape`,
-          { headers: { Authorization: `Client-ID ${apiKey}` } }
-        );
-        if (fallbackResponse.ok) {
-          data = await fallbackResponse.json();
-          logger.info(`Unsplash 카테고리 재검색 결과: total=${data.total}, results=${data.results?.length || 0}`);
-        }
-      }
-    }
-
     if (!data.results || data.results.length === 0) {
-      logger.warn(`Unsplash에서 이미지를 찾을 수 없습니다 (키워드: "${keyword}")`);
+      logger.warn(`Unsplash 결과 없음 (키워드: "${keyword}")`);
       return [];
     }
 
     const images = data.results.slice(0, count).map((img) => ({
       type: "image",
       url: img.urls.regular,
-      alt: img.alt_description || `${keyword} 관련 이미지`,
+      alt: img.alt_description || `${keyword} 이미지`,
       credit: `Photo by ${img.user.name} on Unsplash`,
       creditUrl: img.user.links.html,
     }));
@@ -339,21 +336,26 @@ export async function fetchPexelsImages(product, settings) {
     const categoryId = product.categoryId;
     const categoryName = product.category || product.categoryName || "";
 
-    // 1차: 상품명에서 영어 키워드 추출
-    let keyword = extractKeywordFromProductName(productName);
+    // 1순위: AI로 상품명 분석 → 영어 키워드 추출
+    let keyword = await extractKeywordWithAI(productName, settings.ai);
 
-    // 2차: 카테고리 기반 폴백
+    // 2순위: AI 실패 시 사전 기반 폴백
+    if (!keyword) {
+      keyword = extractKeywordFromProductName(productName);
+    }
+
+    // 3순위: 카테고리 기반 폴백
     if (!keyword) {
       keyword = getKeywordForCategory(categoryId, categoryName);
-      logger.info(`상품명 키워드 추출 실패 → 카테고리 폴백: "${keyword}"`);
+      if (keyword) logger.info(`카테고리 폴백 사용: "${keyword}"`);
     }
 
     if (!keyword) {
-      logger.warn(`Pexels: 키워드를 찾을 수 없습니다. 이미지 수집 스킵 (상품: "${productName}")`);
+      logger.warn(`Pexels: 키워드 없음, 이미지 수집 스킵 (상품: "${productName}")`);
       return [];
     }
 
-    logger.info(`Pexels 이미지 검색: "${keyword}" (원본: "${productName}") (${count}장)`);
+    logger.info(`Pexels 이미지 검색: "${keyword}" (상품: "${productName}") (${count}장)`);
 
     const response = await fetch(
       `https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=${count}&orientation=landscape`,
@@ -364,32 +366,17 @@ export async function fetchPexelsImages(product, settings) {
       throw new Error(`Pexels API 오류: ${response.status}`);
     }
 
-    let data = await response.json();
-
-    // 결과 없으면 카테고리 폴백
-    if (!data.photos || data.photos.length === 0) {
-      const fallbackKeyword = getKeywordForCategory(categoryId, categoryName);
-      if (fallbackKeyword && fallbackKeyword !== keyword) {
-        logger.info(`Pexels 결과 없음 → 카테고리 폴백 재검색: "${fallbackKeyword}"`);
-        const fallbackResponse = await fetch(
-          `https://api.pexels.com/v1/search?query=${encodeURIComponent(fallbackKeyword)}&per_page=${count}&orientation=landscape`,
-          { headers: { Authorization: apiKey } }
-        );
-        if (fallbackResponse.ok) {
-          data = await fallbackResponse.json();
-        }
-      }
-    }
+    const data = await response.json();
 
     if (!data.photos || data.photos.length === 0) {
-      logger.warn(`Pexels에서 이미지를 찾을 수 없습니다 (키워드: "${keyword}")`);
+      logger.warn(`Pexels 결과 없음 (키워드: "${keyword}")`);
       return [];
     }
 
     const images = data.photos.slice(0, count).map((photo) => ({
       type: "image",
       url: photo.src.large,
-      alt: photo.alt || `${keyword} 관련 이미지`,
+      alt: photo.alt || `${keyword} 이미지`,
       credit: `Photo by ${photo.photographer} on Pexels`,
       creditUrl: photo.photographer_url,
     }));
