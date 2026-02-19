@@ -129,8 +129,12 @@ export async function DELETE(
       );
     }
 
+    // resetProduct 쿼리 파라미터 전달 (리뷰 삭제 + 상품 pending 리셋)
+    const resetProduct = request.nextUrl.searchParams.get("resetProduct");
+    const queryString = resetProduct ? `?resetProduct=${resetProduct}` : "";
+
     const response = await fetch(
-      `${AUTOMATION_SERVER_URL}/api/admin/reviews/${id}`,
+      `${AUTOMATION_SERVER_URL}/api/admin/reviews/${id}${queryString}`,
       {
         method: "DELETE",
         headers: {

@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useFirebase } from "@/components/FirebaseProvider";
 import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
 import type { LogEntry, WorkflowItem } from "@/hooks/useAdminDashboardData";
-import { recordAdminAction, updateReviewStatus, deleteReview, regenerateReview } from "@/lib/firestore";
+import { recordAdminAction, updateReviewStatus, deleteReview } from "@/lib/firestore";
 import { useAdminDashboardStore } from "@/stores/adminDashboardStore";
 import { ReviewEditorModal } from "@/components/ReviewEditorModal";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
@@ -449,12 +449,8 @@ function AdminDashboardViewContent({
       setActionMessage(null);
 
       try {
-        // 리뷰 삭제 + 상품 상태를 pending으로 변경
-        if (productId) {
-          await regenerateReview(reviewId, productId);
-        } else {
-          await deleteReview(reviewId);
-        }
+        // 리뷰 삭제 + 상품 상태를 pending으로 리셋
+        await deleteReview(reviewId, { resetProduct: !!productId });
 
         await recordAdminAction("admin_actions", {
           reviewId,

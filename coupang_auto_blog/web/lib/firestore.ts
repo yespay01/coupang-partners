@@ -134,8 +134,12 @@ export async function updateReviewStatus(
   await apiClient.put(`/api/admin/reviews/${reviewId}/status`, { status });
 }
 
-export async function deleteReview(reviewId: string): Promise<void> {
-  await apiClient.delete(`/api/admin/reviews/${reviewId}`);
+export async function deleteReview(
+  reviewId: string,
+  options: { resetProduct?: boolean } = {}
+): Promise<void> {
+  const query = options.resetProduct ? "?resetProduct=true" : "";
+  await apiClient.delete(`/api/admin/reviews/${reviewId}${query}`);
 }
 
 export async function regenerateReview(

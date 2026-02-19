@@ -135,15 +135,29 @@ router.put('/reviews/:id', async (req, res) => {
 
 /**
  * DELETE /api/admin/reviews/:id
- * 리뷰 삭제
+ * 리뷰 삭제 (쿼리 파라미터 resetProduct=true 시 연관 상품을 pending으로 리셋)
  */
 router.delete('/reviews/:id', async (req, res) => {
+  const db = getDb();
   try {
-    const db = getDb();
-    const result = await db.query('DELETE FROM reviews WHERE id = $1 RETURNING id', [req.params.id]);
+    const result = await db.query(
+      'DELETE FROM reviews WHERE id = $1 RETURNING id, product_id',
+      [req.params.id]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: '리뷰를 찾을 수 없습니다.' });
+    }
+
+    // resetProduct=true이면 연관 상품을 pending으로 리셋
+    if (req.query.resetProduct === 'true') {
+      const productId = result.rows[0].product_id;
+      if (productId) {
+        await db.query(
+          "UPDATE products SET status = 'pending', updated_at = NOW() WHERE product_id = $1",
+          [productId]
+        );
+      }
     }
 
     res.json({ success: true, message: '리뷰가 삭제되었습니다.' });
