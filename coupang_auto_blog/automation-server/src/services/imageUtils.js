@@ -10,23 +10,113 @@ import fetch from "node-fetch";
 
 // 카테고리 ID → 검색 키워드 매핑
 const CATEGORY_KEYWORDS = {
-  "1001": ["fashion", "women clothing", "style"],
-  "1002": ["fashion", "men clothing", "style"],
-  "1010": ["beauty", "cosmetics", "skincare"],
-  "1011": ["baby", "kids", "parenting"],
-  "1012": ["food", "cooking", "kitchen"],
-  "1013": ["kitchen", "cooking", "utensils"],
-  "1014": ["home", "living", "household"],
-  "1015": ["interior", "home decor", "furniture"],
-  "1016": ["electronics", "gadget", "technology"],
-  "1017": ["sports", "fitness", "outdoor"],
-  "1018": ["car", "automotive", "vehicle"],
-  "1019": ["books", "reading", "literature"],
-  "1020": ["toys", "hobby", "games"],
-  "1021": ["office", "stationery", "workspace"],
-  "1024": ["health", "fitness", "wellness"],
-  "1029": ["pet", "animals", "dog cat"],
-  "1030": ["kids fashion", "children clothing", "baby wear"],
+  "1001": ["women fashion", "women clothing", "dress style"],
+  "1002": ["men fashion", "men clothing", "menswear"],
+  "1010": ["skincare beauty", "cosmetics", "face cream"],
+  "1011": ["baby products", "baby care", "infant"],
+  "1012": ["food ingredients", "cooking food", "grocery"],
+  "1013": ["kitchen utensils", "cooking tools", "cookware"],
+  "1014": ["home appliance", "household items", "living essentials"],
+  "1015": ["home interior", "home decor", "furniture"],
+  "1016": ["electronics", "gadget", "smart device"],
+  "1017": ["sports equipment", "fitness gear", "outdoor activity"],
+  "1018": ["car accessories", "automotive parts", "vehicle"],
+  "1019": ["books reading", "literature", "education"],
+  "1020": ["toys games", "hobby craft", "board game"],
+  "1021": ["office supplies", "stationery", "desk accessories"],
+  "1024": ["health supplement", "wellness", "vitamin"],
+  "1029": ["pet accessories", "dog food", "cat care"],
+  "1030": ["children clothing", "kids fashion", "baby wear"],
+};
+
+// 한국어 핵심 단어 → 영어 검색 키워드 변환 사전
+const KO_TO_EN_KEYWORDS = {
+  // 뷰티/스킨케어
+  "스킨케어": "skincare",
+  "로션": "lotion skincare",
+  "크림": "face cream skincare",
+  "세럼": "serum skincare",
+  "에센스": "essence skincare",
+  "선크림": "sunscreen SPF",
+  "마스크팩": "sheet mask skincare",
+  "샴푸": "shampoo hair care",
+  "헤어": "hair care",
+  "향수": "perfume fragrance",
+  "립스틱": "lipstick makeup",
+  "파운데이션": "foundation makeup",
+  "아이섀도": "eyeshadow makeup",
+  // 가전/전자
+  "이어폰": "earphone headphone",
+  "에어팟": "wireless earbuds",
+  "블루투스": "bluetooth wireless",
+  "스피커": "bluetooth speaker",
+  "노트북": "laptop computer",
+  "태블릿": "tablet computer",
+  "스마트폰": "smartphone mobile",
+  "충전기": "charger cable",
+  "마우스": "computer mouse",
+  "키보드": "keyboard computer",
+  "모니터": "monitor screen",
+  "카메라": "camera photography",
+  "청소기": "vacuum cleaner",
+  "에어컨": "air conditioner cooling",
+  "냉장고": "refrigerator kitchen",
+  "세탁기": "washing machine",
+  "전자레인지": "microwave oven",
+  "드라이기": "hair dryer",
+  // 패션
+  "티셔츠": "t-shirt casual wear",
+  "청바지": "jeans denim",
+  "원피스": "dress women fashion",
+  "운동화": "sneakers shoes",
+  "구두": "dress shoes leather",
+  "가방": "bag handbag",
+  "지갑": "wallet purse",
+  "시계": "watch accessory",
+  "선글라스": "sunglasses eyewear",
+  "후드": "hoodie sweatshirt",
+  "자켓": "jacket outerwear",
+  "코트": "coat winter fashion",
+  // 식품
+  "커피": "coffee beans",
+  "녹차": "green tea",
+  "홍삼": "red ginseng health",
+  "비타민": "vitamin supplement",
+  "단백질": "protein supplement fitness",
+  "견과류": "nuts healthy snack",
+  "과자": "snack food",
+  // 스포츠/아웃도어
+  "요가": "yoga mat fitness",
+  "런닝": "running shoes jogging",
+  "등산": "hiking outdoor",
+  "자전거": "bicycle cycling",
+  "헬스": "gym fitness workout",
+  "수영": "swimming sport",
+  "텐트": "camping tent outdoor",
+  // 주방/생활
+  "냄비": "cookware pot kitchen",
+  "프라이팬": "frying pan cooking",
+  "도마": "cutting board kitchen",
+  "칼": "kitchen knife cooking",
+  "텀블러": "tumbler water bottle",
+  "그릇": "bowl dishes tableware",
+  "소파": "sofa couch living room",
+  "침대": "bed bedroom furniture",
+  "책상": "desk office furniture",
+  "의자": "chair furniture",
+  "조명": "lighting lamp home",
+  "커튼": "curtain home decor",
+  "카펫": "carpet rug flooring",
+  // 반려동물
+  "강아지": "dog pet",
+  "고양이": "cat pet",
+  "사료": "pet food",
+  "펫": "pet accessories",
+  // 유아
+  "기저귀": "diaper baby care",
+  "유모차": "stroller baby",
+  "분유": "baby formula milk",
+  "장난감": "toy children play",
 };
 
 // 주요 브랜드명 리스트 (검색에서 제외)
@@ -52,57 +142,96 @@ const BRAND_NAMES = [
 ];
 
 /**
- * 상품명에서 검색 키워드 추출
- * 브랜드명, 용량 등을 제거하고 핵심 키워드만 추출
+ * 한국어 상품명에서 영어 검색 키워드 추출
+ * 1) KO_TO_EN_KEYWORDS 사전으로 핵심 단어 변환 시도
+ * 2) 없으면 브랜드/수량 제거 후 한국어 단어 반환 (카테고리 폴백용)
  */
 function extractKeywordFromProductName(productName) {
-  if (!productName) return "product";
+  if (!productName) return null;
 
+  // 1. KO_TO_EN_KEYWORDS 사전에서 매칭되는 영어 키워드 검색
+  for (const [koWord, enKeyword] of Object.entries(KO_TO_EN_KEYWORDS)) {
+    if (productName.includes(koWord)) {
+      logger.info(`한→영 키워드 변환: "${koWord}" → "${enKeyword}" (상품명: "${productName}")`);
+      return enKeyword;
+    }
+  }
+
+  // 2. 사전에 없으면 브랜드/불필요 부분 제거 후 정제
   let keyword = productName;
 
-  // 1. 브랜드명 제거
   for (const brand of BRAND_NAMES) {
     const regex = new RegExp(brand, "gi");
     keyword = keyword.replace(regex, "");
   }
 
-  // 2. 불필요한 부분 제거
   keyword = keyword
-    .replace(/\[[^\]]*\]/g, "") // [대용량], [특가] 등 제거
-    .replace(/\([^)]*\)/g, "") // (3kg), (10개입) 등 제거
-    .replace(/\d+[gkmlL개입팩병캔포장]/g, "") // 용량/수량 제거
-    .replace(/[0-9]+/g, "") // 숫자 제거
-    .replace(/\s+/g, " ") // 연속된 공백 제거
-    .trim();
-
-  // 3. "실속형", "특가", "대용량" 같은 수식어 제거
-  keyword = keyword
+    .replace(/\[[^\]]*\]/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\d+[gkmlL개입팩병캔포장]/g, "")
+    .replace(/[0-9]+/g, "")
     .replace(/(실속형|특가|대용량|프리미엄|고급|한정판|신제품|베스트)/gi, "")
+    .replace(/\s+/g, " ")
     .trim();
 
-  // 4. 너무 긴 경우 앞부분만 사용 (첫 2단어)
+  // 3. 한국어만 남은 경우 null 반환 → 카테고리 폴백으로 처리
+  if (/^[가-힣\s]+$/.test(keyword)) {
+    return null;
+  }
+
   const words = keyword.split(/\s+/).filter((w) => w.length > 0);
   if (words.length > 2) {
     keyword = words.slice(0, 2).join(" ");
-  } else if (words.length > 0) {
-    keyword = words.join(" ");
   }
 
-  // 5. 최소 길이 체크 (너무 짧으면 원본에서 다시 추출)
-  if (keyword.length < 2) {
-    const originalWords = productName.split(/\s+/);
-    keyword = originalWords.slice(-2).join(" "); // 뒤에서 2단어
-  }
-
-  return keyword || "product";
+  return keyword || null;
 }
+
+// 카테고리 이름(한국어) → 영어 키워드 매핑
+const CATEGORY_NAME_KEYWORDS = {
+  "패션의류": "fashion clothing style",
+  "여성패션": "women fashion clothing",
+  "남성패션": "men fashion clothing",
+  "뷰티": "beauty skincare cosmetics",
+  "스킨케어": "skincare face cream",
+  "헤어케어": "hair care shampoo",
+  "유아동": "baby kids children",
+  "식품": "food grocery cooking",
+  "주방용품": "kitchen cookware utensils",
+  "생활용품": "household items home essentials",
+  "가구/인테리어": "furniture home interior",
+  "가전디지털": "electronics gadget tech",
+  "스포츠/레저": "sports fitness outdoor",
+  "자동차용품": "car accessories automotive",
+  "도서": "books reading",
+  "완구/취미": "toys hobby games",
+  "문구/오피스": "office stationery",
+  "헬스/건강식품": "health supplement wellness",
+  "반려동물": "pet dog cat accessories",
+  "출산/육아": "baby parenting infant",
+};
 
 /**
  * 카테고리에서 검색 키워드 가져오기 (폴백용)
+ * categoryId 또는 categoryName 중 하나라도 있으면 사용
  */
-function getKeywordForCategory(categoryId) {
-  const keywords = CATEGORY_KEYWORDS[categoryId] || ["product", "shopping"];
-  return keywords[0]; // 첫 번째 키워드 사용
+function getKeywordForCategory(categoryId, categoryName) {
+  // 카테고리 ID로 먼저 찾기
+  if (categoryId && CATEGORY_KEYWORDS[categoryId]) {
+    return CATEGORY_KEYWORDS[categoryId][0];
+  }
+
+  // 카테고리 이름으로 찾기 (부분 매칭)
+  if (categoryName) {
+    for (const [koName, enKeyword] of Object.entries(CATEGORY_NAME_KEYWORDS)) {
+      if (categoryName.includes(koName) || koName.includes(categoryName)) {
+        return enKeyword;
+      }
+    }
+  }
+
+  // 둘 다 없으면 null 반환 (이미지 수집 포기)
+  return null;
 }
 
 /**
@@ -117,19 +246,31 @@ export async function fetchUnsplashImages(product, settings) {
   }
 
   try {
-    // 상품명에서 키워드 추출
     const productName = product.name || product.productName || "";
-    const keyword = extractKeywordFromProductName(productName);
-    const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(keyword)}&per_page=${count}&orientation=landscape`;
+    const categoryId = product.categoryId;
+    const categoryName = product.category || product.categoryName || "";
+
+    // 1차: 상품명에서 영어 키워드 추출 (한→영 변환 사전 활용)
+    let keyword = extractKeywordFromProductName(productName);
+
+    // 2차: 상품명에서 추출 실패 시 카테고리 기반 키워드
+    if (!keyword) {
+      keyword = getKeywordForCategory(categoryId, categoryName);
+      logger.info(`상품명 키워드 추출 실패 → 카테고리 폴백: "${keyword}" (categoryId: ${categoryId}, categoryName: ${categoryName})`);
+    }
+
+    // 카테고리도 없으면 이미지 수집 포기
+    if (!keyword) {
+      logger.warn(`Unsplash: 키워드를 찾을 수 없습니다. 이미지 수집 스킵 (상품: "${productName}")`);
+      return [];
+    }
 
     logger.info(`Unsplash 이미지 검색: "${keyword}" (원본: "${productName}") (${count}장)`);
-    logger.info(`Unsplash API URL: ${url}`);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Client-ID ${apiKey}`,
-      },
-    });
+    const response = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(keyword)}&per_page=${count}&orientation=landscape`,
+      { headers: { Authorization: `Client-ID ${apiKey}` } }
+    );
 
     logger.info(`Unsplash API 응답 상태: ${response.status}`);
 
@@ -140,41 +281,26 @@ export async function fetchUnsplashImages(product, settings) {
     }
 
     let data = await response.json();
-    logger.info(`Unsplash API 응답 데이터: total=${data.total}, results=${data.results?.length || 0}`);
+    logger.info(`Unsplash 결과: total=${data.total}, results=${data.results?.length || 0}`);
 
-    // 한국어 키워드로 결과가 없으면 카테고리 영어 키워드로 재검색
-    if ((!data.results || data.results.length === 0) && product.categoryId) {
-      const fallbackKeyword = getKeywordForCategory(product.categoryId);
-      logger.info(`Unsplash 한국어 검색 결과 없음 → 카테고리 영어 키워드로 재검색: "${fallbackKeyword}"`);
-
-      const fallbackUrl = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(fallbackKeyword)}&per_page=${count}&orientation=landscape`;
-      const fallbackResponse = await fetch(fallbackUrl, {
-        headers: { Authorization: `Client-ID ${apiKey}` },
-      });
-
-      if (fallbackResponse.ok) {
-        data = await fallbackResponse.json();
-        logger.info(`Unsplash 카테고리 재검색 결과: total=${data.total}, results=${data.results?.length || 0}`);
-      }
-    }
-
-    // 그래도 없으면 상품명 첫 단어 + "product"로 최종 시도
-    if (!data.results || data.results.length === 0) {
-      const genericKeyword = "product shopping";
-      logger.info(`Unsplash 카테고리 검색도 실패 → 범용 키워드로 최종 시도: "${genericKeyword}"`);
-
-      const genericUrl = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(genericKeyword)}&per_page=${count}&orientation=landscape`;
-      const genericResponse = await fetch(genericUrl, {
-        headers: { Authorization: `Client-ID ${apiKey}` },
-      });
-
-      if (genericResponse.ok) {
-        data = await genericResponse.json();
+    // 결과 없으면 카테고리 폴백 (아직 시도 안 한 경우)
+    if ((!data.results || data.results.length === 0)) {
+      const fallbackKeyword = getKeywordForCategory(categoryId, categoryName);
+      if (fallbackKeyword && fallbackKeyword !== keyword) {
+        logger.info(`Unsplash 결과 없음 → 카테고리 폴백 재검색: "${fallbackKeyword}"`);
+        const fallbackResponse = await fetch(
+          `https://api.unsplash.com/search/photos?query=${encodeURIComponent(fallbackKeyword)}&per_page=${count}&orientation=landscape`,
+          { headers: { Authorization: `Client-ID ${apiKey}` } }
+        );
+        if (fallbackResponse.ok) {
+          data = await fallbackResponse.json();
+          logger.info(`Unsplash 카테고리 재검색 결과: total=${data.total}, results=${data.results?.length || 0}`);
+        }
       }
     }
 
     if (!data.results || data.results.length === 0) {
-      logger.warn(`Unsplash에서 이미지를 찾을 수 없습니다 (모든 검색 실패)`);
+      logger.warn(`Unsplash에서 이미지를 찾을 수 없습니다 (키워드: "${keyword}")`);
       return [];
     }
 
@@ -209,18 +335,30 @@ export async function fetchPexelsImages(product, settings) {
   }
 
   try {
-    // 상품명에서 키워드 추출
     const productName = product.name || product.productName || "";
-    const keyword = extractKeywordFromProductName(productName);
-    const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=${count}&orientation=landscape`;
+    const categoryId = product.categoryId;
+    const categoryName = product.category || product.categoryName || "";
+
+    // 1차: 상품명에서 영어 키워드 추출
+    let keyword = extractKeywordFromProductName(productName);
+
+    // 2차: 카테고리 기반 폴백
+    if (!keyword) {
+      keyword = getKeywordForCategory(categoryId, categoryName);
+      logger.info(`상품명 키워드 추출 실패 → 카테고리 폴백: "${keyword}"`);
+    }
+
+    if (!keyword) {
+      logger.warn(`Pexels: 키워드를 찾을 수 없습니다. 이미지 수집 스킵 (상품: "${productName}")`);
+      return [];
+    }
 
     logger.info(`Pexels 이미지 검색: "${keyword}" (원본: "${productName}") (${count}장)`);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: apiKey,
-      },
-    });
+    const response = await fetch(
+      `https://api.pexels.com/v1/search?query=${encodeURIComponent(keyword)}&per_page=${count}&orientation=landscape`,
+      { headers: { Authorization: apiKey } }
+    );
 
     if (!response.ok) {
       throw new Error(`Pexels API 오류: ${response.status}`);
@@ -228,35 +366,23 @@ export async function fetchPexelsImages(product, settings) {
 
     let data = await response.json();
 
-    // 한국어 키워드로 결과가 없으면 카테고리 영어 키워드로 재검색
-    if ((!data.photos || data.photos.length === 0) && product.categoryId) {
-      const fallbackKeyword = getKeywordForCategory(product.categoryId);
-      logger.info(`Pexels 한국어 검색 결과 없음 → 카테고리 영어 키워드로 재검색: "${fallbackKeyword}"`);
-
-      const fallbackUrl = `https://api.pexels.com/v1/search?query=${encodeURIComponent(fallbackKeyword)}&per_page=${count}&orientation=landscape`;
-      const fallbackResponse = await fetch(fallbackUrl, {
-        headers: { Authorization: apiKey },
-      });
-
-      if (fallbackResponse.ok) {
-        data = await fallbackResponse.json();
-      }
-    }
-
-    // 그래도 없으면 범용 키워드로 최종 시도
+    // 결과 없으면 카테고리 폴백
     if (!data.photos || data.photos.length === 0) {
-      const genericUrl = `https://api.pexels.com/v1/search?query=${encodeURIComponent("product shopping")}&per_page=${count}&orientation=landscape`;
-      const genericResponse = await fetch(genericUrl, {
-        headers: { Authorization: apiKey },
-      });
-
-      if (genericResponse.ok) {
-        data = await genericResponse.json();
+      const fallbackKeyword = getKeywordForCategory(categoryId, categoryName);
+      if (fallbackKeyword && fallbackKeyword !== keyword) {
+        logger.info(`Pexels 결과 없음 → 카테고리 폴백 재검색: "${fallbackKeyword}"`);
+        const fallbackResponse = await fetch(
+          `https://api.pexels.com/v1/search?query=${encodeURIComponent(fallbackKeyword)}&per_page=${count}&orientation=landscape`,
+          { headers: { Authorization: apiKey } }
+        );
+        if (fallbackResponse.ok) {
+          data = await fallbackResponse.json();
+        }
       }
     }
 
     if (!data.photos || data.photos.length === 0) {
-      logger.warn(`Pexels에서 이미지를 찾을 수 없습니다 (모든 검색 실패)`);
+      logger.warn(`Pexels에서 이미지를 찾을 수 없습니다 (키워드: "${keyword}")`);
       return [];
     }
 
