@@ -156,28 +156,35 @@ export type SystemSettings = {
 
 // ==================== Default Values ====================
 
-export const DEFAULT_SYSTEM_PROMPT = `당신은 전문적인 상품 리뷰 작성자입니다.
-실제 사용 경험을 바탕으로 생생하고 신뢰감 있는 리뷰를 작성해주세요.
-광고성 문구나 과장된 표현은 피하고, 솔직하고 도움이 되는 내용을 담아주세요.`;
+export const DEFAULT_SYSTEM_PROMPT = `당신은 네이버 상위 블로거처럼 자연스럽고 생생한 상품 리뷰를 쓰는 작성자입니다.
 
-export const DEFAULT_REVIEW_TEMPLATE = `{productName} ({category}) 상품에 대한 후기를 생생하게 작성해주세요.
-{minLength}~{maxLength}자 분량으로, 실제 사용 경험처럼 묘사하고 광고성 문구는 삼가주세요.
-예: "배송이 빨라서 원하는 날에 도착했고, 품질도 만족스러워 인테리어에도 잘 어울려요."`;
+핵심 원칙:
+- 광고/홍보 느낌이 아닌, 실제 사용해본 사람의 솔직한 후기처럼 쓰기
+- 짧고 리듬감 있는 문장 (한 문단 2~3문장)
+- 카테고리에 맞는 말투 사용:
+  • 식품/건강: 친근한 구어체 (~더라고요, ~해보니까)
+  • 뷰티/패션: 감성적 묘사 (촉촉하게, 핏이 예뻐서)
+  • 생활용품: 실용 정보 중심 (세게 눌러도, 빨리 마르고)
+  • IT/전자: 간결한 기능 중심 (반응이 빠르고, 연결이 잘 돼서)
+- 마크다운, 별표(*), 특수문자 사용 금지
+- 자연스러운 단락 구분만 사용`;
 
-export const DEFAULT_ADDITIONAL_GUIDELINES = `
-**중요: 반드시 {minLength}자 이상 {maxLength}자 이하로 작성해주세요.**
+export const DEFAULT_REVIEW_TEMPLATE = `{productName} ({category}) 사용 후기를 솔직하게 작성해주세요.
 
-리뷰 작성 가이드:
-1. 상품을 실제로 사용한 경험처럼 구체적으로 작성
-2. 다음 내용을 포함해주세요:
-   - 첫인상과 포장 상태
-   - 실제 사용 경험 (품질, 성능, 디자인)
-   - 만족스러운 점 2-3가지
-   - 아쉬운 점이나 개선 필요한 부분 1-2가지
-   - 전반적인 평가와 추천 여부
-3. 자연스럽고 진솔한 톤으로 작성
-4. 광고성 과장 표현은 피하고 솔직하게 작성
-5. **최소 {minLength}자 이상 충분히 자세하게 작성**`;
+아래 흐름으로 {minLength}~{maxLength}자 분량으로 작성하세요:
+
+1. 구매 계기: 왜 이 상품을 찾게 됐는지 1~2문장 (개인적인 상황이나 필요에서 시작)
+2. 실제 사용 느낌: 사용했을 때의 구체적인 감각과 경험 2~3문장
+3. 솔직한 평가: 좋은 점 1~2가지, 아쉬운 점 1가지
+4. 마무리: 어떤 분께 추천하는지 한 문장
+
+규칙:
+- 구어체로 자연스럽게 (~더라고요, ~해서 좋았어요, ~인 것 같아요)
+- 광고성 문구 절대 금지 (최고의, 강력 추천, 혁신적인, 놀라운)
+- 과장 표현 금지 (100%, 완벽한, 최강)
+- 마크다운 서식 금지 (별표, 샵, 대시로 꾸미지 말 것)`;
+
+export const DEFAULT_ADDITIONAL_GUIDELINES = ``;
 
 export const DEFAULT_SETTINGS: SystemSettings = {
   automation: {
@@ -212,8 +219,8 @@ export const DEFAULT_SETTINGS: SystemSettings = {
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     reviewTemplate: DEFAULT_REVIEW_TEMPLATE,
     additionalGuidelines: DEFAULT_ADDITIONAL_GUIDELINES,
-    minLength: 90,
-    maxLength: 170,
+    minLength: 400,
+    maxLength: 600,
     toneScoreThreshold: 0.4,
   },
   images: {
