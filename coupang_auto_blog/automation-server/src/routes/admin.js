@@ -273,22 +273,35 @@ router.get('/products/stats', async (req, res) => {
  * 상품 삭제
  */
 router.delete('/products/:id', async (req, res) => {
+  const db = getDb();
   try {
-    const db = getDb();
     const { id } = req.params;
 
-    const result = await db.query(
-      'DELETE FROM products WHERE id = $1 RETURNING id, product_name',
+    // 상품 존재 확인
+    const productResult = await db.query(
+      'SELECT id, product_id, product_name FROM products WHERE id = $1',
       [id]
     );
 
-    if (result.rows.length === 0) {
+    if (productResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: '상품을 찾을 수 없습니다.' });
     }
 
+    const product = productResult.rows[0];
+
+    // 연관 리뷰 먼저 삭제 (외래키 제약 해소)
+    const reviewDeleteResult = await db.query(
+      'DELETE FROM reviews WHERE product_id = $1 RETURNING id',
+      [product.product_id]
+    );
+
+    // 상품 삭제
+    await db.query('DELETE FROM products WHERE id = $1', [id]);
+
     res.json({
       success: true,
-      message: `상품이 삭제되었습니다: ${result.rows[0].product_name}`,
+      message: `상품이 삭제되었습니다: ${product.product_name}`,
+      deletedReviews: reviewDeleteResult.rows.length,
     });
   } catch (error) {
     console.error('상품 삭제 오류:', error);
