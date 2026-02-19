@@ -9,6 +9,7 @@ type ProductListProps = {
   totalCount: number;
   filters: Partial<ProductFilters>;
   onFilterChange: (filters: Partial<ProductFilters>) => void;
+  onDeleteProduct?: (productId: string) => void;
   pageIndex?: number;
   hasNextPage?: boolean;
   hasPrevPage?: boolean;
@@ -43,6 +44,7 @@ export function ProductList({
   totalCount,
   filters,
   onFilterChange,
+  onDeleteProduct,
   pageIndex = 0,
   hasNextPage = false,
   hasPrevPage = false,
@@ -52,6 +54,7 @@ export function ProductList({
 }: ProductListProps) {
   const [search, setSearch] = useState(filters.search || "");
   const [generatingReviews, setGeneratingReviews] = useState<Set<string>>(new Set());
+  const [deletingProducts, setDeletingProducts] = useState<Set<string>>(new Set());
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,6 +108,36 @@ export function ProductList({
       alert(error instanceof Error ? error.message : "리뷰 생성 중 오류가 발생했습니다.");
     } finally {
       setGeneratingReviews((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(product.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (deletingProducts.has(product.id)) return;
+    if (!confirm(`"${product.productName}" 상품을 삭제하시겠습니까?`)) return;
+
+    setDeletingProducts((prev) => new Set(prev).add(product.id));
+
+    try {
+      const response = await fetch(`/api/admin/products/${product.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "삭제 실패");
+      }
+
+      onDeleteProduct?.(product.id);
+    } catch (error) {
+      console.error("상품 삭제 오류:", error);
+      alert(error instanceof Error ? error.message : "삭제 중 오류가 발생했습니다.");
+    } finally {
+      setDeletingProducts((prev) => {
         const newSet = new Set(prev);
         newSet.delete(product.id);
         return newSet;
@@ -338,6 +371,14 @@ export function ProductList({
                             : "리뷰 생성"}
                       </button>
                     )}
+                    {/* 삭제 버튼 */}
+                    <button
+                      onClick={() => handleDeleteProduct(product)}
+                      disabled={deletingProducts.has(product.id)}
+                      className="ml-auto rounded-lg border border-red-300 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {deletingProducts.has(product.id) ? "삭제 중..." : "삭제"}
+                    </button>
                   </div>
                 </div>
               </div>

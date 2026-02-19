@@ -30,11 +30,17 @@ export default function ProductsPage() {
     goToNextPage,
     goToPrevPage,
     goToFirstPage,
+    refetch,
   } = useProducts(filters);
-  const { data: stats, isLoading: statsLoading } = useProductStats();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useProductStats();
 
   const handleFilterChange = (newFilters: Partial<ProductFilters>) => {
     setFilters(newFilters);
+  };
+
+  const handleDeleteProduct = () => {
+    refetch();
+    refetchStats();
   };
 
   return (
@@ -107,6 +113,7 @@ export default function ProductsPage() {
             totalCount={data.totalCount}
             filters={filters}
             onFilterChange={handleFilterChange}
+            onDeleteProduct={handleDeleteProduct}
             pageIndex={pageIndex}
             hasNextPage={hasNextPage}
             hasPrevPage={hasPrevPage}

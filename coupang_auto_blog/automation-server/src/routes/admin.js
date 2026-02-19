@@ -268,6 +268,34 @@ router.get('/products/stats', async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/admin/products/:id
+ * 상품 삭제
+ */
+router.delete('/products/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const { id } = req.params;
+
+    const result = await db.query(
+      'DELETE FROM products WHERE id = $1 RETURNING id, product_name',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '상품을 찾을 수 없습니다.' });
+    }
+
+    res.json({
+      success: true,
+      message: `상품이 삭제되었습니다: ${result.rows[0].product_name}`,
+    });
+  } catch (error) {
+    console.error('상품 삭제 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ==================== Logs ====================
 
 /**
