@@ -96,10 +96,11 @@ async function collectByKeywords(client, keywords, maxProducts) {
       const products = result.products.slice(0, maxProducts - collected);
       if (products.length === 0) continue;
 
-      // 배치 딥링크 생성
-      const productUrls = products.map((p) => p.productUrl);
-      const deeplinkResult = await client.createDeeplinks(productUrls);
+      // 배치 딥링크 생성 (productId로 일반 쿠팡 URL 생성 - API가 www.coupang.com URL 필요)
+      const deeplinkUrls = products.map((p) => `https://www.coupang.com/vp/products/${p.productId}`);
+      const deeplinkResult = await client.createDeeplinks(deeplinkUrls);
 
+      // productId → shortenUrl 매핑
       const deeplinkMap = new Map();
       if (deeplinkResult.success && deeplinkResult.deeplinks) {
         if (deeplinkResult.deeplinks.length === 0) {
@@ -107,9 +108,7 @@ async function collectByKeywords(client, keywords, maxProducts) {
         }
         deeplinkResult.deeplinks.forEach((dl, index) => {
           if (dl.shortenUrl) {
-            // productUrl 필드가 있으면 그것을 키로, 없으면 인덱스 기반 매핑
-            const key = dl.productUrl || dl.originalUrl || productUrls[index];
-            deeplinkMap.set(key, dl.shortenUrl);
+            deeplinkMap.set(products[index].productId, dl.shortenUrl);
           }
         });
       } else if (!deeplinkResult.success) {
@@ -119,7 +118,8 @@ async function collectByKeywords(client, keywords, maxProducts) {
       for (const product of products) {
         if (collected >= maxProducts) break;
 
-        const affiliateUrl = deeplinkMap.get(product.productUrl) || product.productUrl;
+        // productId로 매핑, 실패 시 productUrl(이미 affiliate URL) 폴백
+        const affiliateUrl = deeplinkMap.get(product.productId) || product.productUrl;
         const saved = await saveProduct(
           { ...product, affiliateUrl },
           `keyword:${keyword}`
@@ -150,8 +150,8 @@ async function collectGoldbox(client, maxProducts) {
     const products = result.products.slice(0, maxProducts);
     if (products.length === 0) return 0;
 
-    const productUrls = products.map((p) => p.productUrl);
-    const deeplinkResult = await client.createDeeplinks(productUrls);
+    const deeplinkUrls = products.map((p) => `https://www.coupang.com/vp/products/${p.productId}`);
+    const deeplinkResult = await client.createDeeplinks(deeplinkUrls);
 
     const deeplinkMap = new Map();
     if (deeplinkResult.success && deeplinkResult.deeplinks) {
@@ -160,8 +160,7 @@ async function collectGoldbox(client, maxProducts) {
       }
       deeplinkResult.deeplinks.forEach((dl, index) => {
         if (dl.shortenUrl) {
-          const key = dl.productUrl || dl.originalUrl || productUrls[index];
-          deeplinkMap.set(key, dl.shortenUrl);
+          deeplinkMap.set(products[index].productId, dl.shortenUrl);
         }
       });
     } else if (!deeplinkResult.success) {
@@ -170,7 +169,7 @@ async function collectGoldbox(client, maxProducts) {
 
     let collected = 0;
     for (const product of products) {
-      const affiliateUrl = deeplinkMap.get(product.productUrl) || product.productUrl;
+      const affiliateUrl = deeplinkMap.get(product.productId) || product.productUrl;
       const saved = await saveProduct({ ...product, affiliateUrl }, 'goldbox');
       if (saved) collected++;
     }
@@ -209,8 +208,8 @@ async function collectCoupangPL(client, brands, maxProducts) {
       const products = result.products.slice(0, maxProducts - collected);
       if (products.length === 0) continue;
 
-      const productUrls = products.map((p) => p.productUrl);
-      const deeplinkResult = await client.createDeeplinks(productUrls);
+      const deeplinkUrls = products.map((p) => `https://www.coupang.com/vp/products/${p.productId}`);
+      const deeplinkResult = await client.createDeeplinks(deeplinkUrls);
 
       const deeplinkMap = new Map();
       if (deeplinkResult.success && deeplinkResult.deeplinks) {
@@ -219,8 +218,7 @@ async function collectCoupangPL(client, brands, maxProducts) {
         }
         deeplinkResult.deeplinks.forEach((dl, index) => {
           if (dl.shortenUrl) {
-            const key = dl.productUrl || dl.originalUrl || productUrls[index];
-            deeplinkMap.set(key, dl.shortenUrl);
+            deeplinkMap.set(products[index].productId, dl.shortenUrl);
           }
         });
       } else if (!deeplinkResult.success) {
@@ -230,7 +228,7 @@ async function collectCoupangPL(client, brands, maxProducts) {
       for (const product of products) {
         if (collected >= maxProducts) break;
 
-        const affiliateUrl = deeplinkMap.get(product.productUrl) || product.productUrl;
+        const affiliateUrl = deeplinkMap.get(product.productId) || product.productUrl;
         const saved = await saveProduct(
           { ...product, affiliateUrl },
           `coupangPL:${brandId}`
@@ -280,8 +278,8 @@ async function collectByCategories(client, categories, maxProducts) {
       const products = result.products.slice(0, maxProducts - collected);
       if (products.length === 0) continue;
 
-      const productUrls = products.map((p) => p.productUrl);
-      const deeplinkResult = await client.createDeeplinks(productUrls);
+      const deeplinkUrls = products.map((p) => `https://www.coupang.com/vp/products/${p.productId}`);
+      const deeplinkResult = await client.createDeeplinks(deeplinkUrls);
 
       const deeplinkMap = new Map();
       if (deeplinkResult.success && deeplinkResult.deeplinks) {
@@ -290,8 +288,7 @@ async function collectByCategories(client, categories, maxProducts) {
         }
         deeplinkResult.deeplinks.forEach((dl, index) => {
           if (dl.shortenUrl) {
-            const key = dl.productUrl || dl.originalUrl || productUrls[index];
-            deeplinkMap.set(key, dl.shortenUrl);
+            deeplinkMap.set(products[index].productId, dl.shortenUrl);
           }
         });
       } else if (!deeplinkResult.success) {
@@ -301,7 +298,7 @@ async function collectByCategories(client, categories, maxProducts) {
       for (const product of products) {
         if (collected >= maxProducts) break;
 
-        const affiliateUrl = deeplinkMap.get(product.productUrl) || product.productUrl;
+        const affiliateUrl = deeplinkMap.get(product.productId) || product.productUrl;
         const saved = await saveProduct(
           {
             ...product,
