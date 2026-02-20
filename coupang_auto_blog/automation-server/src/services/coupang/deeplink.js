@@ -18,8 +18,12 @@ export async function createDeeplinks(params, credentials) {
 
   const body = {
     coupangUrls: Array.isArray(urls) ? urls : [urls],
-    subId: subId || "",
   };
+
+  // subId가 있을 때만 포함 (빈 문자열 전송 시 API 오류 가능)
+  if (subId) {
+    body.subId = subId;
+  }
 
   try {
     logger.info(`딥링크 생성 요청: ${urls.length || 1}개 URL`);
