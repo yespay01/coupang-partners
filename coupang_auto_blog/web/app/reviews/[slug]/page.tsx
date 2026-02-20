@@ -142,20 +142,9 @@ export default async function ReviewPage({ params }: PageProps) {
 }
 
 /**
- * 정적 경로 생성 (빌드 시에는 빈 배열 반환)
+ * 정적 경로 생성 - 빈 배열 반환 (dynamicParams=true로 런타임에 동적 처리)
+ * 빌드 중 automation-server가 없으므로 API 호출 안 함
  */
 export async function generateStaticParams() {
-  try {
-    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/reviews?limit=100`);
-    if (!response.ok) return [];
-
-    const result = await response.json();
-    const reviews = result.data?.reviews || [];
-
-    return reviews
-      .filter((r: any) => r.slug)
-      .map((r: any) => ({ slug: r.slug }));
-  } catch {
-    return [];
-  }
+  return [];
 }
