@@ -102,11 +102,18 @@ async function collectByKeywords(client, keywords, maxProducts) {
 
       const deeplinkMap = new Map();
       if (deeplinkResult.success && deeplinkResult.deeplinks) {
+        if (deeplinkResult.deeplinks.length === 0) {
+          console.warn(`키워드(${keyword}) 딥링크 결과가 비어있습니다.`);
+        }
         deeplinkResult.deeplinks.forEach((dl, index) => {
           if (dl.shortenUrl) {
-            deeplinkMap.set(productUrls[index], dl.shortenUrl);
+            // productUrl 필드가 있으면 그것을 키로, 없으면 인덱스 기반 매핑
+            const key = dl.productUrl || dl.originalUrl || productUrls[index];
+            deeplinkMap.set(key, dl.shortenUrl);
           }
         });
+      } else if (!deeplinkResult.success) {
+        console.warn(`키워드(${keyword}) 딥링크 생성 실패: ${deeplinkResult.message}`);
       }
 
       for (const product of products) {
@@ -148,11 +155,17 @@ async function collectGoldbox(client, maxProducts) {
 
     const deeplinkMap = new Map();
     if (deeplinkResult.success && deeplinkResult.deeplinks) {
+      if (deeplinkResult.deeplinks.length === 0) {
+        console.warn('골드박스 딥링크 결과가 비어있습니다.');
+      }
       deeplinkResult.deeplinks.forEach((dl, index) => {
         if (dl.shortenUrl) {
-          deeplinkMap.set(productUrls[index], dl.shortenUrl);
+          const key = dl.productUrl || dl.originalUrl || productUrls[index];
+          deeplinkMap.set(key, dl.shortenUrl);
         }
       });
+    } else if (!deeplinkResult.success) {
+      console.warn(`골드박스 딥링크 생성 실패: ${deeplinkResult.message}`);
     }
 
     let collected = 0;
@@ -201,11 +214,17 @@ async function collectCoupangPL(client, brands, maxProducts) {
 
       const deeplinkMap = new Map();
       if (deeplinkResult.success && deeplinkResult.deeplinks) {
+        if (deeplinkResult.deeplinks.length === 0) {
+          console.warn(`쿠팡 PL 브랜드(${brandId}) 딥링크 결과가 비어있습니다.`);
+        }
         deeplinkResult.deeplinks.forEach((dl, index) => {
           if (dl.shortenUrl) {
-            deeplinkMap.set(productUrls[index], dl.shortenUrl);
+            const key = dl.productUrl || dl.originalUrl || productUrls[index];
+            deeplinkMap.set(key, dl.shortenUrl);
           }
         });
+      } else if (!deeplinkResult.success) {
+        console.warn(`쿠팡 PL 브랜드(${brandId}) 딥링크 생성 실패: ${deeplinkResult.message}`);
       }
 
       for (const product of products) {
@@ -266,11 +285,17 @@ async function collectByCategories(client, categories, maxProducts) {
 
       const deeplinkMap = new Map();
       if (deeplinkResult.success && deeplinkResult.deeplinks) {
+        if (deeplinkResult.deeplinks.length === 0) {
+          console.warn(`카테고리(${category.name}) 딥링크 결과가 비어있습니다.`);
+        }
         deeplinkResult.deeplinks.forEach((dl, index) => {
           if (dl.shortenUrl) {
-            deeplinkMap.set(productUrls[index], dl.shortenUrl);
+            const key = dl.productUrl || dl.originalUrl || productUrls[index];
+            deeplinkMap.set(key, dl.shortenUrl);
           }
         });
+      } else if (!deeplinkResult.success) {
+        console.warn(`카테고리(${category.name}) 딥링크 생성 실패: ${deeplinkResult.message}`);
       }
 
       for (const product of products) {

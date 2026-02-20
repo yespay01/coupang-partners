@@ -39,9 +39,12 @@ export async function createDeeplinks(params, credentials) {
     // 딥링크 결과 로깅
     if (result.data && result.data.length > 0) {
       logger.info("딥링크 생성 성공:", {
-        sample: result.data[0],
         totalCount: result.data.length,
+        sampleKeys: Object.keys(result.data[0] || {}), // 응답 필드명 확인용
+        sample: result.data[0],
       });
+    } else {
+      logger.warn("딥링크 응답 data가 비어있습니다:", { rCode: result.rCode, rMessage: result.rMessage });
     }
 
     return {
