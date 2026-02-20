@@ -1,22 +1,23 @@
-import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { Noto_Serif_KR, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
+import { Metadata } from "next";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
+const notoSerif = Noto_Serif_KR({
+  subsets: ["latin"],
+  weight: ["400", "700", "900"],
+  variable: "--font-serif",
 });
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
+
+const notoSans = Noto_Sans_KR({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-sans",
 });
 
 export const metadata: Metadata = {
-  title: "쿠팡 파트너스 자동 블로그",
-  description: "AI가 생성한 후기와 수익 대시보드를 한 곳에서 관리하세요.",
+  title: "세모링크 - 세상의 모든 링크",
+  description: "세상의 모든 링크가 모이는 허브, 세모링크입니다.",
 };
 
 export default function RootLayout({
@@ -27,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${notoSerif.variable} ${notoSans.variable} font-sans antialiased`}
       >
         <Providers>
           <div className="flex min-h-screen flex-col">

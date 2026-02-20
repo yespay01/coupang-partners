@@ -17,14 +17,17 @@ async function fetchPublishedReviews(maxCount: number, retries = 2): Promise<Pub
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+
+      // Attempt multiple data extraction patterns based on API response
       if (Array.isArray(data.data)) return data.data;
-      if (Array.isArray((data.data as any)?.reviews)) return (data.data as any).reviews;
+      if (data.data && Array.isArray(data.data.reviews)) return data.data.reviews;
+      if (Array.isArray(data.reviews)) return data.reviews;
+      if (Array.isArray(data)) return data;
+
       return [];
     } catch (error) {
-      console.error(`리뷰 로딩 실패 (시도 ${attempt + 1}/${retries + 1}):`, error);
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
-      }
+      console.error(`리뷰 로딩 실패 (시도 ${attempt + 1}):`, error);
+      if (attempt < retries) await new Promise((r) => setTimeout(r, 1000));
     }
   }
   return [];
@@ -33,7 +36,7 @@ async function fetchPublishedReviews(maxCount: number, retries = 2): Promise<Pub
 function formatDate(dateString: string): string {
   if (!dateString) return "";
   const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
+  if (isNaN(date.getTime())) return dateString;
   return new Intl.DateTimeFormat("ko-KR", {
     year: "numeric",
     month: "long",
@@ -44,7 +47,6 @@ function formatDate(dateString: string): string {
 function stripHtmlTags(html: string): string {
   if (!html) return "";
   return html
-    .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<[^>]*>/g, "")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
@@ -55,7 +57,7 @@ function stripHtmlTags(html: string): string {
     .trim();
 }
 
-function truncateContent(content: string, maxLength: number = 120): string {
+function truncateContent(content: string, maxLength: number = 100): string {
   if (!content) return "";
   const plainText = stripHtmlTags(content);
   if (plainText.length <= maxLength) return plainText;
@@ -63,80 +65,55 @@ function truncateContent(content: string, maxLength: number = 120): string {
 }
 
 function ReviewCard({ review }: { review: PublishedReview }) {
+  const previewImage = review.media?.find(m => m.type === 'image')?.url;
+
   return (
-    <article className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition line-clamp-2">
-            {review.productName || `상품 리뷰 #${review.id.slice(0, 6)}`}
-          </h3>
-          <p className="mt-2 text-sm text-slate-600 line-clamp-3">
-            {truncateContent(review.content || "", 150)}
-          </p>
+    <article className="group cursor-pointer flex flex-col h-full">
+      <Link href={`/review/${review.id}`}>
+        <div className="relative aspect-[3/4] overflow-hidden bg-slate-50 mb-6 group-hover:shadow-2xl transition-shadow duration-1000">
+          {previewImage ? (
+            <img
+              src={previewImage}
+              alt={review.productName || ""}
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-slate-200 bg-slate-50">
+              <span className="text-[10px] tracking-[0.2em] font-bold uppercase">No Image Preview</span>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-500" />
         </div>
-      </div>
-      <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            {review.author || "AI 리뷰어"}
+      </Link>
+
+      <div className="flex flex-col flex-grow">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-xs font-bold tracking-widest text-amber-700/80 uppercase">
+            {review.category || "큐레이션"}
           </span>
-          <span>{formatDate(review.createdAt || "")}</span>
+          <span className="w-4 h-[1px] bg-slate-200" />
+          <span className="text-xs font-medium tracking-tight text-slate-400">
+            {formatDate(review.createdAt || "")}
+          </span>
         </div>
-        <Link
-          href={`/review/${review.id}`}
-          className="inline-flex items-center gap-1 font-medium text-blue-600 hover:text-blue-700 transition"
-        >
-          자세히 보기
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
+
+        <Link href={`/review/${review.id}`} className="block mb-4">
+          <h3 className="text-xl md:text-2xl font-serif font-bold text-slate-900 leading-tight hover:text-amber-800 transition-colors line-clamp-2 h-[3.5rem] md:h-[4rem]">
+            {review.productName}
+          </h3>
         </Link>
+
+        <p className="text-slate-500 line-clamp-2 text-base leading-relaxed font-serif italic opacity-80 mb-8 min-h-[3rem]">
+          "{truncateContent(review.content || "", 90)}"
+        </p>
+
+        <div className="mt-auto pt-4 border-t border-slate-50">
+          <Link href={`/review/${review.id}`} className="text-xs font-bold tracking-widest uppercase border-b border-amber-200 pb-1 hover:border-slate-900 transition-all">
+            Read More
+          </Link>
+        </div>
       </div>
     </article>
-  );
-}
-
-function ReviewCardSkeleton() {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm animate-pulse">
-      <div className="h-6 bg-slate-200 rounded w-3/4 mb-3" />
-      <div className="space-y-2">
-        <div className="h-4 bg-slate-100 rounded w-full" />
-        <div className="h-4 bg-slate-100 rounded w-5/6" />
-      </div>
-      <div className="mt-4 flex items-center justify-between">
-        <div className="h-3 bg-slate-100 rounded w-24" />
-        <div className="h-3 bg-slate-100 rounded w-16" />
-      </div>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-12 text-center">
-      <div className="mx-auto w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-        <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
-      </div>
-      <h3 className="text-lg font-semibold text-slate-700 mb-2">아직 게시된 리뷰가 없습니다</h3>
-      <p className="text-sm text-slate-500 mb-6">
-        관리자가 리뷰를 승인하면 여기에 표시됩니다.
-      </p>
-      <Link
-        href="/admin"
-        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
-      >
-        관리자 대시보드로 이동
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-        </svg>
-      </Link>
-    </div>
   );
 }
 
@@ -149,220 +126,181 @@ const categories = [
 ];
 
 export default function HomePage() {
-  const [latestReviews, setLatestReviews] = useState<PublishedReview[]>([]);
-  const [popularReviews, setPopularReviews] = useState<PublishedReview[]>([]);
+  const [allReviews, setAllReviews] = useState<PublishedReview[]>([]);
+  const [filteredReviews, setFilteredReviews] = useState<PublishedReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState("all");
 
   useEffect(() => {
-    async function loadReviews() {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const reviews = await fetchPublishedReviews(12);
-        setLatestReviews(reviews.slice(0, 6));
-        setPopularReviews(reviews.slice(0, 6).reverse());
-      } catch (err) {
-        console.error("리뷰 로딩 실패:", err);
-        setError("리뷰를 불러오는 중 오류가 발생했습니다.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadReviews();
+    fetchPublishedReviews(100).then(data => {
+      setAllReviews(data);
+      setFilteredReviews(data);
+      setIsLoading(false);
+    });
   }, []);
 
+  useEffect(() => {
+    if (activeCategory === "all") {
+      setFilteredReviews(allReviews);
+    } else {
+      setFilteredReviews(allReviews.filter(r => r.category === activeCategory || r.category?.toLowerCase() === activeCategory));
+    }
+  }, [activeCategory, allReviews]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50/50 to-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-lg">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="flex h-16 items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">C</span>
-              </div>
-              <span className="font-bold text-slate-900">쿠팡 리뷰</span>
+    <div className="min-h-screen bg-white selection:bg-amber-50">
+      {/* Navigation */}
+      <header className="fixed top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-slate-50">
+        <div className="mx-auto max-w-7xl px-8 lg:px-16">
+          <div className="flex h-24 items-center justify-between">
+            <Link href="/" className="flex items-center">
+              <img src="/logo.png" alt="세모링크" className="h-20 md:h-28 w-auto transition-transform hover:scale-105" />
             </Link>
-            <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+
+            <nav className="hidden lg:flex items-center gap-14 text-sm font-bold tracking-[0.1em] text-slate-500">
               {categories.slice(1).map((cat) => (
                 <button
                   key={cat.slug}
                   onClick={() => setActiveCategory(cat.slug)}
-                  className={`hover:text-slate-900 transition ${
-                    activeCategory === cat.slug ? "text-blue-600" : ""
-                  }`}
+                  className={`hover:text-slate-900 transition-colors relative py-1 ${activeCategory === cat.slug ? "text-slate-900 font-black" : ""}`}
                 >
                   {cat.name}
+                  {activeCategory === cat.slug && (
+                    <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-amber-500" />
+                  )}
                 </button>
               ))}
             </nav>
-            <Link
-              href="/admin"
-              className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition"
-            >
-              관리자
-            </Link>
+
+            <div className="flex items-center gap-8">
+              <Link href="/admin" className="text-xs font-bold tracking-widest uppercase text-slate-400 hover:text-slate-900 transition-colors">
+                Journal Access
+              </Link>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-        <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-          <div className="text-center">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium text-white/90 backdrop-blur">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
-              </span>
-              AI가 작성한 신뢰할 수 있는 리뷰
+      <section className="relative pt-48 pb-32 lg:pt-64 lg:pb-48 text-center bg-[#fcf9f2]/50 overflow-hidden">
+        {/* Dynamic Decorative Orb - Sparkling movement - Increased Visibility */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-amber-300/30 rounded-full blur-[120px] animate-glow pointer-events-none" />
+        <div className="absolute top-1/3 right-[15%] w-40 h-40 border-2 border-amber-400/30 rounded-full animate-float pointer-events-none" />
+        <div className="absolute bottom-1/4 left-[10%] w-24 h-24 border-2 border-amber-500/25 rounded-full animate-float pointer-events-none" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 left-[5%] w-12 h-12 bg-amber-200/40 rounded-full blur-xl animate-pulse pointer-events-none" />
+
+        <div className="mx-auto max-w-5xl px-8 relative z-10">
+          <div className="flex flex-col items-center">
+            <div className="w-16 h-[1px] bg-amber-300 mb-10" />
+            <span className="text-[11px] font-black tracking-[0.6em] text-amber-800/60 mb-10 block uppercase">
+              Archiviste de la Qualité
             </span>
-            <h1 className="mt-6 text-3xl font-bold tracking-tight sm:text-5xl">
-              쿠팡 상품 리뷰를
-              <br />
-              <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                한눈에 확인하세요
-              </span>
+            <h1 className="text-4xl md:text-6xl font-serif font-bold text-slate-900 leading-[1.2] mb-12 tracking-tight">
+              세상의 모든 링크, <br />
+              <span className="italic font-normal serif opacity-90">더 나은 일상을 기록하다.</span>
             </h1>
-            <p className="mx-auto mt-4 max-w-xl text-base text-slate-300 sm:text-lg">
-              AI가 분석하고 정리한 쿠팡 파트너스 상품 리뷰를 만나보세요.
-              <br className="hidden sm:block" />
-              실제 구매에 도움이 되는 정보만 엄선했습니다.
+            <p className="max-w-xl text-slate-500 font-serif italic text-lg md:text-xl leading-relaxed mb-16 opacity-80">
+              "우리는 단지 제품을 소개하지 않습니다. <br />
+              품격 있는 삶을 위한 안목을 공유하고, <br />
+              당신의 매일이 하나의 예술이 되기를 바랍니다."
             </p>
+            <div className="w-[1px] h-24 bg-gradient-to-b from-amber-200 to-transparent" />
           </div>
         </div>
       </section>
 
-      {/* Category Filter (Mobile) */}
-      <div className="md:hidden border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-3">
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+      {/* Main Grid */}
+      <main className="mx-auto max-w-7xl px-8 lg:px-16 py-24">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-10 mb-20">
+          <div className="max-w-xl">
+            <h2 className="text-3xl md:text-5xl font-serif font-bold text-slate-900 mb-6">취향의 발견</h2>
+            <p className="text-slate-400 font-serif italic text-lg opacity-70">당신의 일상에 영감을 줄 선별된 아이템입니다.</p>
+          </div>
+
+          <div className="flex gap-10 overflow-x-auto no-scrollbar pb-4 border-b border-slate-50">
             {categories.map((cat) => (
               <button
                 key={cat.slug}
                 onClick={() => setActiveCategory(cat.slug)}
-                className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                  activeCategory === cat.slug
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
+                className={`shrink-0 text-sm font-bold tracking-widest uppercase transition-all ${activeCategory === cat.slug ? "text-amber-800 border-b-2 border-amber-800 pb-1" : "text-slate-400 hover:text-slate-600"
+                  }`}
               >
                 {cat.name}
               </button>
             ))}
           </div>
         </div>
-      </div>
 
-      <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        {error && (
-          <div className="mb-8 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-            {error}
-          </div>
-        )}
-
-        {/* Latest Reviews Section */}
-        <section className="mb-16">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900">최신 리뷰</h2>
-              <p className="mt-1 text-sm text-slate-500">방금 게시된 따끈따끈한 리뷰</p>
-            </div>
-            <Link
-              href="/reviews?sort=latest"
-              className="text-sm font-medium text-blue-600 hover:text-blue-700 transition flex items-center gap-1"
-            >
-              전체보기
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
-
-          {isLoading ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {[...Array(6)].map((_, i) => (
-                <ReviewCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : latestReviews.length > 0 ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {latestReviews.map((review) => (
-                <ReviewCard key={review.id} review={review} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState />
-          )}
-        </section>
-
-        {/* Popular Reviews Section */}
-        {!isLoading && popularReviews.length > 0 && (
-          <section className="mb-16">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900">인기 리뷰</h2>
-                <p className="mt-1 text-sm text-slate-500">많은 분들이 찾아본 리뷰</p>
+        {isLoading ? (
+          <div className="grid gap-x-12 gap-y-32 sm:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[3/4] bg-slate-50 mb-8" />
+                <div className="h-4 bg-slate-50 w-1/4 mb-6" />
+                <div className="h-10 bg-slate-50 w-full mb-6" />
+                <div className="h-20 bg-slate-50 w-full" />
               </div>
-              <Link
-                href="/reviews?sort=popular"
-                className="text-sm font-medium text-blue-600 hover:text-blue-700 transition flex items-center gap-1"
-              >
-                전체보기
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {popularReviews.map((review) => (
-                <ReviewCard key={`popular-${review.id}`} review={review} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* CTA Section */}
-        <section className="rounded-3xl bg-gradient-to-br from-slate-100 to-slate-50 p-8 sm:p-12 text-center">
-          <h2 className="text-2xl font-bold text-slate-900 mb-3">
-            더 많은 리뷰가 궁금하신가요?
-          </h2>
-          <p className="text-slate-600 mb-6 max-w-lg mx-auto">
-            매일 새로운 상품 리뷰가 AI에 의해 자동으로 생성되고 있습니다.
-            관리자 승인을 거쳐 신뢰할 수 있는 리뷰만 게시됩니다.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              href="/reviews"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition"
-            >
-              모든 리뷰 보기
-            </Link>
-            <Link
-              href="/admin"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
-            >
-              관리자 대시보드
-            </Link>
+            ))}
           </div>
-        </section>
+        ) : filteredReviews.length > 0 ? (
+          <div className="grid gap-x-12 gap-y-32 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredReviews.map((review) => (
+              <ReviewCard key={review.id} review={review} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-40 border-y border-slate-50">
+            <p className="text-slate-300 font-serif italic text-2xl">아직 게시된 리뷰가 없습니다.</p>
+          </div>
+        )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-xs">C</span>
-              </div>
-              <span>쿠팡 파트너스 자동화 블로그</span>
+      <footer className="bg-white pt-40 pb-20 border-t border-slate-100">
+        <div className="mx-auto max-w-7xl px-8 lg:px-16">
+          <div className="grid gap-24 lg:grid-cols-3 mb-40">
+            <div className="lg:col-span-1">
+              <img src="/logo.png" alt="세모링크" className="h-16 w-auto mb-12" />
+              <p className="text-slate-400 text-base font-serif italic leading-relaxed opacity-80">
+                Semolink는 가치 있는 소비와 일상의 발견을 기록하는 전문 아카이브입니다.
+                수많은 선택지 속에서 진정한 탁월함을 찾아내는 당신의 안목을 위해
+                우리는 가장 좋은 것만을 선별하여 기록합니다.
+              </p>
             </div>
-            <p>&copy; {new Date().getFullYear()} Coupang Partners Auto Blog. AI 기반 리뷰 시스템.</p>
+
+            <div className="lg:col-span-2 grid gap-16 grid-cols-2 md:grid-cols-3">
+              <div>
+                <h4 className="text-[11px] font-black tracking-[0.4em] uppercase text-slate-900 mb-10">ARCHIVE</h4>
+                <ul className="space-y-5 text-[10px] font-black tracking-[0.3em] uppercase text-slate-400">
+                  {categories.slice(1).map(c => (
+                    <li key={c.slug} onClick={() => setActiveCategory(c.slug)} className="hover:text-amber-800 cursor-pointer transition-colors">
+                      {c.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h4 className="text-[11px] font-black tracking-[0.4em] uppercase text-slate-900 mb-10">ABOUT</h4>
+                <ul className="space-y-5 text-[10px] font-black tracking-[0.3em] uppercase text-slate-400">
+                  <li className="hover:text-slate-900 cursor-pointer">Curation Policy</li>
+                  <li className="hover:text-slate-900 cursor-pointer">Brand Story</li>
+                  <li className="hover:text-slate-900 cursor-pointer">Contact</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="text-[11px] font-black tracking-[0.4em] uppercase text-slate-900 mb-10">LEGAL</h4>
+                <ul className="space-y-5 text-[10px] font-black tracking-[0.3em] uppercase text-slate-400">
+                  <li className="hover:text-slate-900 cursor-pointer">Privacy</li>
+                  <li className="hover:text-slate-900 cursor-pointer">Terms</li>
+                  <li className="hover:text-slate-900 cursor-pointer text-amber-700">Instagram</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8 pt-16 border-t border-slate-100 text-[10px] font-black tracking-[0.4em] uppercase text-slate-300">
+            <p>&copy; {new Date().getFullYear()} SEMOLINK ARCHIVE. ALL RIGHTS RESERVED.</p>
+            <p className="opacity-50 italic">CURATED WITH EXCELLENCE IN SEOUL</p>
           </div>
         </div>
       </footer>
