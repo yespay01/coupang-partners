@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { type ReviewDoc } from "@/lib/firestore";
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 
 function formatDate(dateString: string): string {
   if (!dateString) return "";
@@ -51,18 +53,9 @@ export default function ReviewDetailPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="fixed top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-slate-50">
-        <div className="mx-auto max-w-4xl px-6">
-          <div className="flex h-20 items-center justify-between">
-            <Link href="/">
-              <img src="/logo.png" alt="세모링크" className="h-16 w-auto" />
-            </Link>
-            <Link href="/admin" className="text-[10px] font-bold tracking-widest text-slate-400 hover:text-slate-900 transition-colors">ADMIN</Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
-      <main className="pt-40 pb-32">
+      <main className="pt-36 pb-32">
         <article className="mx-auto max-w-3xl px-6">
           <header className="text-center mb-20">
             <div className="flex items-center justify-center gap-4 mb-8">
@@ -126,15 +119,7 @@ export default function ReviewDetailPage() {
         </article>
       </main>
 
-      <footer className="bg-slate-50 py-16 border-t border-slate-100">
-        <div className="mx-auto max-w-4xl px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-bold tracking-widest uppercase text-slate-400">
-          <div className="flex items-center gap-4">
-            <img src="/logo.png" alt="세모링크" className="h-10 w-auto opacity-50" />
-            <span>Archive</span>
-          </div>
-          <p>&copy; {new Date().getFullYear()} SEMOLINK.</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

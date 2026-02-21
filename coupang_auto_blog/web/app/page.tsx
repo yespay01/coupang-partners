@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { type ReviewDoc } from "@/lib/firestore";
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 
 type PublishedReview = ReviewDoc & {
   id: string;
@@ -117,72 +119,23 @@ function ReviewCard({ review }: { review: PublishedReview }) {
   );
 }
 
-const categories = [
-  { name: "전체", slug: "all" },
-  { name: "라이프스타일", slug: "lifestyle" },
-  { name: "디지털/가전", slug: "digital" },
-  { name: "주방/쿠킹", slug: "kitchen" },
-  { name: "패션/뷰티", slug: "fashion" },
-];
-
 export default function HomePage() {
-  const [allReviews, setAllReviews] = useState<PublishedReview[]>([]);
-  const [filteredReviews, setFilteredReviews] = useState<PublishedReview[]>([]);
+  const [reviews, setReviews] = useState<PublishedReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState("all");
 
   useEffect(() => {
     fetchPublishedReviews(100).then(data => {
-      setAllReviews(data);
-      setFilteredReviews(data);
+      setReviews(data);
       setIsLoading(false);
     });
   }, []);
 
-  useEffect(() => {
-    if (activeCategory === "all") {
-      setFilteredReviews(allReviews);
-    } else {
-      setFilteredReviews(allReviews.filter(r => r.category === activeCategory || r.category?.toLowerCase() === activeCategory));
-    }
-  }, [activeCategory, allReviews]);
-
   return (
     <div className="min-h-screen bg-white selection:bg-amber-50">
-      {/* Navigation */}
-      <header className="fixed top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-slate-50">
-        <div className="mx-auto max-w-7xl px-8 lg:px-16">
-          <div className="flex h-24 items-center justify-between">
-            <Link href="/" className="flex items-center">
-              <img src="/logo.png" alt="세모링크" className="h-20 md:h-28 w-auto transition-transform hover:scale-105" />
-            </Link>
-
-            <nav className="hidden lg:flex items-center gap-14 text-sm font-bold tracking-[0.1em] text-slate-500">
-              {categories.slice(1).map((cat) => (
-                <button
-                  key={cat.slug}
-                  onClick={() => setActiveCategory(cat.slug)}
-                  className={`hover:text-slate-900 transition-colors relative py-1 ${activeCategory === cat.slug ? "text-slate-900 font-black" : ""}`}
-                >
-                  {cat.name}
-                  {activeCategory === cat.slug && (
-                    <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-amber-500" />
-                  )}
-                </button>
-              ))}
-            </nav>
-
-            <div className="flex items-center gap-8">
-              <Link href="/admin" className="text-xs font-bold tracking-widest uppercase text-slate-400 hover:text-slate-900 transition-colors">
-                Journal Access
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* Hero Section */}
-      <section className="relative pt-48 pb-32 lg:pt-64 lg:pb-48 text-center bg-[#fcf9f2]/50 overflow-hidden">
+      <section className="relative pt-48 pb-24 lg:pt-60 lg:pb-36 text-center bg-[#fcf9f2]/50 overflow-hidden">
         {/* Dynamic Decorative Orb - Sparkling movement - Increased Visibility */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-amber-300/30 rounded-full blur-[120px] animate-glow pointer-events-none" />
         <div className="absolute top-1/3 right-[15%] w-40 h-40 border-2 border-amber-400/30 rounded-full animate-float pointer-events-none" />
@@ -211,24 +164,9 @@ export default function HomePage() {
 
       {/* Main Grid */}
       <main className="mx-auto max-w-7xl px-8 lg:px-16 py-24">
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-10 mb-20">
-          <div className="max-w-xl">
-            <h2 className="text-3xl md:text-5xl font-serif font-bold text-slate-900 mb-6">취향의 발견</h2>
-            <p className="text-slate-400 font-serif italic text-lg opacity-70">당신의 일상에 영감을 줄 선별된 아이템입니다.</p>
-          </div>
-
-          <div className="flex gap-10 overflow-x-auto no-scrollbar pb-4 border-b border-slate-50">
-            {categories.map((cat) => (
-              <button
-                key={cat.slug}
-                onClick={() => setActiveCategory(cat.slug)}
-                className={`shrink-0 text-sm font-bold tracking-widest uppercase transition-all ${activeCategory === cat.slug ? "text-amber-800 border-b-2 border-amber-800 pb-1" : "text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
+        <div className="mb-16">
+          <h2 className="text-3xl md:text-5xl font-serif font-bold text-slate-900 mb-4">취향의 발견</h2>
+          <p className="text-slate-400 font-serif italic text-lg opacity-70">당신의 일상에 영감을 줄 선별된 아이템입니다.</p>
         </div>
 
         {isLoading ? (
@@ -242,9 +180,9 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-        ) : filteredReviews.length > 0 ? (
+        ) : reviews.length > 0 ? (
           <div className="grid gap-x-12 gap-y-32 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredReviews.map((review) => (
+            {reviews.map((review) => (
               <ReviewCard key={review.id} review={review} />
             ))}
           </div>
@@ -255,55 +193,7 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white pt-40 pb-20 border-t border-slate-100">
-        <div className="mx-auto max-w-7xl px-8 lg:px-16">
-          <div className="grid gap-24 lg:grid-cols-3 mb-40">
-            <div className="lg:col-span-1">
-              <img src="/logo.png" alt="세모링크" className="h-16 w-auto mb-12" />
-              <p className="text-slate-400 text-base font-serif italic leading-relaxed opacity-80">
-                Semolink는 가치 있는 소비와 일상의 발견을 기록하는 전문 아카이브입니다.
-                수많은 선택지 속에서 진정한 탁월함을 찾아내는 당신의 안목을 위해
-                우리는 가장 좋은 것만을 선별하여 기록합니다.
-              </p>
-            </div>
-
-            <div className="lg:col-span-2 grid gap-16 grid-cols-2 md:grid-cols-3">
-              <div>
-                <h4 className="text-[11px] font-black tracking-[0.4em] uppercase text-slate-900 mb-10">ARCHIVE</h4>
-                <ul className="space-y-5 text-[10px] font-black tracking-[0.3em] uppercase text-slate-400">
-                  {categories.slice(1).map(c => (
-                    <li key={c.slug} onClick={() => setActiveCategory(c.slug)} className="hover:text-amber-800 cursor-pointer transition-colors">
-                      {c.name}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h4 className="text-[11px] font-black tracking-[0.4em] uppercase text-slate-900 mb-10">ABOUT</h4>
-                <ul className="space-y-5 text-[10px] font-black tracking-[0.3em] uppercase text-slate-400">
-                  <li className="hover:text-slate-900 cursor-pointer">Curation Policy</li>
-                  <li className="hover:text-slate-900 cursor-pointer">Brand Story</li>
-                  <li className="hover:text-slate-900 cursor-pointer">Contact</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="text-[11px] font-black tracking-[0.4em] uppercase text-slate-900 mb-10">LEGAL</h4>
-                <ul className="space-y-5 text-[10px] font-black tracking-[0.3em] uppercase text-slate-400">
-                  <li className="hover:text-slate-900 cursor-pointer">Privacy</li>
-                  <li className="hover:text-slate-900 cursor-pointer">Terms</li>
-                  <li className="hover:text-slate-900 cursor-pointer text-amber-700">Instagram</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8 pt-16 border-t border-slate-100 text-[10px] font-black tracking-[0.4em] uppercase text-slate-300">
-            <p>&copy; {new Date().getFullYear()} SEMOLINK ARCHIVE. ALL RIGHTS RESERVED.</p>
-            <p className="opacity-50 italic">CURATED WITH EXCELLENCE IN SEOUL</p>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
