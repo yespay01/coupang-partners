@@ -351,7 +351,7 @@ router.post('/generate', async (req, res) => {
         reviewText,
         'draft',
         product.category_name,
-        product.affiliate_url,
+        product.product_url,
         'auto-bot',
         JSON.stringify(media),
         toneScore,

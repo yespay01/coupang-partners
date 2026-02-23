@@ -3,13 +3,27 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiClient } from "@/lib/apiClient";
 
+interface CoupangProduct {
+  ingredientName: string;
+  productName: string;
+  productPrice: number;
+  productImage?: string;
+  productUrl?: string;
+  affiliateUrl?: string;
+}
+
+interface Ingredient {
+  name: string;
+  amount: string;
+}
+
 interface Recipe {
   id: string;
   title: string;
   description: string;
-  ingredients: { name: string; amount: string }[];
+  ingredients: Ingredient[];
   instructions: string;
-  coupangProducts: { ingredientName: string; productName: string; productPrice: number }[];
+  coupangProducts: CoupangProduct[];
   imageUrl: string | null;
   slug: string;
   status: string;
@@ -24,6 +38,8 @@ export default function AdminRecipesPage() {
   const [dishName, setDishName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchRecipes = useCallback(async () => {
     try {
@@ -91,6 +107,20 @@ export default function AdminRecipesPage() {
     }
   };
 
+  const handleUnpublish = async (id: string) => {
+    try {
+      const data = await apiClient.put<{ success: boolean }>(`/api/admin/recipes/${id}`, {
+        status: "draft",
+      });
+      if (data.success) {
+        fetchRecipes();
+        setMessage({ type: "success", text: "레시피가 초안으로 변경되었습니다." });
+      }
+    } catch (err) {
+      console.error("초안 변경 실패:", err);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
     try {
@@ -102,6 +132,225 @@ export default function AdminRecipesPage() {
     }
   };
 
+  const handleEdit = async (recipe: Recipe) => {
+    // 상세 데이터 로드
+    try {
+      const data = await apiClient.get<{ success: boolean; data: Recipe }>(
+        `/api/admin/recipes/${recipe.id}`
+      );
+      if (data.success && data.data) {
+        setEditingRecipe(data.data);
+      } else {
+        setEditingRecipe(recipe);
+      }
+    } catch {
+      setEditingRecipe(recipe);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!editingRecipe || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      const data = await apiClient.put<{ success: boolean }>(`/api/admin/recipes/${editingRecipe.id}`, {
+        title: editingRecipe.title,
+        description: editingRecipe.description,
+        instructions: editingRecipe.instructions,
+        ingredients: editingRecipe.ingredients,
+        coupangProducts: editingRecipe.coupangProducts,
+      });
+
+      if (data.success) {
+        setMessage({ type: "success", text: "레시피가 수정되었습니다." });
+        setEditingRecipe(null);
+        fetchRecipes();
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "수정 중 오류 발생";
+      setMessage({ type: "error", text: errorMessage });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateIngredient = (index: number, field: keyof Ingredient, value: string) => {
+    if (!editingRecipe) return;
+    const updated = [...editingRecipe.ingredients];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditingRecipe({ ...editingRecipe, ingredients: updated });
+  };
+
+  const removeIngredient = (index: number) => {
+    if (!editingRecipe) return;
+    const updated = editingRecipe.ingredients.filter((_, i) => i !== index);
+    setEditingRecipe({ ...editingRecipe, ingredients: updated });
+  };
+
+  const addIngredient = () => {
+    if (!editingRecipe) return;
+    setEditingRecipe({
+      ...editingRecipe,
+      ingredients: [...editingRecipe.ingredients, { name: "", amount: "" }],
+    });
+  };
+
+  // 수정 화면
+  if (editingRecipe) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="mx-auto max-w-4xl space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">레시피 수정</h1>
+              <p className="mt-1 text-sm text-slate-500">레시피 내용을 수정한 후 저장하세요.</p>
+            </div>
+            <button
+              onClick={() => setEditingRecipe(null)}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              목록으로
+            </button>
+          </div>
+
+          {/* 제목 */}
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">제목</label>
+            <input
+              type="text"
+              value={editingRecipe.title}
+              onChange={(e) => setEditingRecipe({ ...editingRecipe, title: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* 설명 */}
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">설명</label>
+            <textarea
+              value={editingRecipe.description}
+              onChange={(e) => setEditingRecipe({ ...editingRecipe, description: e.target.value })}
+              rows={3}
+              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* 재료 */}
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <label className="text-sm font-semibold text-slate-700">
+                재료 ({editingRecipe.ingredients?.length || 0}개)
+              </label>
+              <button
+                onClick={addIngredient}
+                className="rounded-lg border border-blue-300 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+              >
+                + 재료 추가
+              </button>
+            </div>
+            <div className="space-y-2">
+              {editingRecipe.ingredients?.map((ing, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={ing.name}
+                    onChange={(e) => updateIngredient(i, "name", e.target.value)}
+                    placeholder="재료명"
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    value={ing.amount}
+                    onChange={(e) => updateIngredient(i, "amount", e.target.value)}
+                    placeholder="양"
+                    className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => removeIngredient(i)}
+                    className="rounded-lg border border-red-200 p-2 text-red-500 hover:bg-red-50"
+                    title="삭제"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 조리법 */}
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">조리법</label>
+            <textarea
+              value={editingRecipe.instructions}
+              onChange={(e) => setEditingRecipe({ ...editingRecipe, instructions: e.target.value })}
+              rows={12}
+              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm leading-relaxed focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* 쿠팡 상품 */}
+          {editingRecipe.coupangProducts && editingRecipe.coupangProducts.length > 0 && (
+            <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <label className="mb-4 block text-sm font-semibold text-slate-700">
+                연결된 쿠팡 상품 ({editingRecipe.coupangProducts.length}개)
+              </label>
+              <div className="space-y-2">
+                {editingRecipe.coupangProducts.map((product, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 text-sm"
+                  >
+                    <div className="flex-1">
+                      <span className="mr-2 text-xs font-medium text-amber-600">{product.ingredientName}</span>
+                      <span className="text-slate-700">{product.productName}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {product.productPrice > 0 && (
+                        <span className="text-xs font-medium text-red-600">
+                          {product.productPrice.toLocaleString()}원
+                        </span>
+                      )}
+                      {(product.affiliateUrl || product.productUrl) && (
+                        <a
+                          href={product.affiliateUrl || product.productUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-500 hover:underline"
+                        >
+                          링크 확인
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 저장 버튼 */}
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={() => setEditingRecipe(null)}
+              className="rounded-lg border border-slate-300 px-6 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              취소
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isSaving ? "저장 중..." : "저장"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 목록 화면
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -196,12 +445,25 @@ export default function AdminRecipesPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    {recipe.status === "draft" && (
+                    <button
+                      onClick={() => handleEdit(recipe)}
+                      className="rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+                    >
+                      수정
+                    </button>
+                    {recipe.status === "draft" ? (
                       <button
                         onClick={() => handlePublish(recipe.id)}
                         className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-50"
                       >
                         발행
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleUnpublish(recipe.id)}
+                        className="rounded-lg border border-yellow-300 px-3 py-1.5 text-xs font-medium text-yellow-700 transition hover:bg-yellow-50"
+                      >
+                        초안으로
                       </button>
                     )}
                     <button
