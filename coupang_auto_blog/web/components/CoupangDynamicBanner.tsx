@@ -7,26 +7,29 @@ interface CoupangDynamicBannerProps {
 }
 
 const G_JS_URL = "https://ads-partners.coupang.com/g.js";
+const WIDGET_SCRIPT = `new PartnersCoupang.G({"id":967328,"template":"carousel","trackingCode":"AF7225079","width":"680","height":"140","tsource":""});`;
 
 export function CoupangDynamicBanner({ className = "" }: CoupangDynamicBannerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const initialized = useRef(false);
 
   useEffect(() => {
-    if (initialized.current || !containerRef.current) return;
-    initialized.current = true;
+    let iframeEl: HTMLElement | null = null;
+    let widgetScript: HTMLScriptElement | null = null;
+    let observer: MutationObserver | null = null;
 
     const injectWidget = () => {
       if (!(window as any).PartnersCoupang || !containerRef.current) return;
 
-      // iframe이 body에 추가되는 순간 캐치해서 container로 이동
-      const observer = new MutationObserver((mutations) => {
+      // body에 추가되는 iframe을 감지해 container로 이동
+      observer = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           for (const node of Array.from(mutation.addedNodes)) {
             if ((node as HTMLElement).nodeName === "IFRAME") {
-              observer.disconnect();
+              observer?.disconnect();
+              observer = null;
+              iframeEl = node as HTMLElement;
               if (containerRef.current) {
-                containerRef.current.prepend(node as HTMLElement);
+                containerRef.current.appendChild(iframeEl);
               }
               return;
             }
@@ -35,33 +38,32 @@ export function CoupangDynamicBanner({ className = "" }: CoupangDynamicBannerPro
       });
       observer.observe(document.body, { childList: true });
 
-      // 위젯 스크립트 실행
-      const s = document.createElement("script");
-      s.text = `new PartnersCoupang.G({"id":967328,"template":"carousel","trackingCode":"AF7225079","width":"680","height":"140","tsource":""});`;
-      document.body.appendChild(s);
+      widgetScript = document.createElement("script");
+      widgetScript.text = WIDGET_SCRIPT;
+      document.body.appendChild(widgetScript);
     };
 
     const tryInit = () => {
       if ((window as any).PartnersCoupang) {
         injectWidget();
-      } else {
-        let tries = 0;
-        const timer = setInterval(() => {
-          tries++;
-          if ((window as any).PartnersCoupang) {
-            clearInterval(timer);
-            injectWidget();
-          } else if (tries > 50) {
-            clearInterval(timer);
-            console.warn("CoupangDynamicBanner: 로드 실패");
-          }
-        }, 100);
+        return;
       }
+      let tries = 0;
+      const timer = setInterval(() => {
+        tries++;
+        if ((window as any).PartnersCoupang) {
+          clearInterval(timer);
+          injectWidget();
+        } else if (tries > 50) {
+          clearInterval(timer);
+          console.warn("CoupangDynamicBanner: 로드 실패");
+        }
+      }, 100);
     };
 
-    const w = window as any;
-    if (!w.__coupangGLoaded__) {
-      w.__coupangGLoaded__ = true;
+    // g.js 로드 (이미 로드됐으면 재사용)
+    const existingScript = document.querySelector(`script[src="${G_JS_URL}"]`);
+    if (!existingScript) {
       const gScript = document.createElement("script");
       gScript.src = G_JS_URL;
       gScript.async = true;
@@ -71,6 +73,13 @@ export function CoupangDynamicBanner({ className = "" }: CoupangDynamicBannerPro
     } else {
       tryInit();
     }
+
+    // 페이지 이동 시 cleanup — iframe/script body에서 제거
+    return () => {
+      observer?.disconnect();
+      iframeEl?.parentNode?.removeChild(iframeEl);
+      widgetScript?.parentNode?.removeChild(widgetScript);
+    };
   }, []);
 
   return (
