@@ -10,6 +10,7 @@ RUN npm ci --only=production
 
 # 소스 복사
 COPY src ./src
+COPY db ./db
 
 # 환경변수
 ENV NODE_ENV=production
