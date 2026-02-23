@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from "./apiClient";
+import { COUPANG_CATEGORIES } from "@/types/settings";
 
 export type SystemSettings = {
   ai: {
@@ -36,7 +37,25 @@ export async function getSystemSettings(): Promise<SystemSettings> {
     const data = await apiClient.get<{ success: boolean; data: SystemSettings }>(
       "/api/admin/settings"
     );
-    return data.data;
+    const db = data.data;
+    const defaults = getDefaultSettings();
+
+    // topics.categories가 없거나 빈 배열이면 기본 카테고리(COUPANG_CATEGORIES) 사용
+    const dbCategories = db?.topics?.categories;
+    const categories =
+      Array.isArray(dbCategories) && dbCategories.length > 0
+        ? dbCategories
+        : defaults.topics.categories;
+
+    return {
+      ...defaults,
+      ...db,
+      topics: {
+        ...defaults.topics,
+        ...db?.topics,
+        categories,
+      },
+    };
   } catch {
     return getDefaultSettings();
   }
@@ -98,7 +117,7 @@ export function getDefaultSettings(): SystemSettings {
       coupangDetailImages: { enabled: false, maxCount: 3, delayMs: 2000 },
     },
     coupang: { enabled: false, accessKey: "", secretKey: "" },
-    topics: { goldboxEnabled: true, keywords: [], categories: [], coupangPLBrands: [] },
+    topics: { goldboxEnabled: true, keywords: [], categories: COUPANG_CATEGORIES, coupangPLBrands: [] },
     automation: { enabled: false, schedule: "0 8 * * *", maxProductsPerRun: 50 },
   };
 }
