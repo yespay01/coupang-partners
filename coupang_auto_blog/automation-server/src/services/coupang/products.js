@@ -52,9 +52,7 @@ export async function getGoldboxProducts(params, credentials) {
 
   const queryParams = new URLSearchParams();
 
-  if (subId) {
-    queryParams.append("subId", subId);
-  }
+  queryParams.append("subId", subId || '');
 
   if (imageSize) {
     queryParams.append("imageSize", imageSize);
@@ -104,9 +102,7 @@ export async function getBestProducts(params, credentials) {
     limit: String(limit),
   });
 
-  if (subId) {
-    queryParams.append("subId", subId);
-  }
+  queryParams.append("subId", subId || '');
 
   const path = `/v2/providers/affiliate_open_api/apis/openapi/products/bestcategories/${categoryId}?${queryParams.toString()}`;
 
@@ -143,9 +139,7 @@ export async function getCoupangPLProducts(params, credentials) {
     limit: String(limit),
   });
 
-  if (subId) {
-    queryParams.append("subId", subId);
-  }
+  queryParams.append("subId", subId || '');
 
   if (imageSize) {
     queryParams.append("imageSize", imageSize);
@@ -186,9 +180,7 @@ export async function getCoupangPLBrandProducts(params, credentials) {
     limit: String(limit),
   });
 
-  if (subId) {
-    queryParams.append("subId", subId);
-  }
+  queryParams.append("subId", subId || '');
 
   if (imageSize) {
     queryParams.append("imageSize", imageSize);
