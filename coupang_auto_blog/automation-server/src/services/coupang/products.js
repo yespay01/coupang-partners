@@ -15,11 +15,8 @@ export async function searchProducts(params, credentials) {
   const queryParams = new URLSearchParams({
     keyword: keyword,
     limit: String(limit),
+    subId: subId || '',
   });
-
-  if (subId) {
-    queryParams.append("subId", subId);
-  }
 
   const path = `/v2/providers/affiliate_open_api/apis/openapi/products/search?${queryParams.toString()}`;
 
