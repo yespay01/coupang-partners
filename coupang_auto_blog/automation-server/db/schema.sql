@@ -69,6 +69,46 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Recipes Table (AI 요리 레시피)
+CREATE TABLE IF NOT EXISTS recipes (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(500) NOT NULL,
+  description TEXT,
+  ingredients JSONB DEFAULT '[]'::jsonb,
+  instructions TEXT,
+  coupang_products JSONB DEFAULT '[]'::jsonb,
+  image_url TEXT,
+  slug VARCHAR(255) UNIQUE,
+  status VARCHAR(50) DEFAULT 'draft',
+  view_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_recipes_status ON recipes(status);
+CREATE INDEX IF NOT EXISTS idx_recipes_slug ON recipes(slug);
+CREATE INDEX IF NOT EXISTS idx_recipes_created_at ON recipes(created_at);
+
+-- News Table (AI 뉴스 기사)
+CREATE TABLE IF NOT EXISTS news (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(500) NOT NULL,
+  summary TEXT,
+  content TEXT,
+  category VARCHAR(255),
+  image_url TEXT,
+  slug VARCHAR(255) UNIQUE,
+  status VARCHAR(50) DEFAULT 'draft',
+  view_count INTEGER DEFAULT 0,
+  published_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_news_status ON news(status);
+CREATE INDEX IF NOT EXISTS idx_news_slug ON news(slug);
+CREATE INDEX IF NOT EXISTS idx_news_published_at ON news(published_at);
+
 -- Logs Table (시스템 로그)
 CREATE TABLE IF NOT EXISTS logs (
   id SERIAL PRIMARY KEY,

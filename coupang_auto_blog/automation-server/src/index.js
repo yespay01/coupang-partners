@@ -70,6 +70,9 @@ const routes = await Promise.all([
   import('./routes/collect.js'),
   import('./routes/review.js'),
   import('./routes/admin.js'),
+  import('./routes/recipe.js'),
+  import('./routes/news.js'),
+  import('./routes/search.js'),
 ]);
 
 // Routes
@@ -78,6 +81,9 @@ app.use('/api/collect', routes[1].default);
 app.use('/api/review', routes[2].default);
 app.use('/api', routes[2].default); // public reviews API
 app.use('/api/admin', routes[3].default);
+app.use('/api', routes[4].default); // public recipes API
+app.use('/api', routes[5].default); // public news API
+app.use('/api', routes[6].default); // public search API
 
 // Error handler
 app.use((err, req, res, next) => {

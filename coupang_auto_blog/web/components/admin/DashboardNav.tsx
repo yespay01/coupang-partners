@@ -32,6 +32,12 @@ export function DashboardNav() {
       <Link href="/admin/products" className="hover:text-white">
         수집 상품
       </Link>
+      <Link href="/admin/recipes" className="hover:text-white">
+        요리
+      </Link>
+      <Link href="/admin/news" className="hover:text-white">
+        뉴스
+      </Link>
       <Link href="/admin/logs" className="hover:text-white">
         로그 뷰어
       </Link>
