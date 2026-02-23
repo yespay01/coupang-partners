@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 import { useSystemSettings, useSettingsValidation } from "@/hooks/useSystemSettings";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { AutomationSettings } from "./AutomationSettings";
@@ -24,15 +22,6 @@ type TabId = (typeof TABS)[number]["id"];
 
 export function SettingsView() {
   const { activeTab, setActiveTab, hasUnsavedChanges } = useSettingsStore();
-  const searchParams = useSearchParams();
-
-  // URL ?tab= 파라미터로 초기 탭 설정
-  useEffect(() => {
-    const tabParam = searchParams.get("tab") as TabId | null;
-    if (tabParam && TABS.some((t) => t.id === tabParam)) {
-      setActiveTab(tabParam);
-    }
-  }, []);
   const { isLoading, isSaving, error, saveSettings, discardChanges, resetSettings } = useSystemSettings();
   const { validateAll } = useSettingsValidation();
 

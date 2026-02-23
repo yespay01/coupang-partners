@@ -1,10 +1,7 @@
-import { Suspense } from "react";
+"use client";
+
 import { SettingsView } from "@/components/admin/settings/SettingsView";
 
 export default function SettingsPage() {
-  return (
-    <Suspense>
-      <SettingsView />
-    </Suspense>
-  );
+  return <SettingsView />;
 }
