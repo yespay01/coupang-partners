@@ -32,6 +32,9 @@ export function DashboardNav() {
       <Link href="/admin/products" className="hover:text-white">
         수집 상품
       </Link>
+      <Link href="/admin/settings?tab=topics" className="hover:text-white">
+        수집 설정
+      </Link>
       <Link href="/admin/recipes" className="hover:text-white">
         요리
       </Link>
