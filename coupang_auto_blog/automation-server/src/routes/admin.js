@@ -666,7 +666,12 @@ router.post('/recipes/generate', async (req, res) => {
       ? customPrompt.userPrompt.replace(/\{dishName\}/g, dishName.trim())
       : defaultUserPrompt;
 
-    const aiResult = await generateText(settings.ai, userPrompt, systemPrompt);
+    // 레시피는 긴 응답이 필요하므로 maxTokens를 충분히 설정 (최소 2048)
+    const recipeAiSettings = {
+      ...settings.ai,
+      maxTokens: Math.max(settings.ai?.maxTokens || 1024, 2048),
+    };
+    const aiResult = await generateText(recipeAiSettings, userPrompt, systemPrompt);
     let parsed;
     try {
       const jsonMatch = aiResult.text.match(/\{[\s\S]*\}/);

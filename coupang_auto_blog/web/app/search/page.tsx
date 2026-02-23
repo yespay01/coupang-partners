@@ -32,7 +32,7 @@ export default function SearchPage() {
         success: boolean;
         data?: { products: Product[]; totalCount: number };
         error?: string;
-      }>(`/api/search?keyword=${encodeURIComponent(keyword.trim())}&limit=20`);
+      }>(`/api/search?keyword=${encodeURIComponent(keyword.trim())}&limit=10`);
 
       if (data.success && data.data) {
         setProducts(data.data.products);

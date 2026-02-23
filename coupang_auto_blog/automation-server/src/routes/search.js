@@ -10,11 +10,14 @@ const router = express.Router();
  */
 router.get('/search', async (req, res) => {
   try {
-    const { keyword, limit = 20 } = req.query;
+    const { keyword, limit = 10 } = req.query;
 
     if (!keyword || !keyword.trim()) {
       return res.status(400).json({ success: false, message: '검색어를 입력해주세요.' });
     }
+
+    // 쿠팡 API limit 범위: 1~100 (기본값 10)
+    const safeLimit = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
 
     const settings = await getSystemSettings();
     const { accessKey, secretKey, subId } = settings.coupang || {};
@@ -24,7 +27,7 @@ router.get('/search', async (req, res) => {
     }
 
     const result = await searchProducts(
-      { keyword: keyword.trim(), limit: parseInt(limit), subId },
+      { keyword: keyword.trim(), limit: safeLimit, subId },
       { accessKey, secretKey }
     );
 
