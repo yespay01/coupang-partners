@@ -96,32 +96,12 @@ async function collectByKeywords(client, keywords, maxProducts) {
       const products = result.products.slice(0, maxProducts - collected);
       if (products.length === 0) continue;
 
-      // 배치 딥링크 생성 (productId로 일반 쿠팡 URL 생성 - API가 www.coupang.com URL 필요)
-      const deeplinkUrls = products.map((p) => `https://www.coupang.com/vp/products/${p.productId}`);
-      const deeplinkResult = await client.createDeeplinks(deeplinkUrls);
-
-      // productId → shortenUrl 매핑
-      const deeplinkMap = new Map();
-      if (deeplinkResult.success && deeplinkResult.deeplinks) {
-        if (deeplinkResult.deeplinks.length === 0) {
-          console.warn(`키워드(${keyword}) 딥링크 결과가 비어있습니다.`);
-        }
-        deeplinkResult.deeplinks.forEach((dl, index) => {
-          if (dl.shortenUrl) {
-            deeplinkMap.set(products[index].productId, dl.shortenUrl);
-          }
-        });
-      } else if (!deeplinkResult.success) {
-        console.warn(`키워드(${keyword}) 딥링크 생성 실패: ${deeplinkResult.message}`);
-      }
-
       for (const product of products) {
         if (collected >= maxProducts) break;
 
-        // productId로 매핑, 실패 시 productUrl(이미 affiliate URL) 폴백
-        const affiliateUrl = deeplinkMap.get(product.productId) || product.productUrl;
+        // productUrl은 이미 제휴 링크이므로 그대로 사용
         const saved = await saveProduct(
-          { ...product, affiliateUrl },
+          { ...product, affiliateUrl: product.productUrl },
           `keyword:${keyword}`
         );
 
@@ -150,27 +130,10 @@ async function collectGoldbox(client, maxProducts) {
     const products = result.products.slice(0, maxProducts);
     if (products.length === 0) return 0;
 
-    const deeplinkUrls = products.map((p) => `https://www.coupang.com/vp/products/${p.productId}`);
-    const deeplinkResult = await client.createDeeplinks(deeplinkUrls);
-
-    const deeplinkMap = new Map();
-    if (deeplinkResult.success && deeplinkResult.deeplinks) {
-      if (deeplinkResult.deeplinks.length === 0) {
-        console.warn('골드박스 딥링크 결과가 비어있습니다.');
-      }
-      deeplinkResult.deeplinks.forEach((dl, index) => {
-        if (dl.shortenUrl) {
-          deeplinkMap.set(products[index].productId, dl.shortenUrl);
-        }
-      });
-    } else if (!deeplinkResult.success) {
-      console.warn(`골드박스 딥링크 생성 실패: ${deeplinkResult.message}`);
-    }
-
     let collected = 0;
     for (const product of products) {
-      const affiliateUrl = deeplinkMap.get(product.productId) || product.productUrl;
-      const saved = await saveProduct({ ...product, affiliateUrl }, 'goldbox');
+      // productUrl은 이미 제휴 링크이므로 그대로 사용
+      const saved = await saveProduct({ ...product, affiliateUrl: product.productUrl }, 'goldbox');
       if (saved) collected++;
     }
 
@@ -208,29 +171,12 @@ async function collectCoupangPL(client, brands, maxProducts) {
       const products = result.products.slice(0, maxProducts - collected);
       if (products.length === 0) continue;
 
-      const deeplinkUrls = products.map((p) => `https://www.coupang.com/vp/products/${p.productId}`);
-      const deeplinkResult = await client.createDeeplinks(deeplinkUrls);
-
-      const deeplinkMap = new Map();
-      if (deeplinkResult.success && deeplinkResult.deeplinks) {
-        if (deeplinkResult.deeplinks.length === 0) {
-          console.warn(`쿠팡 PL 브랜드(${brandId}) 딥링크 결과가 비어있습니다.`);
-        }
-        deeplinkResult.deeplinks.forEach((dl, index) => {
-          if (dl.shortenUrl) {
-            deeplinkMap.set(products[index].productId, dl.shortenUrl);
-          }
-        });
-      } else if (!deeplinkResult.success) {
-        console.warn(`쿠팡 PL 브랜드(${brandId}) 딥링크 생성 실패: ${deeplinkResult.message}`);
-      }
-
       for (const product of products) {
         if (collected >= maxProducts) break;
 
-        const affiliateUrl = deeplinkMap.get(product.productId) || product.productUrl;
+        // productUrl은 이미 제휴 링크이므로 그대로 사용
         const saved = await saveProduct(
-          { ...product, affiliateUrl },
+          { ...product, affiliateUrl: product.productUrl },
           `coupangPL:${brandId}`
         );
 
@@ -278,33 +224,16 @@ async function collectByCategories(client, categories, maxProducts) {
       const products = result.products.slice(0, maxProducts - collected);
       if (products.length === 0) continue;
 
-      const deeplinkUrls = products.map((p) => `https://www.coupang.com/vp/products/${p.productId}`);
-      const deeplinkResult = await client.createDeeplinks(deeplinkUrls);
-
-      const deeplinkMap = new Map();
-      if (deeplinkResult.success && deeplinkResult.deeplinks) {
-        if (deeplinkResult.deeplinks.length === 0) {
-          console.warn(`카테고리(${category.name}) 딥링크 결과가 비어있습니다.`);
-        }
-        deeplinkResult.deeplinks.forEach((dl, index) => {
-          if (dl.shortenUrl) {
-            deeplinkMap.set(products[index].productId, dl.shortenUrl);
-          }
-        });
-      } else if (!deeplinkResult.success) {
-        console.warn(`카테고리(${category.name}) 딥링크 생성 실패: ${deeplinkResult.message}`);
-      }
-
       for (const product of products) {
         if (collected >= maxProducts) break;
 
-        const affiliateUrl = deeplinkMap.get(product.productId) || product.productUrl;
+        // productUrl은 이미 제휴 링크이므로 그대로 사용
         const saved = await saveProduct(
           {
             ...product,
             categoryId: category.id,
             categoryName: category.name,
-            affiliateUrl,
+            affiliateUrl: product.productUrl,
           },
           `category:${category.id}`
         );
