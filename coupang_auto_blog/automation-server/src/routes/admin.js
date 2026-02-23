@@ -539,6 +539,8 @@ function mapRecipeRow(row) {
     id: String(row.id),
     title: row.title,
     description: row.description,
+    cookingTime: row.cooking_time || '',
+    difficulty: row.difficulty || '',
     ingredients: row.ingredients || [],
     instructions: row.instructions,
     coupangProducts: row.coupang_products || [],
@@ -641,16 +643,22 @@ router.post('/recipes/generate', async (req, res) => {
 {
   "title": "요리 제목",
   "description": "요리 소개 (2-3문장)",
+  "cookingTime": "총 조리시간 (예: 30분, 1시간)",
+  "difficulty": "난이도 (쉬움/보통/어려움)",
   "ingredients": [
     {"name": "재료명", "amount": "양", "searchKeyword": "쿠팡 검색용 키워드"}
   ],
-  "instructions": "조리법 (번호로 단계 구분)"
+  "instructions": "조리법을 상세하게 작성"
 }
 
 규칙:
 - 재료는 5~12개
 - searchKeyword는 쿠팡 검색용 구체적 상품명 (예: "양파" → "양파 1kg")
-- 조리법은 5~7단계, 각 단계에 시간과 불세기 포함
+- 조리법은 번호로 단계를 구분하고 각 단계를 상세하게 작성:
+  * 시간과 불세기 명시 (예: "중불에서 3분간 볶아주세요")
+  * 재료 넣는 순서와 타이밍 설명
+  * 팁이나 포인트 포함 (예: "(뚜껑을 덮으면 더 빨리 익어요)")
+  * 완성 징후 설명 (예: "국물이 보글보글 끓어오르면")
 - 구어체로 자연스럽게 작성`;
 
     const systemPrompt = customPrompt?.systemPrompt || defaultSystemPrompt;
@@ -751,11 +759,13 @@ router.post('/recipes/generate', async (req, res) => {
 
     const slug = `recipe-${Date.now()}`;
     const insertResult = await db.query(
-      `INSERT INTO recipes (title, description, ingredients, instructions, coupang_products, image_url, slug, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      `INSERT INTO recipes (title, description, cooking_time, difficulty, ingredients, instructions, coupang_products, image_url, slug, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
       [
         parsed.title || dishName.trim(),
         parsed.description || '',
+        parsed.cookingTime || '',
+        parsed.difficulty || '',
         JSON.stringify(parsed.ingredients || []),
         parsed.instructions || '',
         JSON.stringify(coupangProducts),
@@ -788,13 +798,15 @@ router.post('/recipes/generate', async (req, res) => {
 router.put('/recipes/:id', async (req, res) => {
   try {
     const db = getDb();
-    const { title, description, ingredients, instructions, coupangProducts, status, imageUrl } = req.body;
+    const { title, description, cookingTime, difficulty, ingredients, instructions, coupangProducts, status, imageUrl } = req.body;
     const fields = [];
     const params = [];
     let idx = 1;
 
     if (title !== undefined) { fields.push(`title = $${idx++}`); params.push(title); }
     if (description !== undefined) { fields.push(`description = $${idx++}`); params.push(description); }
+    if (cookingTime !== undefined) { fields.push(`cooking_time = $${idx++}`); params.push(cookingTime); }
+    if (difficulty !== undefined) { fields.push(`difficulty = $${idx++}`); params.push(difficulty); }
     if (ingredients !== undefined) { fields.push(`ingredients = $${idx++}`); params.push(JSON.stringify(ingredients)); }
     if (instructions !== undefined) { fields.push(`instructions = $${idx++}`); params.push(instructions); }
     if (coupangProducts !== undefined) { fields.push(`coupang_products = $${idx++}`); params.push(JSON.stringify(coupangProducts)); }

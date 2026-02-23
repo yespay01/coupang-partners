@@ -8,6 +8,8 @@ function mapRecipeRow(row) {
     id: String(row.id),
     title: row.title,
     description: row.description,
+    cookingTime: row.cooking_time || '',
+    difficulty: row.difficulty || '',
     ingredients: row.ingredients || [],
     instructions: row.instructions,
     coupangProducts: row.coupang_products || [],

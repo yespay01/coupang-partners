@@ -14,6 +14,8 @@ interface Recipe {
   id: string;
   title: string;
   description: string;
+  cookingTime?: string;
+  difficulty?: string;
   ingredients: { name: string; amount: string }[];
   instructions: string;
   coupangProducts: {
@@ -91,7 +93,19 @@ export default async function RecipeDetailPage({ params }: PageProps) {
         <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">{recipe.title}</h1>
         <p className="text-lg text-slate-600 mb-8">{recipe.description}</p>
 
-        <div className="flex gap-4 text-sm text-slate-500 mb-8">
+        <div className="flex flex-wrap gap-4 text-sm text-slate-500 mb-8">
+          {recipe.cookingTime && (
+            <span className="inline-flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              {recipe.cookingTime}
+            </span>
+          )}
+          {recipe.difficulty && (
+            <span className="inline-flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              {recipe.difficulty}
+            </span>
+          )}
           <span>{new Date(recipe.createdAt).toLocaleDateString("ko-KR")}</span>
           <span>조회수 {recipe.viewCount}</span>
         </div>

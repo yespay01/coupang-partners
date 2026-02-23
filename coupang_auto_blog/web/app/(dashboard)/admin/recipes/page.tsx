@@ -21,6 +21,8 @@ interface Recipe {
   id: string;
   title: string;
   description: string;
+  cookingTime: string;
+  difficulty: string;
   ingredients: Ingredient[];
   instructions: string;
   coupangProducts: CoupangProduct[];
@@ -156,8 +158,11 @@ export default function AdminRecipesPage() {
       const data = await apiClient.put<{ success: boolean }>(`/api/admin/recipes/${editingRecipe.id}`, {
         title: editingRecipe.title,
         description: editingRecipe.description,
+        cookingTime: editingRecipe.cookingTime,
+        difficulty: editingRecipe.difficulty,
         instructions: editingRecipe.instructions,
         ingredients: editingRecipe.ingredients,
+        imageUrl: editingRecipe.imageUrl,
         coupangProducts: editingRecipe.coupangProducts,
       });
 
@@ -250,6 +255,35 @@ export default function AdminRecipesPage() {
               onChange={(e) => setEditingRecipe({ ...editingRecipe, title: e.target.value })}
               className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
+          </div>
+
+          {/* 조리시간 / 난이도 */}
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">조리시간</label>
+                <input
+                  type="text"
+                  value={editingRecipe.cookingTime || ""}
+                  onChange={(e) => setEditingRecipe({ ...editingRecipe, cookingTime: e.target.value })}
+                  placeholder="예: 30분, 1시간"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">난이도</label>
+                <select
+                  value={editingRecipe.difficulty || ""}
+                  onChange={(e) => setEditingRecipe({ ...editingRecipe, difficulty: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">선택</option>
+                  <option value="쉬움">쉬움</option>
+                  <option value="보통">보통</option>
+                  <option value="어려움">어려움</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* 설명 */}
@@ -475,7 +509,9 @@ export default function AdminRecipesPage() {
                         </span>
                       </div>
                       <p className="mt-1 text-sm text-slate-600">{recipe.description}</p>
-                      <div className="mt-2 flex gap-4 text-xs text-slate-500">
+                      <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+                        {recipe.cookingTime && <span>{recipe.cookingTime}</span>}
+                        {recipe.difficulty && <span>{recipe.difficulty}</span>}
                         <span>재료 {recipe.ingredients?.length || 0}개</span>
                         <span>쿠팡 상품 {recipe.coupangProducts?.length || 0}개</span>
                         <span>조회수 {recipe.viewCount}</span>

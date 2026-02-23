@@ -74,6 +74,8 @@ CREATE TABLE IF NOT EXISTS recipes (
   id SERIAL PRIMARY KEY,
   title VARCHAR(500) NOT NULL,
   description TEXT,
+  cooking_time VARCHAR(100),
+  difficulty VARCHAR(50),
   ingredients JSONB DEFAULT '[]'::jsonb,
   instructions TEXT,
   coupang_products JSONB DEFAULT '[]'::jsonb,
@@ -84,6 +86,12 @@ CREATE TABLE IF NOT EXISTS recipes (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 기존 테이블에 컬럼 추가 (이미 있으면 무시)
+DO $$ BEGIN
+  ALTER TABLE recipes ADD COLUMN IF NOT EXISTS cooking_time VARCHAR(100);
+  ALTER TABLE recipes ADD COLUMN IF NOT EXISTS difficulty VARCHAR(50);
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_recipes_status ON recipes(status);
 CREATE INDEX IF NOT EXISTS idx_recipes_slug ON recipes(slug);
