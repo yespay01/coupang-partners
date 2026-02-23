@@ -6,7 +6,7 @@ import { invalidateSettingsCache, getSystemSettings } from '../services/settings
 import { generateText } from '../services/aiProviders.js';
 import { searchProducts } from '../services/coupang/products.js';
 import { createDeeplinks } from '../services/coupang/deeplink.js';
-import { fetchStockImages } from '../services/imageUtils.js';
+import fetch from 'node-fetch';
 
 const router = express.Router();
 
@@ -675,16 +675,52 @@ router.post('/recipes/generate', async (req, res) => {
       return res.status(500).json({ success: false, message: 'AI 응답을 파싱할 수 없습니다.' });
     }
 
-    // 대표 이미지 검색 (fetchStockImages 재사용)
+    // 대표 이미지 검색 (AI로 요리명 → 영어 번역 후 Unsplash/Pexels 검색)
     let imageUrl = null;
     try {
-      if (settings.images?.stockImages?.enabled) {
-        const images = await fetchStockImages(
-          { productName: dishName.trim(), name: dishName.trim() },
-          settings
-        );
-        if (images.length > 0) {
-          imageUrl = images[0].url;
+      const stockConfig = settings.images?.stockImages;
+      if (stockConfig?.enabled && stockConfig?.apiKey) {
+        // AI로 요리명을 영어 음식 검색 키워드로 변환
+        let englishKeyword = '';
+        try {
+          const translateResult = await generateText(
+            { ...settings.ai, maxTokens: 30, temperature: 0.1 },
+            `다음 한국 요리명을 Unsplash 음식 이미지 검색용 영어 키워드 2~3개로 번역하세요. 영어 단어만 출력하세요.
+요리명: "${dishName.trim()}"
+예시: "김치찌개" → "kimchi jjigae stew", "된장국" → "doenjang soybean paste soup"`,
+            ''
+          );
+          englishKeyword = translateResult.text.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+        } catch (e) {
+          console.error('요리명 번역 실패:', e);
+        }
+
+        // AI 번역 실패 시 요리명 그대로 사용
+        const searchQuery = englishKeyword || dishName.trim();
+        const provider = stockConfig.provider || 'unsplash';
+
+        if (provider === 'unsplash') {
+          const resp = await fetch(
+            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery + ' food')}&per_page=1&orientation=landscape`,
+            { headers: { Authorization: `Client-ID ${stockConfig.apiKey}` } }
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.results && data.results.length > 0) {
+              imageUrl = data.results[0].urls.regular;
+            }
+          }
+        } else if (provider === 'pexels') {
+          const resp = await fetch(
+            `https://api.pexels.com/v1/search?query=${encodeURIComponent(searchQuery + ' food')}&per_page=1&orientation=landscape`,
+            { headers: { Authorization: stockConfig.apiKey } }
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.photos && data.photos.length > 0) {
+              imageUrl = data.photos[0].src.large;
+            }
+          }
         }
       }
     } catch (imgErr) {
