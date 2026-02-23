@@ -347,7 +347,7 @@ export function ProductList({
                       rel="noopener noreferrer"
                       className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
                     >
-                      제휴 링크
+                      딥링크 (단축)
                     </a>
                     <a
                       href={product.productUrl}
@@ -355,7 +355,7 @@ export function ProductList({
                       rel="noopener noreferrer"
                       className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                     >
-                      원본 링크
+                      제휴 링크
                     </a>
                     {/* 대기중 또는 실패 상태일 때 리뷰 생성/재시도 버튼 */}
                     {(product.status === "pending" || product.status === "failed") && (

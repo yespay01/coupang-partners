@@ -669,11 +669,12 @@ router.post('/recipes/generate', async (req, res) => {
             const product = result.products[0];
             return {
               ingredientName: ingredient.name,
+              productId: product.productId,
               productName: product.productName,
               productPrice: product.productPrice,
               productImage: product.productImage,
               productUrl: product.productUrl,
-              affiliateUrl: null,
+              affiliateUrl: product.productUrl,
             };
           }
         } catch (err) {
@@ -684,24 +685,6 @@ router.post('/recipes/generate', async (req, res) => {
 
       const results = await Promise.all(searchPromises);
       coupangProducts = results.filter(Boolean);
-
-      // 딥링크 일괄 생성
-      if (coupangProducts.length > 0) {
-        const urls = coupangProducts.map(p => p.productUrl).filter(Boolean);
-        try {
-          const dlResult = await createDeeplinks({ urls, subId }, { accessKey, secretKey });
-          if (dlResult.success && dlResult.deeplinks) {
-            const dlMap = {};
-            dlResult.deeplinks.forEach(dl => { dlMap[dl.originalUrl] = dl.shortenUrl; });
-            coupangProducts = coupangProducts.map(p => ({
-              ...p,
-              affiliateUrl: dlMap[p.productUrl] || p.productUrl,
-            }));
-          }
-        } catch (dlErr) {
-          console.error('딥링크 생성 실패:', dlErr);
-        }
-      }
     }
 
     const slug = `recipe-${Date.now()}`;
@@ -992,6 +975,52 @@ router.delete('/news/:id', async (req, res) => {
     }
     res.json({ success: true, message: '뉴스가 삭제되었습니다.' });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Deeplink ====================
+
+/**
+ * POST /api/admin/deeplink
+ * 일반 쿠팡 URL을 제휴 딥링크(단축 URL)로 변환
+ */
+router.post('/deeplink', async (req, res) => {
+  try {
+    const { urls } = req.body;
+
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+      return res.status(400).json({ success: false, message: 'URL 배열을 입력해주세요.' });
+    }
+
+    if (urls.length > 20) {
+      return res.status(400).json({ success: false, message: '한 번에 최대 20개 URL만 변환할 수 있습니다.' });
+    }
+
+    const settings = await getSystemSettings();
+    const { accessKey, secretKey, subId } = settings.coupang || {};
+
+    if (!accessKey || !secretKey) {
+      return res.status(503).json({ success: false, message: '쿠팡 API가 설정되지 않았습니다.' });
+    }
+
+    const result = await createDeeplinks({ urls, subId }, { accessKey, secretKey });
+
+    if (!result.success) {
+      return res.status(502).json({ success: false, message: result.message || '딥링크 변환 실패' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        deeplinks: (result.deeplinks || []).map((dl, i) => ({
+          originalUrl: urls[i] || '',
+          shortenUrl: dl.shortenUrl || '',
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('딥링크 변환 오류:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

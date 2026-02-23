@@ -38,6 +38,9 @@ export function DashboardNav() {
       <Link href="/admin/news" className="hover:text-white">
         뉴스
       </Link>
+      <Link href="/admin/deeplink" className="hover:text-white">
+        딥링크
+      </Link>
       <Link href="/admin/logs" className="hover:text-white">
         로그 뷰어
       </Link>
