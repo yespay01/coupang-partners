@@ -635,7 +635,8 @@ router.post('/recipes/generate', async (req, res) => {
 
     // 기본 프롬프트
     const defaultSystemPrompt = `당신은 10년 경력의 전문 요리 블로거이자 요리 연구가입니다. 한국어로 상세한 레시피를 작성합니다.
-반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력합니다.`;
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력합니다.
+절대 마크다운 서식을 사용하지 마세요. 별표(**), 샵(#), 대시(-) 등 마크다운 기호 금지. 순수 텍스트만 작성하세요.`;
 
     const defaultUserPrompt = `"${dishName.trim()}" 레시피를 JSON으로 작성해주세요.
 
@@ -659,7 +660,8 @@ router.post('/recipes/generate', async (req, res) => {
   * 재료 넣는 순서와 타이밍 설명
   * 팁이나 포인트 포함 (예: "(뚜껑을 덮으면 더 빨리 익어요)")
   * 완성 징후 설명 (예: "국물이 보글보글 끓어오르면")
-- 구어체로 자연스럽게 작성`;
+- 구어체로 자연스럽게 작성
+- 마크다운 서식 절대 금지 (**, ##, - 등 사용하지 말 것). 순수 텍스트만 작성`;
 
     const systemPrompt = customPrompt?.systemPrompt || defaultSystemPrompt;
     const userPrompt = customPrompt?.userPrompt
