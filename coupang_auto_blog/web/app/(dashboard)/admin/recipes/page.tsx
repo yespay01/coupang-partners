@@ -213,6 +213,34 @@ export default function AdminRecipesPage() {
             </button>
           </div>
 
+          {/* 대표 이미지 */}
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">대표 이미지</label>
+            <div className="flex gap-4">
+              {editingRecipe.imageUrl && (
+                <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                  <img
+                    src={editingRecipe.imageUrl}
+                    alt={editingRecipe.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={editingRecipe.imageUrl || ""}
+                  onChange={(e) => setEditingRecipe({ ...editingRecipe, imageUrl: e.target.value || null })}
+                  placeholder="이미지 URL을 입력하세요 (비워두면 이미지 없음)"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  자동 검색된 이미지가 맞지 않으면 직접 URL을 변경하세요.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* 제목 */}
           <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
             <label className="mb-2 block text-sm font-semibold text-slate-700">제목</label>
