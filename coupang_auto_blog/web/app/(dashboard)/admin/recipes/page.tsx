@@ -423,25 +423,36 @@ export default function AdminRecipesPage() {
                 className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-slate-900">{recipe.title}</h3>
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          recipe.status === "published"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}
-                      >
-                        {recipe.status === "published" ? "발행됨" : "초안"}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-600">{recipe.description}</p>
-                    <div className="mt-2 flex gap-4 text-xs text-slate-500">
-                      <span>재료 {recipe.ingredients?.length || 0}개</span>
-                      <span>쿠팡 상품 {recipe.coupangProducts?.length || 0}개</span>
-                      <span>조회수 {recipe.viewCount}</span>
-                      <span>{new Date(recipe.createdAt).toLocaleDateString("ko-KR")}</span>
+                  <div className="flex flex-1 gap-4">
+                    {recipe.imageUrl && (
+                      <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                        <img
+                          src={recipe.imageUrl}
+                          alt={recipe.title}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-semibold text-slate-900">{recipe.title}</h3>
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            recipe.status === "published"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {recipe.status === "published" ? "발행됨" : "초안"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-600">{recipe.description}</p>
+                      <div className="mt-2 flex gap-4 text-xs text-slate-500">
+                        <span>재료 {recipe.ingredients?.length || 0}개</span>
+                        <span>쿠팡 상품 {recipe.coupangProducts?.length || 0}개</span>
+                        <span>조회수 {recipe.viewCount}</span>
+                        <span>{new Date(recipe.createdAt).toLocaleDateString("ko-KR")}</span>
+                      </div>
                     </div>
                   </div>
                   <div className="flex gap-2">

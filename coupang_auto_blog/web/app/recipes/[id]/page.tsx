@@ -23,6 +23,7 @@ interface Recipe {
     productImage: string;
     affiliateUrl: string;
   }[];
+  imageUrl?: string;
   viewCount: number;
   createdAt: string;
 }
@@ -58,6 +59,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: recipe.title,
       description: recipe.description,
       type: "article",
+      ...(recipe.imageUrl ? { images: [{ url: recipe.imageUrl }] } : {}),
     },
   };
 }
@@ -94,6 +96,17 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           <span>조회수 {recipe.viewCount}</span>
         </div>
 
+        {/* Hero Image */}
+        {recipe.imageUrl && (
+          <div className="mb-10 overflow-hidden rounded-xl">
+            <img
+              src={recipe.imageUrl}
+              alt={recipe.title}
+              className="w-full h-auto max-h-[480px] object-cover"
+            />
+          </div>
+        )}
+
         {/* Ingredients */}
         <section className="mb-10">
           <h2 className="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200">
@@ -112,7 +125,21 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           </div>
         </section>
 
-        {/* Coupang Products */}
+        {/* Instructions */}
+        <section className="mb-10">
+          <h2 className="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200">
+            조리법
+          </h2>
+          <div className="prose prose-slate max-w-none">
+            {recipe.instructions?.split("\n").map((line, i) => (
+              <p key={i} className="text-slate-700 leading-relaxed mb-3">
+                {line}
+              </p>
+            ))}
+          </div>
+        </section>
+
+        {/* Coupang Products (last) */}
         {recipe.coupangProducts && recipe.coupangProducts.length > 0 && (
           <section className="mb-10">
             <h2 className="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200">
@@ -156,20 +183,6 @@ export default async function RecipeDetailPage({ params }: PageProps) {
             </p>
           </section>
         )}
-
-        {/* Instructions */}
-        <section className="mb-10">
-          <h2 className="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200">
-            조리법
-          </h2>
-          <div className="prose prose-slate max-w-none">
-            {recipe.instructions?.split("\n").map((line, i) => (
-              <p key={i} className="text-slate-700 leading-relaxed mb-3">
-                {line}
-              </p>
-            ))}
-          </div>
-        </section>
 
         {/* Back */}
         <div className="border-t border-slate-200 pt-8">

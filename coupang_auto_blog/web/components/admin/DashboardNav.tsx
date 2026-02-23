@@ -35,6 +35,9 @@ export function DashboardNav() {
       <Link href="/admin/recipes" className="hover:text-white">
         요리
       </Link>
+      <Link href="/admin/recipe-prompt" className="hover:text-white">
+        레시피 설정
+      </Link>
       <Link href="/admin/news" className="hover:text-white">
         뉴스
       </Link>

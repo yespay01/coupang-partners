@@ -6,6 +6,7 @@ import { invalidateSettingsCache, getSystemSettings } from '../services/settings
 import { generateText } from '../services/aiProviders.js';
 import { searchProducts } from '../services/coupang/products.js';
 import { createDeeplinks } from '../services/coupang/deeplink.js';
+import { fetchStockImages } from '../services/imageUtils.js';
 
 const router = express.Router();
 
@@ -624,26 +625,46 @@ router.post('/recipes/generate', async (req, res) => {
 
     const settings = await getSystemSettings();
 
-    const systemPrompt = `당신은 전문 요리 블로거입니다. 한국어로 레시피를 작성합니다.
+    // DB에서 레시피 프롬프트 설정 확인
+    const db = getDb();
+    const promptSettingsResult = await db.query("SELECT value FROM settings WHERE key = 'system'");
+    const dbSettings = promptSettingsResult.rows.length > 0 ? promptSettingsResult.rows[0].value : {};
+    const customPrompt = dbSettings?.recipePrompt;
+
+    // 기본 프롬프트
+    const defaultSystemPrompt = `당신은 10년 경력의 전문 요리 블로거이자 요리 연구가입니다. 한국어로 상세한 레시피를 작성합니다.
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력합니다.`;
 
-    const userPrompt = `"${dishName.trim()}" 레시피를 JSON으로 작성해주세요.
+    const defaultUserPrompt = `"${dishName.trim()}" 레시피를 JSON으로 작성해주세요.
 
 형식:
 {
   "title": "요리 제목",
-  "description": "요리 소개 (2-3문장)",
+  "description": "요리 소개 (2-3문장, 이 요리의 매력과 특징을 설명)",
   "ingredients": [
     {"name": "재료명", "amount": "양", "searchKeyword": "쿠팡 검색용 키워드"}
   ],
-  "instructions": "조리법을 단락으로 구분하여 작성 (1. 2. 3. 순서)"
+  "instructions": "조리법을 단계별로 상세하게 작성"
 }
 
 규칙:
 - 재료는 5~15개 사이
 - searchKeyword는 쿠팡에서 검색할 수 있는 구체적인 상품명 (예: "양파" → "양파 1kg", "간장" → "진간장 500ml")
-- 조리법은 구체적으로 단계별로 작성
-- 설명은 친근하고 자연스러운 구어체로`;
+- 조리법은 반드시 다음 형식으로 상세하게 작성:
+  * 각 단계를 "1. ", "2. " 등 번호로 구분
+  * 각 단계마다 구체적인 시간 명시 (예: "중불에서 3분간 볶아주세요")
+  * 불 세기 명시 (강불/중불/약불/중약불)
+  * 조리 팁이나 포인트를 괄호 안에 포함 (예: "(이때 뚜껑을 덮으면 더 빨리 익어요)")
+  * 재료를 넣는 순서와 타이밍을 정확히 설명
+  * 완성 징후 설명 (예: "국물이 보글보글 끓어오르면")
+- 조리법은 최소 8단계 이상으로 자세하게 작성
+- 설명은 친근하고 자연스러운 구어체로
+- 준비 과정(재료 손질)부터 플레이팅까지 포함`;
+
+    const systemPrompt = customPrompt?.systemPrompt || defaultSystemPrompt;
+    const userPrompt = customPrompt?.userPrompt
+      ? customPrompt.userPrompt.replace(/\{dishName\}/g, dishName.trim())
+      : defaultUserPrompt;
 
     const aiResult = await generateText(settings.ai, userPrompt, systemPrompt);
     let parsed;
@@ -654,12 +675,28 @@ router.post('/recipes/generate', async (req, res) => {
       return res.status(500).json({ success: false, message: 'AI 응답을 파싱할 수 없습니다.' });
     }
 
-    // 쿠팡 재료 검색
+    // 대표 이미지 검색 (fetchStockImages 재사용)
+    let imageUrl = null;
+    try {
+      if (settings.images?.stockImages?.enabled) {
+        const images = await fetchStockImages(
+          { productName: dishName.trim(), name: dishName.trim() },
+          settings
+        );
+        if (images.length > 0) {
+          imageUrl = images[0].url;
+        }
+      }
+    } catch (imgErr) {
+      console.error('레시피 이미지 검색 실패:', imgErr);
+    }
+
+    // 쿠팡 재료 검색 (전체 재료)
     let coupangProducts = [];
     const { accessKey, secretKey, subId } = settings.coupang || {};
 
     if (accessKey && secretKey && parsed.ingredients) {
-      const searchPromises = parsed.ingredients.slice(0, 8).map(async (ingredient) => {
+      const searchPromises = parsed.ingredients.map(async (ingredient) => {
         try {
           const result = await searchProducts(
             { keyword: ingredient.searchKeyword || ingredient.name, limit: 1, subId },
@@ -688,16 +725,16 @@ router.post('/recipes/generate', async (req, res) => {
     }
 
     const slug = `recipe-${Date.now()}`;
-    const db = getDb();
     const insertResult = await db.query(
-      `INSERT INTO recipes (title, description, ingredients, instructions, coupang_products, slug, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      `INSERT INTO recipes (title, description, ingredients, instructions, coupang_products, image_url, slug, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
       [
         parsed.title || dishName.trim(),
         parsed.description || '',
         JSON.stringify(parsed.ingredients || []),
         parsed.instructions || '',
         JSON.stringify(coupangProducts),
+        imageUrl,
         slug,
         'draft',
       ]
@@ -711,6 +748,7 @@ router.post('/recipes/generate', async (req, res) => {
         title: parsed.title,
         ingredientCount: (parsed.ingredients || []).length,
         coupangProductCount: coupangProducts.length,
+        imageUrl,
       },
     });
   } catch (error) {
