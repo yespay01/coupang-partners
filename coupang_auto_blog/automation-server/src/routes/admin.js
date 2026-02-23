@@ -685,10 +685,9 @@ router.post('/recipes/generate', async (req, res) => {
         let englishKeyword = '';
         try {
           const translateResult = await generateText(
-            { ...settings.ai, maxTokens: 256, temperature: 0.1 },
-            `다음 한국 요리명을 영어 음식 이미지 검색 키워드 2~3개로 번역하세요. 영어 단어만 출력하세요.
-요리명: "${dishName.trim()}"`,
-            '영어 단어만 출력. 다른 설명 없이.'
+            { ...settings.ai, maxTokens: 50, temperature: 0.1 },
+            `"${dishName.trim()}" → English food keywords (2-3 words only):`,
+            'Output ONLY English words, nothing else. No explanation, no quotes, no punctuation.'
           );
           englishKeyword = translateResult.text.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
         } catch (e) {

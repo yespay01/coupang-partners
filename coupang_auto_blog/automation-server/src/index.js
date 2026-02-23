@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 
 // Database & Storage
-import { initializeDatabase, testConnection } from './config/database.js';
+import { initializeDatabase, testConnection, initializeSchema } from './config/database.js';
 import { initializeStorage, initializeBuckets } from './config/storage.js';
 
 dotenv.config();
@@ -47,6 +47,10 @@ async function initializeServices() {
     initializeDatabase();
     await testConnection();
     console.log('✅ Database connected');
+
+    // Run schema migrations
+    await initializeSchema();
+    console.log('✅ Database schema initialized');
 
     // Initialize storage
     console.log('🔄 Initializing storage...');
