@@ -34,23 +34,23 @@ export function createCoupangClient(accessKey, secretKey, partnerId, subId = "")
   return {
     // 상품 조회 API
     searchProducts: (keyword, limit) =>
-      searchProducts({ keyword, limit, subId: subId || partnerId }, credentials),
+      searchProducts({ keyword, limit, subId: subId }, credentials),
 
     getBestProducts: (categoryId, limit) =>
-      getBestProducts({ categoryId, limit, subId: subId || partnerId }, credentials),
+      getBestProducts({ categoryId, limit, subId: subId }, credentials),
 
     getGoldboxProducts: (imageSize) =>
-      getGoldboxProducts({ subId: subId || partnerId, imageSize }, credentials),
+      getGoldboxProducts({ subId: subId, imageSize }, credentials),
 
     getCoupangPLProducts: (limit, imageSize) =>
-      getCoupangPLProducts({ limit, subId: subId || partnerId, imageSize }, credentials),
+      getCoupangPLProducts({ limit, subId: subId, imageSize }, credentials),
 
     getCoupangPLBrandProducts: (brandId, limit, imageSize) =>
-      getCoupangPLBrandProducts({ brandId, limit, subId: subId || partnerId, imageSize }, credentials),
+      getCoupangPLBrandProducts({ brandId, limit, subId: subId, imageSize }, credentials),
 
     // 딥링크 API
     createDeeplinks: (urls) =>
-      createDeeplinks({ urls, subId: subId || partnerId }, credentials),
+      createDeeplinks({ urls, subId: subId }, credentials),
 
     // 카테고리 추천 API
     recommendCategory: (productName) =>
@@ -73,7 +73,7 @@ export function createCoupangClient(accessKey, secretKey, partnerId, subId = "")
     testConnection: async () => {
       try {
         const result = await createDeeplinks(
-          { urls: ["https://www.coupang.com"], subId: subId || partnerId },
+          { urls: ["https://www.coupang.com"], subId: subId },
           credentials
         );
         return { success: result.success, message: result.message };
