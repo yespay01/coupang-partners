@@ -4,6 +4,7 @@ import { useState } from "react";
 import { apiClient } from "@/lib/apiClient";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { CoupangDynamicBanner } from "@/components/CoupangDynamicBanner";
 
 interface Product {
   productName: string;
@@ -87,6 +88,11 @@ export default function SearchPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* 다이나믹 배너 - 검색창 하단 */}
+      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+        <CoupangDynamicBanner />
       </div>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
