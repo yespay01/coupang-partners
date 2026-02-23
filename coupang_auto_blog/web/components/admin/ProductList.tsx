@@ -342,18 +342,10 @@ export function ProductList({
                   {/* 링크 버튼 */}
                   <div className="mt-3 flex gap-2">
                     <a
-                      href={product.affiliateUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
-                    >
-                      딥링크 (단축)
-                    </a>
-                    <a
                       href={product.productUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
                     >
                       제휴 링크
                     </a>
