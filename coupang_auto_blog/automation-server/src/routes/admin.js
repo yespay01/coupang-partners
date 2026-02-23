@@ -640,38 +640,25 @@ router.post('/recipes/generate', async (req, res) => {
 형식:
 {
   "title": "요리 제목",
-  "description": "요리 소개 (2-3문장, 이 요리의 매력과 특징을 설명)",
+  "description": "요리 소개 (2-3문장)",
   "ingredients": [
     {"name": "재료명", "amount": "양", "searchKeyword": "쿠팡 검색용 키워드"}
   ],
-  "instructions": "조리법을 단계별로 상세하게 작성"
+  "instructions": "조리법 (번호로 단계 구분)"
 }
 
 규칙:
-- 재료는 5~15개 사이
-- searchKeyword는 쿠팡에서 검색할 수 있는 구체적인 상품명 (예: "양파" → "양파 1kg", "간장" → "진간장 500ml")
-- 조리법은 반드시 다음 형식으로 상세하게 작성:
-  * 각 단계를 "1. ", "2. " 등 번호로 구분
-  * 각 단계마다 구체적인 시간 명시 (예: "중불에서 3분간 볶아주세요")
-  * 불 세기 명시 (강불/중불/약불/중약불)
-  * 조리 팁이나 포인트를 괄호 안에 포함 (예: "(이때 뚜껑을 덮으면 더 빨리 익어요)")
-  * 재료를 넣는 순서와 타이밍을 정확히 설명
-  * 완성 징후 설명 (예: "국물이 보글보글 끓어오르면")
-- 조리법은 최소 8단계 이상으로 자세하게 작성
-- 설명은 친근하고 자연스러운 구어체로
-- 준비 과정(재료 손질)부터 플레이팅까지 포함`;
+- 재료는 5~12개
+- searchKeyword는 쿠팡 검색용 구체적 상품명 (예: "양파" → "양파 1kg")
+- 조리법은 5~7단계, 각 단계에 시간과 불세기 포함
+- 구어체로 자연스럽게 작성`;
 
     const systemPrompt = customPrompt?.systemPrompt || defaultSystemPrompt;
     const userPrompt = customPrompt?.userPrompt
       ? customPrompt.userPrompt.replace(/\{dishName\}/g, dishName.trim())
       : defaultUserPrompt;
 
-    // 레시피는 긴 응답이 필요하므로 maxTokens를 충분히 설정 (최소 2048)
-    const recipeAiSettings = {
-      ...settings.ai,
-      maxTokens: Math.max(settings.ai?.maxTokens || 1024, 2048),
-    };
-    const aiResult = await generateText(recipeAiSettings, userPrompt, systemPrompt);
+    const aiResult = await generateText(settings.ai, userPrompt, systemPrompt);
     let parsed;
     try {
       const jsonMatch = aiResult.text.match(/\{[\s\S]*\}/);
