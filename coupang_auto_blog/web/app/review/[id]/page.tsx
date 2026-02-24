@@ -66,9 +66,6 @@ export default function ReviewDetailPage() {
             <h1 className="text-3xl md:text-5xl font-serif font-bold text-slate-900 leading-tight mb-10">
               {review.productName}
             </h1>
-            <div className="flex items-center justify-center gap-3 text-[11px] font-bold tracking-widest uppercase text-slate-400">
-              <span>By {review.author || "Curator"}</span>
-            </div>
           </header>
 
           {review.media && review.media.length > 0 && (
