@@ -21,10 +21,9 @@ interface PageProps {
  */
 async function getReviewBySlug(slug: string): Promise<Review | null> {
   try {
-    const response = await fetch(
-      `${AUTOMATION_SERVER_URL}/api/reviews/${encodeURIComponent(slug)}`,
-      { next: { revalidate: 3600 } }
-    );
+    const url = new URL(`${AUTOMATION_SERVER_URL}/api/reviews/by-slug`);
+    url.searchParams.set('slug', slug);
+    const response = await fetch(url.toString(), { next: { revalidate: 3600 } });
 
     if (!response.ok) {
       return null;

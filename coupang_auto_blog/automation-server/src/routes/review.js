@@ -135,6 +135,64 @@ router.get('/reviews/id/:id', async (req, res) => {
 });
 
 /**
+ * GET /api/reviews/by-slug?slug=...
+ * 공개 리뷰 상세 조회 (slug 쿼리 파라미터 기반) - 한글 slug 인코딩 문제 방지
+ */
+router.get('/reviews/by-slug', async (req, res) => {
+  try {
+    const db = getDb();
+    const { slug } = req.query;
+
+    if (!slug) {
+      return res.status(400).json({ success: false, message: 'slug가 필요합니다.' });
+    }
+
+    const result = await db.query(
+      `SELECT * FROM reviews WHERE slug = $1 AND status = 'published'`,
+      [slug]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '리뷰를 찾을 수 없습니다.' });
+    }
+
+    const row = result.rows[0];
+
+    db.query(
+      'UPDATE reviews SET view_count = COALESCE(view_count, 0) + 1 WHERE id = $1',
+      [row.id]
+    ).catch(err => console.error('조회수 증가 실패:', err));
+
+    const review = {
+      id: String(row.id),
+      productId: row.product_id,
+      productName: row.product_name,
+      productPrice: row.product_price,
+      productImage: row.product_image,
+      title: row.title,
+      content: row.content,
+      slug: row.slug,
+      status: row.status,
+      category: row.category,
+      affiliateUrl: row.affiliate_url,
+      author: row.author,
+      media: row.media,
+      charCount: row.char_count,
+      viewCount: (row.view_count || 0) + 1,
+      seoMeta: row.seo_meta,
+      createdAt: row.created_at?.toISOString(),
+      updatedAt: row.updated_at?.toISOString(),
+      publishedAt: row.published_at?.toISOString(),
+    };
+
+    res.json({ success: true, data: review });
+  } catch (error) {
+    console.error('리뷰 slug 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
  * GET /api/reviews/:slug
  * 공개 리뷰 상세 조회 (slug 기반) + 조회수 증가
  */
