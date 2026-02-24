@@ -21,17 +21,17 @@
 ### 서버 컴퓨터 (Production Server)
 - **역할**: 배포 및 실행만
 - **Git 저장소 루트**: `/home/insuk/blog`
-- **Docker-compose 실행 경로**: `/home/insuk/blog/coupang_auto_blog` ← 여기서 docker-compose 명령어 실행
+- **Docker-compose 실행 경로**: `/home/insuk/blog/coupang_auto_blog` ← 여기서 docker compose 명령어 실행
 - **허용된 작업**:
   - ✅ `git pull` (코드 받기만)
-  - ✅ `docker-compose build` (도커 이미지 빌드)
-  - ✅ `docker-compose up` (서비스 실행)
+  - ✅ `docker compose build` (도커 이미지 빌드)
+  - ✅ `docker compose up` (서비스 실행)
   - ✅ 모니터링 (로그 확인, 상태 체크)
   - ✅ 환경변수 수정 (`.env.production`만)
 - **금지된 작업**:
   - ❌ 코드 파일 수정 (절대 금지!)
   - ❌ Git 커밋
-  - ❌ `Dockerfile`, `docker-compose.yml` 수정
+  - ❌ `Dockerfile`, `docker compose.yml` 수정
   - ❌ 소스 코드 편집
 
 ---
@@ -44,7 +44,7 @@ pwd
 ```
 
 - **개발 컴퓨터**: `/c/Users/sakai/OneDrive/바탕 화면/Coupang partnner/coupang_auto_blog`
-- **서버 컴퓨터**: `/home/insuk/blog/coupang_auto_blog` (docker-compose 실행 위치)
+- **서버 컴퓨터**: `/home/insuk/blog/coupang_auto_blog` (docker compose 실행 위치)
 
 **또는 OS 확인:**
 ```bash
@@ -82,17 +82,17 @@ git push
 
 **케이스 A: 일반 코드 수정 (tsx, js, py 등) — 대부분 이 경우**
 ```bash
-cd /home/insuk/blog/coupang_auto_blog && git -C /home/insuk/blog pull && docker-compose down && docker-compose build && docker-compose up -d
+cd /home/insuk/blog/coupang_auto_blog && git -C /home/insuk/blog pull && docker compose down && docker compose build && docker compose up -d
 ```
 
 **케이스 B: package.json 또는 Dockerfile 변경 시만 `--no-cache` 사용**
 ```bash
-cd /home/insuk/blog/coupang_auto_blog && git -C /home/insuk/blog pull && docker-compose down && docker-compose build --no-cache && docker-compose up -d
+cd /home/insuk/blog/coupang_auto_blog && git -C /home/insuk/blog pull && docker compose down && docker compose build --no-cache && docker compose up -d
 ```
 
 ```bash
 # 로그 확인
-docker-compose logs -f
+docker compose logs -f
 
 # 끝! 절대 코드 수정하지 말 것!
 ```
@@ -116,7 +116,7 @@ docker image prune -f       # <none> 태그 이미지만 정리
      - ✅ "이 작업은 개발 컴퓨터에서 해야 합니다"라고 안내
 
 2. **배포만 담당합니다**
-   - `git pull` → `docker-compose build` → `docker-compose up`
+   - `git pull` → `docker compose build` → `docker compose up`
    - 이 외의 작업은 금지
 
 3. **문제가 생기면**
@@ -160,7 +160,7 @@ coupang_auto_blog/
 │   │   └── utils/            # 유틸리티
 │   └── ...
 ├── docs/                      # 문서
-├── docker-compose.yml         # Docker 설정
+├── docker compose.yml         # Docker 설정
 ├── CLAUDE.md                  # 이 파일
 └── README.md
 ```
@@ -176,14 +176,14 @@ coupang_auto_blog/
 docker ps -a
 
 # 2. 로그 확인
-docker-compose logs
+docker compose logs
 
 # 3. 재시작
-docker-compose restart
+docker compose restart
 
 # 4. 안되면 재빌드
-docker-compose down
-docker-compose up -d --build
+docker compose down
+docker compose up -d --build
 ```
 
 ### 작업 내용이 충돌할 때
@@ -286,17 +286,17 @@ return NextResponse.json(await response.json());
 
 ```bash
 # ❌ 잘못된 방법 (코드 변경이 반영되지 않음)
-docker-compose restart
+docker compose restart
 
 # ✅ 일반 코드 수정 시 (tsx/js/py 등 — 대부분 이 경우)
-docker-compose down
-docker-compose build
-docker-compose up -d
+docker compose down
+docker compose build
+docker compose up -d
 
 # ✅ package.json / Dockerfile 변경 시만 --no-cache 사용
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 ```
 
 > `--no-cache`를 매번 쓰면 빌드 캐시가 쌓여 디스크 용량을 빠르게 소진합니다.
@@ -316,7 +316,7 @@ docker-compose up -d
 | 인증 엔드포인트 | `automation-server/src/routes/auth.js` |
 | API 클라이언트 (프론트) | `web/lib/apiClient.ts` |
 | Firestore 대체 모듈 | `web/lib/firestore.ts` (API 클라이언트 래퍼) |
-| Docker 설정 | `docker-compose.yml` |
+| Docker 설정 | `docker compose.yml` |
 
 ---
 
