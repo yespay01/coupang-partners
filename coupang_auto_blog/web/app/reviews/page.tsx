@@ -100,7 +100,7 @@ function ReviewCard({ review }: { review: PublishedReview }) {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              {review.author || "AI 리뷰어"}
+              {review.author || "세모링크"}
             </span>
             <span>{formatDate(review.createdAt || "")}</span>
           </div>
@@ -241,7 +241,7 @@ function ReviewsPageContent() {
             {sortParam === "popular" ? "인기 리뷰" : "모든 리뷰"}
           </h1>
           <p className="mt-2 text-slate-600">
-            AI가 분석하고 정리한 쿠팡 파트너스 상품 리뷰를 확인하세요.
+            다양한 카테고리의 쿠팡 파트너스 상품 리뷰를 확인하세요.
           </p>
         </div>
       </div>
@@ -326,7 +326,7 @@ function ReviewsPageContent() {
               <div className="w-6 h-6 rounded bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                 <span className="text-white font-bold text-xs">C</span>
               </div>
-              <span>쿠팡 파트너스 자동화 블로그</span>
+              <span>세모링크</span>
             </div>
             <p>&copy; {new Date().getFullYear()} Coupang Partners Auto Blog</p>
           </div>

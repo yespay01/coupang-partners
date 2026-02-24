@@ -116,7 +116,7 @@ export default async function ReviewPage({ params }: PageProps) {
       },
       author: {
         "@type": "Organization",
-        name: "쿠팡 리뷰 블로그",
+        name: "세모링크",
       },
       reviewBody: review.content,
       datePublished: review.publishedAt,

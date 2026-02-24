@@ -82,7 +82,7 @@ export default function RecipesPage() {
           </nav>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">요리 레시피</h1>
           <p className="mt-2 text-slate-600">
-            AI가 만든 레시피와 함께 필요한 재료를 쿠팡에서 바로 구매하세요.
+            다양한 레시피와 함께 필요한 재료를 쿠팡에서 바로 구매하세요.
           </p>
         </div>
       </div>
