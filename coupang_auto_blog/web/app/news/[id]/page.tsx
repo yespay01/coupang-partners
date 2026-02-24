@@ -19,6 +19,7 @@ interface NewsItem {
   viewCount: number;
   publishedAt: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface PageProps {
@@ -75,8 +76,44 @@ export default async function NewsDetailPage({ params }: PageProps) {
   const news = await getNews(id);
   if (!news) notFound();
 
+  const description = news.summary
+    ? news.summary.slice(0, 160)
+    : news.title;
+
+  const publishedIso = new Date(news.publishedAt || news.createdAt).toISOString();
+  const modifiedIso = new Date(news.updatedAt || news.publishedAt || news.createdAt).toISOString();
+
+  const newsJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    headline: news.title,
+    description,
+    datePublished: publishedIso,
+    dateModified: modifiedIso,
+    author: {
+      "@type": "Organization",
+      name: "세모링크",
+      url: "https://semolink.store",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "세모링크",
+      url: "https://semolink.store",
+    },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `https://semolink.store/news/${id}`,
+    },
+    ...(news.category ? { articleSection: news.category } : {}),
+  };
+
   return (
     <div className="min-h-screen bg-white selection:bg-amber-50">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(newsJsonLd) }}
+      />
+
       <SiteHeader />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 pt-24">
@@ -105,13 +142,13 @@ export default async function NewsDetailPage({ params }: PageProps) {
 
         {/* Meta */}
         <div className="flex gap-4 text-sm text-slate-500 mb-8 pb-6 border-b border-slate-200">
-          <span>
+          <time dateTime={publishedIso}>
             {new Date(news.publishedAt || news.createdAt).toLocaleDateString("ko-KR", {
               year: "numeric",
               month: "long",
               day: "numeric",
             })}
-          </span>
+          </time>
           <span>조회수 {news.viewCount}</span>
         </div>
 

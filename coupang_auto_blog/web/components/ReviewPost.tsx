@@ -51,7 +51,7 @@ export default function ReviewPost({ review }: ReviewPostProps) {
       {/* 헤더 */}
       <header className="mb-8">
         <h1 className="text-4xl font-bold mb-4 text-gray-900">
-          {review.productName}
+          {review.seoMeta?.title || `${review.productName} 리뷰`}
         </h1>
 
         <div className="flex items-center gap-4 text-sm text-gray-600">
@@ -121,7 +121,7 @@ export default function ReviewPost({ review }: ReviewPostProps) {
                 {item.type === "image" && (
                   <Image
                     src={item.url}
-                    alt={item.name}
+                    alt={`${review.productName} 이미지 ${index + 1}`}
                     fill
                     className="object-cover"
                   />

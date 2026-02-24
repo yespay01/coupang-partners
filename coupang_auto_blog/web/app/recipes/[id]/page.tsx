@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
@@ -92,8 +93,43 @@ export default async function RecipeDetailPage({ params }: PageProps) {
   const recipe = await getRecipe(id);
   if (!recipe) notFound();
 
+  const description = recipe.description
+    ? recipe.description.slice(0, 160)
+    : `${recipe.title} 레시피. 재료와 조리법을 확인하세요.`;
+
+  const recipeJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Recipe",
+    name: recipe.title,
+    description,
+    image: recipe.imageUrl,
+    datePublished: recipe.createdAt,
+    author: {
+      "@type": "Organization",
+      name: "세모링크",
+      url: "https://semolink.store",
+    },
+    ...(recipe.cookingTime ? { totalTime: recipe.cookingTime } : {}),
+    recipeIngredient: recipe.ingredients?.map(
+      (i) => `${i.name} ${i.amount}`.trim()
+    ),
+    recipeInstructions: recipe.instructions
+      ?.split("\n")
+      .filter(Boolean)
+      .map((step, i) => ({
+        "@type": "HowToStep",
+        position: i + 1,
+        text: step.trim(),
+      })),
+  };
+
   return (
     <div className="min-h-screen bg-white selection:bg-amber-50">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(recipeJsonLd) }}
+      />
+
       <SiteHeader />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 pt-24">
@@ -127,17 +163,22 @@ export default async function RecipeDetailPage({ params }: PageProps) {
               {recipe.difficulty}
             </span>
           )}
-          <span>{new Date(recipe.createdAt).toLocaleDateString("ko-KR")}</span>
+          <time dateTime={new Date(recipe.createdAt).toISOString()}>
+            {new Date(recipe.createdAt).toLocaleDateString("ko-KR")}
+          </time>
           <span>조회수 {recipe.viewCount}</span>
         </div>
 
         {/* Hero Image */}
         {recipe.imageUrl && (
-          <div className="mb-10 overflow-hidden rounded-xl">
-            <img
+          <div className="mb-10 overflow-hidden rounded-xl relative w-full" style={{ aspectRatio: "16/9", maxHeight: "480px" }}>
+            <Image
               src={recipe.imageUrl}
-              alt={recipe.title}
-              className="w-full h-auto max-h-[480px] object-cover"
+              alt={`${recipe.title} 요리 완성 이미지`}
+              fill
+              className="object-cover"
+              priority
+              sizes="(max-width: 768px) 100vw, 896px"
             />
           </div>
         )}
@@ -190,11 +231,13 @@ export default async function RecipeDetailPage({ params }: PageProps) {
                   className="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
                   {product.productImage && (
-                    <div className="mb-3 aspect-square overflow-hidden rounded-lg bg-slate-100">
-                      <img
+                    <div className="mb-3 aspect-square overflow-hidden rounded-lg bg-slate-100 relative">
+                      <Image
                         src={product.productImage}
-                        alt={product.productName}
-                        className="h-full w-full object-contain"
+                        alt={`${product.ingredientName} - ${product.productName}`}
+                        fill
+                        className="object-contain"
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
                       />
                     </div>
                   )}
