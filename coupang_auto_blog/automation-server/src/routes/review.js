@@ -143,26 +143,17 @@ router.get('/reviews/by-slug', async (req, res) => {
     const db = getDb();
     const { slug } = req.query;
 
-    console.log('[by-slug] raw query:', JSON.stringify(req.query));
-    console.log('[by-slug] slug value:', JSON.stringify(slug));
-    console.log('[by-slug] slug length:', slug ? slug.length : 'undefined');
-
     if (!slug) {
       return res.status(400).json({ success: false, message: 'slug가 필요합니다.' });
     }
 
-    // DB에서 일치하는 slug 목록 확인 (디버그용)
-    const allSlugsResult = await db.query(
-      `SELECT id, slug, status FROM reviews WHERE status = 'published' LIMIT 5`
-    );
-    console.log('[by-slug] published reviews sample:', JSON.stringify(allSlugsResult.rows.map(r => ({ id: r.id, slug: r.slug?.substring(0, 30) }))));
+    // URL 인코딩된 slug 디코딩 (한글 slug가 %EC%B2%9C... 형태로 전달될 수 있음)
+    const decodedSlug = decodeURIComponent(slug);
 
     const result = await db.query(
       `SELECT * FROM reviews WHERE slug = $1 AND status = 'published'`,
-      [slug]
+      [decodedSlug]
     );
-
-    console.log('[by-slug] query result count:', result.rows.length);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: '리뷰를 찾을 수 없습니다.' });
