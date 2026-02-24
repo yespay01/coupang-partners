@@ -1,6 +1,6 @@
 # 쿠팡 자동 블로그 프로젝트 - Claude 작업 지침
 
-> **최종 업데이트**: 2026-02-11
+> **최종 업데이트**: 2026-02-24
 > **핵심 원칙**: Git 기반 워크플로우
 
 ---
@@ -76,22 +76,37 @@ git push
 ```
 
 ### 서버 컴퓨터에서 (배포만):
-```bash
-# 1. 최신 코드 받기
-git fetch
-git pull
 
-# 2. 도커 이미지 재빌드
+> ⚠️ `--no-cache`는 디스크 용량을 많이 사용합니다. 아래 기준을 반드시 확인하고 사용하세요.
+
+**케이스 A: 일반 코드 수정 (tsx, js, py 등) — 대부분 이 경우**
+```bash
+git pull
+docker-compose down
+docker-compose build
+docker-compose up -d
+```
+
+**케이스 B: package.json 또는 Dockerfile 변경 시만 `--no-cache` 사용**
+```bash
+git pull
 docker-compose down
 docker-compose build --no-cache
-
-# 3. 서비스 실행
 docker-compose up -d
+```
 
-# 4. 로그 확인
+```bash
+# 로그 확인
 docker-compose logs -f
 
 # 끝! 절대 코드 수정하지 말 것!
+```
+
+**서버 용량 정리 (용량 부족 시):**
+```bash
+docker system prune -f      # 사용하지 않는 이미지/컨테이너/캐시 전체 정리
+docker builder prune -f     # 빌드 캐시만 정리 (수 GB 확보 가능)
+docker image prune -f       # <none> 태그 이미지만 정리
 ```
 
 ---
@@ -278,11 +293,19 @@ return NextResponse.json(await response.json());
 # ❌ 잘못된 방법 (코드 변경이 반영되지 않음)
 docker-compose restart
 
-# ✅ 올바른 방법
+# ✅ 일반 코드 수정 시 (tsx/js/py 등 — 대부분 이 경우)
+docker-compose down
+docker-compose build
+docker-compose up -d
+
+# ✅ package.json / Dockerfile 변경 시만 --no-cache 사용
 docker-compose down
 docker-compose build --no-cache
 docker-compose up -d
 ```
+
+> `--no-cache`를 매번 쓰면 빌드 캐시가 쌓여 디스크 용량을 빠르게 소진합니다.
+> 변경 내용을 먼저 확인하고 필요한 경우에만 사용하세요.
 
 ---
 
