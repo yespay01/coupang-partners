@@ -117,7 +117,7 @@ export default function RecipesPage() {
             <div className="mb-4 text-sm text-slate-500">총 {recipes.length}개의 레시피</div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {recipes.map((recipe) => (
-                <Link key={recipe.id} href={`/recipes/${recipe.id}`}>
+                <Link key={recipe.id} href={`/recipes/${recipe.slug || recipe.id}`}>
                   <article className="group h-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg cursor-pointer">
                     <span className="inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 mb-2">
                       재료 {recipe.ingredients?.length || 0}개

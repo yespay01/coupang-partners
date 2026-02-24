@@ -35,12 +35,24 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-async function getRecipe(id: string): Promise<Recipe | null> {
+async function getRecipe(slugOrId: string): Promise<Recipe | null> {
   try {
-    const response = await fetch(
-      `${AUTOMATION_SERVER_URL}/api/recipes/id/${id}`,
-      { next: { revalidate: 3600 } }
-    );
+    // 숫자면 ID로 조회 (기존 링크 호환)
+    if (/^\d+$/.test(slugOrId)) {
+      const response = await fetch(
+        `${AUTOMATION_SERVER_URL}/api/recipes/id/${slugOrId}`,
+        { next: { revalidate: 3600 } }
+      );
+      if (!response.ok) return null;
+      const result = await response.json();
+      if (!result.success || !result.data) return null;
+      return result.data as Recipe;
+    }
+
+    // 슬러그로 조회 (한글 slug 인코딩 문제 방지를 위해 쿼리 파라미터 사용)
+    const url = new URL(`${AUTOMATION_SERVER_URL}/api/recipes/by-slug`);
+    url.searchParams.set("slug", slugOrId);
+    const response = await fetch(url.toString(), { next: { revalidate: 3600 } });
     if (!response.ok) return null;
     const result = await response.json();
     if (!result.success || !result.data) return null;
@@ -215,7 +227,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           </div>
         </section>
 
-        {/* Coupang Products (last) */}
+        {/* Coupang Products */}
         {recipe.coupangProducts && recipe.coupangProducts.length > 0 && (
           <section className="mb-10">
             <h2 className="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200">

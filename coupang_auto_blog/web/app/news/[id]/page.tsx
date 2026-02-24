@@ -26,12 +26,24 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-async function getNews(id: string): Promise<NewsItem | null> {
+async function getNews(slugOrId: string): Promise<NewsItem | null> {
   try {
-    const response = await fetch(
-      `${AUTOMATION_SERVER_URL}/api/news/id/${id}`,
-      { next: { revalidate: 3600 } }
-    );
+    // 숫자면 ID로 조회 (기존 링크 호환)
+    if (/^\d+$/.test(slugOrId)) {
+      const response = await fetch(
+        `${AUTOMATION_SERVER_URL}/api/news/id/${slugOrId}`,
+        { next: { revalidate: 3600 } }
+      );
+      if (!response.ok) return null;
+      const result = await response.json();
+      if (!result.success || !result.data) return null;
+      return result.data as NewsItem;
+    }
+
+    // 슬러그로 조회 (인코딩 문제 방지를 위해 쿼리 파라미터 사용)
+    const url = new URL(`${AUTOMATION_SERVER_URL}/api/news/by-slug`);
+    url.searchParams.set("slug", slugOrId);
+    const response = await fetch(url.toString(), { next: { revalidate: 3600 } });
     if (!response.ok) return null;
     const result = await response.json();
     if (!result.success || !result.data) return null;
@@ -46,9 +58,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const news = await getNews(id);
   if (!news) return { title: "뉴스를 찾을 수 없습니다" };
 
-  const description = news.summary
-    ? news.summary.slice(0, 160)
-    : news.title;
+  const description = news.summary ? news.summary.slice(0, 160) : news.title;
 
   return {
     title: news.title,
@@ -76,9 +86,7 @@ export default async function NewsDetailPage({ params }: PageProps) {
   const news = await getNews(id);
   if (!news) notFound();
 
-  const description = news.summary
-    ? news.summary.slice(0, 160)
-    : news.title;
+  const description = news.summary ? news.summary.slice(0, 160) : news.title;
 
   const publishedIso = new Date(news.publishedAt || news.createdAt).toISOString();
   const modifiedIso = new Date(news.updatedAt || news.publishedAt || news.createdAt).toISOString();

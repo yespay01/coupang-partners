@@ -117,7 +117,7 @@ export default function NewsPage() {
             <div className="mb-4 text-sm text-slate-500">총 {newsList.length}개의 뉴스</div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {newsList.map((news) => (
-                <Link key={news.id} href={`/news/${news.id}`}>
+                <Link key={news.id} href={`/news/${news.slug || news.id}`}>
                   <article className="group h-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg cursor-pointer">
                     {news.category && (
                       <span className="inline-block rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 mb-2">
