@@ -13,9 +13,7 @@ const AUTOMATION_SERVER_URL =
   process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
 interface PageProps {
-  params: {
-    slug: string;
-  };
+  params: Promise<{ slug: string }>;
 }
 
 /**
@@ -51,7 +49,8 @@ async function getReviewBySlug(slug: string): Promise<Review | null> {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const review = await getReviewBySlug(params.slug);
+  const { slug } = await params;
+  const review = await getReviewBySlug(slug);
 
   if (!review) {
     return {
@@ -71,7 +70,7 @@ export async function generateMetadata({
     description: seoMeta.description,
     keywords: seoMeta.keywords,
     alternates: {
-      canonical: `https://semolink.store/reviews/${params.slug}`,
+      canonical: `https://semolink.store/reviews/${slug}`,
     },
     openGraph: {
       title: seoMeta.title,
@@ -94,7 +93,8 @@ export async function generateMetadata({
  * 리뷰 상세 페이지
  */
 export default async function ReviewPage({ params }: PageProps) {
-  const review = await getReviewBySlug(params.slug);
+  const { slug } = await params;
+  const review = await getReviewBySlug(slug);
 
   // 404 처리
   if (!review) {
