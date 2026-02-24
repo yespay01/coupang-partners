@@ -48,11 +48,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: news.title,
     description: news.summary,
+    keywords: [news.title, news.category, "뉴스", "세모링크"].filter(Boolean),
+    alternates: {
+      canonical: `https://semolink.store/news/${id}`,
+    },
     openGraph: {
       title: news.title,
       description: news.summary,
       type: "article",
       publishedTime: news.publishedAt,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: news.title,
+      description: news.summary,
     },
   };
 }

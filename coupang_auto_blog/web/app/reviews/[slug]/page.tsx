@@ -70,6 +70,9 @@ export async function generateMetadata({
     title: seoMeta.title,
     description: seoMeta.description,
     keywords: seoMeta.keywords,
+    alternates: {
+      canonical: `https://semolink.store/reviews/${params.slug}`,
+    },
     openGraph: {
       title: seoMeta.title,
       description: seoMeta.description,

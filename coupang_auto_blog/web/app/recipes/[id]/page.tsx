@@ -54,14 +54,31 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const recipe = await getRecipe(id);
   if (!recipe) return { title: "레시피를 찾을 수 없습니다" };
 
+  const keywords = [
+    recipe.title,
+    "레시피",
+    "요리",
+    ...(recipe.ingredients?.map((i: { name: string }) => i.name) || []),
+  ].filter(Boolean);
+
   return {
     title: `${recipe.title} - 레시피`,
     description: recipe.description,
+    keywords,
+    alternates: {
+      canonical: `https://semolink.store/recipes/${id}`,
+    },
     openGraph: {
-      title: recipe.title,
+      title: `${recipe.title} - 레시피`,
       description: recipe.description,
       type: "article",
       ...(recipe.imageUrl ? { images: [{ url: recipe.imageUrl }] } : {}),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${recipe.title} - 레시피`,
+      description: recipe.description,
+      ...(recipe.imageUrl ? { images: [recipe.imageUrl] } : {}),
     },
   };
 }

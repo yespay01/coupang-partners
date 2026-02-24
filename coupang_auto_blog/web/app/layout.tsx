@@ -16,8 +16,20 @@ const notoSans = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: "세모링크 - 세상의 모든 링크",
+  metadataBase: new URL("https://semolink.store"),
+  title: {
+    default: "세모링크 - 세상의 모든 링크",
+    template: "%s | 세모링크",
+  },
   description: "세상의 모든 링크가 모이는 허브, 세모링크입니다.",
+  openGraph: {
+    siteName: "세모링크",
+    locale: "ko_KR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({
