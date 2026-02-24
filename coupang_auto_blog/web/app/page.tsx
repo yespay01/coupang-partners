@@ -68,10 +68,11 @@ function truncateContent(content: string, maxLength: number = 100): string {
 
 function ReviewCard({ review }: { review: PublishedReview }) {
   const previewImage = review.media?.find(m => m.type === 'image')?.url;
+  const href = review.slug ? `/reviews/${review.slug}` : `/review/${review.id}`;
 
   return (
     <article className="group cursor-pointer flex flex-col h-full">
-      <Link href={`/review/${review.id}`}>
+      <Link href={href}>
         <div className="relative aspect-[3/4] overflow-hidden bg-slate-50 mb-6 group-hover:shadow-2xl transition-shadow duration-1000">
           {previewImage ? (
             <img
@@ -99,7 +100,7 @@ function ReviewCard({ review }: { review: PublishedReview }) {
           </span>
         </div>
 
-        <Link href={`/review/${review.id}`} className="block mb-4">
+        <Link href={href} className="block mb-4">
           <h3 className="text-xl md:text-2xl font-serif font-bold text-slate-900 leading-tight hover:text-amber-800 transition-colors line-clamp-2 h-[3.5rem] md:h-[4rem]">
             {review.productName}
           </h3>
@@ -110,7 +111,7 @@ function ReviewCard({ review }: { review: PublishedReview }) {
         </p>
 
         <div className="mt-auto pt-4 border-t border-slate-50">
-          <Link href={`/review/${review.id}`} className="text-xs font-bold tracking-widest uppercase border-b border-amber-200 pb-1 hover:border-slate-900 transition-all">
+          <Link href={href} className="text-xs font-bold tracking-widest uppercase border-b border-amber-200 pb-1 hover:border-slate-900 transition-all">
             Read More
           </Link>
         </div>
