@@ -96,12 +96,6 @@ function ReviewCard({ review }: { review: PublishedReview }) {
         </div>
         <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              {review.author || "세모링크"}
-            </span>
             <span>{formatDate(review.createdAt || "")}</span>
           </div>
           <span className="inline-flex items-center gap-1 font-medium text-blue-600 group-hover:text-blue-700 transition">
@@ -241,7 +235,7 @@ function ReviewsPageContent() {
             {sortParam === "popular" ? "인기 리뷰" : "모든 리뷰"}
           </h1>
           <p className="mt-2 text-slate-600">
-            다양한 카테고리의 쿠팡 파트너스 상품 리뷰를 확인하세요.
+            다양한 카테고리의 상품 리뷰를 확인하세요.
           </p>
         </div>
       </div>
