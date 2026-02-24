@@ -13,6 +13,30 @@ const router = express.Router();
 // 모든 admin 라우트에 인증 미들웨어 적용
 router.use(authenticateToken);
 
+/**
+ * 제목으로 고유 slug 생성 (중복 시 -2, -3, ... 자동 부여)
+ */
+async function generateUniqueSlug(db, table, title) {
+  const base = title
+    .replace(/[^\w\uAC00-\uD7A3\u3040-\u309F\u30A0-\u30FF]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80)
+    .toLowerCase();
+
+  const existing = await db.query(
+    `SELECT slug FROM ${table} WHERE slug = $1 OR slug ~ $2`,
+    [base, `^${base}-[0-9]+$`]
+  );
+
+  if (existing.rows.length === 0) return base;
+
+  const usedSlugs = new Set(existing.rows.map(r => r.slug));
+  let counter = 2;
+  while (usedSlugs.has(`${base}-${counter}`)) counter++;
+  return `${base}-${counter}`;
+}
+
 // ==================== Reviews ====================
 
 /**
@@ -776,13 +800,7 @@ router.post('/recipes/generate', async (req, res) => {
       coupangProducts = results.filter(Boolean);
     }
 
-    const titleForSlug = (parsed.title || dishName.trim())
-      .replace(/[^\w\uAC00-\uD7A3\u3040-\u309F\u30A0-\u30FF]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 60)
-      .toLowerCase();
-    const slug = `${titleForSlug}-${Date.now()}`;
+    const slug = await generateUniqueSlug(db, 'recipes', parsed.title || dishName.trim());
     const insertResult = await db.query(
       `INSERT INTO recipes (title, description, cooking_time, difficulty, ingredients, instructions, coupang_products, image_url, slug, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
@@ -993,8 +1011,8 @@ router.post('/news/generate', async (req, res) => {
       return res.status(500).json({ success: false, message: 'AI 응답을 파싱할 수 없습니다.' });
     }
 
-    const slug = `news-${Date.now()}`;
     const db = getDb();
+    const slug = await generateUniqueSlug(db, 'news', parsed.title || topic.trim());
     const insertResult = await db.query(
       `INSERT INTO news (title, summary, content, category, slug, status)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
