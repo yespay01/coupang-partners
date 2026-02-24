@@ -61,23 +61,27 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     ...(recipe.ingredients?.map((i: { name: string }) => i.name) || []),
   ].filter(Boolean);
 
+  const description = recipe.description
+    ? recipe.description.slice(0, 160)
+    : `${recipe.title} 레시피. 재료와 조리법을 확인하세요.`;
+
   return {
     title: `${recipe.title} - 레시피`,
-    description: recipe.description,
+    description,
     keywords,
     alternates: {
       canonical: `https://semolink.store/recipes/${id}`,
     },
     openGraph: {
       title: `${recipe.title} - 레시피`,
-      description: recipe.description,
+      description,
       type: "article",
       ...(recipe.imageUrl ? { images: [{ url: recipe.imageUrl }] } : {}),
     },
     twitter: {
       card: "summary_large_image",
       title: `${recipe.title} - 레시피`,
-      description: recipe.description,
+      description,
       ...(recipe.imageUrl ? { images: [recipe.imageUrl] } : {}),
     },
   };

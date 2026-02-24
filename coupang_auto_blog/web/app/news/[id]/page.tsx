@@ -45,23 +45,27 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const news = await getNews(id);
   if (!news) return { title: "뉴스를 찾을 수 없습니다" };
 
+  const description = news.summary
+    ? news.summary.slice(0, 160)
+    : news.title;
+
   return {
     title: news.title,
-    description: news.summary,
+    description,
     keywords: [news.title, news.category, "뉴스", "세모링크"].filter(Boolean),
     alternates: {
       canonical: `https://semolink.store/news/${id}`,
     },
     openGraph: {
       title: news.title,
-      description: news.summary,
+      description,
       type: "article",
       publishedTime: news.publishedAt,
     },
     twitter: {
       card: "summary_large_image",
       title: news.title,
-      description: news.summary,
+      description,
     },
   };
 }

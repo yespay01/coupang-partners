@@ -758,7 +758,13 @@ router.post('/recipes/generate', async (req, res) => {
       coupangProducts = results.filter(Boolean);
     }
 
-    const slug = `recipe-${Date.now()}`;
+    const titleForSlug = (parsed.title || dishName.trim())
+      .replace(/[^\w\uAC00-\uD7A3\u3040-\u309F\u30A0-\u30FF]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 60)
+      .toLowerCase();
+    const slug = `${titleForSlug}-${Date.now()}`;
     const insertResult = await db.query(
       `INSERT INTO recipes (title, description, cooking_time, difficulty, ingredients, instructions, coupang_products, image_url, slug, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
