@@ -342,9 +342,9 @@ router.post('/generate', async (req, res) => {
     const reviewResult = await db.query(
       `INSERT INTO reviews (
         product_id, product_name, content, status, category,
-        affiliate_url, author, media, tone_score, char_count,
+        affiliate_url, media, tone_score, char_count,
         product_price, product_image
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
       [
         product.product_id,
         product.product_name,
@@ -352,7 +352,6 @@ router.post('/generate', async (req, res) => {
         'draft',
         product.category_name,
         product.product_url,
-        'auto-bot',
         JSON.stringify(media),
         toneScore,
         charCount,

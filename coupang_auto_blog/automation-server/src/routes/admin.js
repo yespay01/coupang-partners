@@ -116,6 +116,24 @@ router.put('/reviews/:id', async (req, res) => {
 
     if (status === 'published') {
       fields.push(`published_at = NOW()`);
+
+      // slug가 없으면 상품명 기반으로 생성
+      const existing = await db.query(
+        'SELECT slug, product_name FROM reviews WHERE id = $1',
+        [req.params.id]
+      );
+      if (existing.rows.length > 0 && !existing.rows[0].slug) {
+        const pName = productName || existing.rows[0].product_name || '';
+        const titleForSlug = pName
+          .replace(/[^\w\uAC00-\uD7A3\u3040-\u309F\u30A0-\u30FF]/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '')
+          .slice(0, 60)
+          .toLowerCase();
+        const newSlug = `${titleForSlug}-${Date.now()}`;
+        fields.push(`slug = $${idx++}`);
+        params.push(newSlug);
+      }
     }
 
     fields.push('updated_at = NOW()');
