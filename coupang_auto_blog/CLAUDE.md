@@ -20,7 +20,8 @@
 
 ### 서버 컴퓨터 (Production Server)
 - **역할**: 배포 및 실행만
-- **위치**: `/home/insuk/blog` (리눅스 서버)
+- **Git 저장소 루트**: `/home/insuk/blog`
+- **Docker-compose 실행 경로**: `/home/insuk/blog/coupang_auto_blog` ← 여기서 docker-compose 명령어 실행
 - **허용된 작업**:
   - ✅ `git pull` (코드 받기만)
   - ✅ `docker-compose build` (도커 이미지 빌드)
@@ -43,7 +44,7 @@ pwd
 ```
 
 - **개발 컴퓨터**: `/c/Users/sakai/OneDrive/바탕 화면/Coupang partnner/coupang_auto_blog`
-- **서버 컴퓨터**: `/home/insuk/blog`
+- **서버 컴퓨터**: `/home/insuk/blog/coupang_auto_blog` (docker-compose 실행 위치)
 
 **또는 OS 확인:**
 ```bash
@@ -81,18 +82,12 @@ git push
 
 **케이스 A: 일반 코드 수정 (tsx, js, py 등) — 대부분 이 경우**
 ```bash
-git pull
-docker-compose down
-docker-compose build
-docker-compose up -d
+cd /home/insuk/blog/coupang_auto_blog && git -C /home/insuk/blog pull && docker-compose down && docker-compose build && docker-compose up -d
 ```
 
 **케이스 B: package.json 또는 Dockerfile 변경 시만 `--no-cache` 사용**
 ```bash
-git pull
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+cd /home/insuk/blog/coupang_auto_blog && git -C /home/insuk/blog pull && docker-compose down && docker-compose build --no-cache && docker-compose up -d
 ```
 
 ```bash
