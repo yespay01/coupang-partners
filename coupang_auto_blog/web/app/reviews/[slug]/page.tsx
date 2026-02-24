@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import ReviewPost from "@/components/ReviewPost";
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 import { Review } from "@/types";
 
 // ISR: 1시간마다 재생성
@@ -130,7 +132,9 @@ export default async function ReviewPage({ params }: PageProps) {
   };
 
   return (
-    <>
+    <div className="min-h-screen bg-white">
+      <SiteHeader />
+
       {/* 구조화된 데이터 */}
       <script
         type="application/ld+json"
@@ -138,8 +142,12 @@ export default async function ReviewPage({ params }: PageProps) {
       />
 
       {/* 리뷰 포스트 */}
-      <ReviewPost review={review} />
-    </>
+      <main className="pt-36 pb-32">
+        <ReviewPost review={review} />
+      </main>
+
+      <SiteFooter />
+    </div>
   );
 }
 
