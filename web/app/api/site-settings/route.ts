@@ -7,7 +7,7 @@ const AUTOMATION_SERVER_URL =
 
 export async function GET() {
   try {
-    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/admin/settings`, {
+    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/public/site-settings`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       next: { revalidate },
@@ -21,9 +21,7 @@ export async function GET() {
     }
 
     const payload = await response.json().catch(() => ({ success: true, data: {} }));
-    const site = payload?.data?.site && typeof payload.data.site === "object"
-      ? payload.data.site
-      : {};
+    const site = payload?.data && typeof payload.data === "object" ? payload.data : {};
 
     return NextResponse.json({ success: true, data: site });
   } catch (error) {

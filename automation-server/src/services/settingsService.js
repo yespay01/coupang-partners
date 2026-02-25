@@ -93,6 +93,9 @@ const DEFAULT_SETTINGS = {
     affiliateDisclosureText: "이 포스트는 쿠팡 파트너스 활동의 일환으로 일정 수수료를 받을 수 있습니다.",
     contactEmail: "",
     businessName: "",
+    privacyPolicyUrl: "",
+    termsUrl: "",
+    disclosureUrl: "",
   },
   topics: {
     goldboxEnabled: true,

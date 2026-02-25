@@ -33,7 +33,7 @@ function normalizeSiteSettings(input?: Partial<SiteSettings>): SiteSettings {
 
 export const getServerSiteBranding = cache(async (): Promise<SiteSettings> => {
   try {
-    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/admin/settings`, {
+    const response = await fetch(`${AUTOMATION_SERVER_URL}/api/public/site-settings`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       next: { revalidate: SITE_BRANDING_REVALIDATE_SECONDS },
@@ -44,10 +44,10 @@ export const getServerSiteBranding = cache(async (): Promise<SiteSettings> => {
     }
 
     const payload = (await response.json().catch(() => ({}))) as {
-      data?: { site?: Partial<SiteSettings> };
+      data?: Partial<SiteSettings>;
     };
 
-    return normalizeSiteSettings(payload?.data?.site);
+    return normalizeSiteSettings(payload?.data);
   } catch {
     return normalizeSiteSettings();
   }

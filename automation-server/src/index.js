@@ -39,6 +39,18 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Public site branding settings (safe subset only)
+app.get('/api/public/site-settings', async (req, res) => {
+  try {
+    const { getSystemSettings } = await import('./services/settingsService.js');
+    const settings = await getSystemSettings();
+    res.json({ success: true, data: settings?.site || {} });
+  } catch (error) {
+    console.error('공개 사이트 설정 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message || 'site settings load failed' });
+  }
+});
+
 // Initialize database and storage
 async function initializeServices() {
   try {
