@@ -1,9 +1,13 @@
 import express from 'express';
 import { getDb } from '../config/database.js';
+import { authenticateToken } from '../config/auth.js';
 import { createCoupangClient } from '../services/coupang/index.js';
 import { notifySlack } from '../services/slack.js';
 
 const router = express.Router();
+
+// 수집 엔드포인트는 관리자/크론만 호출하도록 보호
+router.use(authenticateToken);
 
 /**
  * 시스템 설정 조회

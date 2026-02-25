@@ -97,15 +97,28 @@ export async function fetchReviewPage(options: {
 
     const data = await apiClient.get<{
       success: boolean;
-      data: (ReviewDoc & { id: string })[];
+      data?: {
+        reviews?: (ReviewDoc & { id: string })[];
+        totalCount?: number;
+        hasMore?: boolean;
+      } | (ReviewDoc & { id: string })[];
       total?: number;
     }>(`/api/admin/reviews?${params.toString()}`);
 
-    const docs = data.data ?? [];
+    const docs = Array.isArray(data.data)
+      ? data.data
+      : (data.data?.reviews ?? []);
+    const totalCount = Array.isArray(data.data)
+      ? (data.total ?? docs.length)
+      : (data.data?.totalCount ?? data.total ?? docs.length);
+    const hasMore = Array.isArray(data.data)
+      ? docs.length === (options.limit ?? 12)
+      : (data.data?.hasMore ?? docs.length === (options.limit ?? 12));
+
     return {
       documents: docs,
-      hasMore: docs.length === (options.limit ?? 12),
-      totalCount: data.total ?? docs.length,
+      hasMore,
+      totalCount,
     };
   } catch {
     return { documents: [], hasMore: false, totalCount: 0 };
@@ -114,7 +127,7 @@ export async function fetchReviewPage(options: {
 
 export async function createReview(input: ReviewInput): Promise<string> {
   const data = await apiClient.post<{ success: boolean; data: { reviewId: string } }>(
-    "/api/review/generate",
+    "/api/admin/generate-review",
     { productId: input.productId }
   );
   return data.data.reviewId;

@@ -29,7 +29,18 @@ export type SystemSettings = {
   };
   coupang: { enabled: boolean; accessKey: string; secretKey: string };
   topics: { goldboxEnabled: boolean; keywords: string[]; categories: string[]; coupangPLBrands: string[] };
-  automation: { enabled: boolean; schedule: string; maxProductsPerRun: number };
+  automation: {
+    enabled: boolean;
+    schedule: string;
+    collectSchedule?: string;
+    maxProductsPerRun: number;
+    reviewGeneration?: {
+      enabled: boolean;
+      maxPerRun: number;
+      schedule: string;
+      pauseWhenDraftCountExceeds: number;
+    };
+  };
 };
 
 export async function getSystemSettings(): Promise<SystemSettings> {
@@ -54,6 +65,14 @@ export async function getSystemSettings(): Promise<SystemSettings> {
         ...defaults.topics,
         ...db?.topics,
         categories,
+      },
+      automation: {
+        ...defaults.automation,
+        ...db?.automation,
+        reviewGeneration: {
+          ...defaults.automation.reviewGeneration,
+          ...db?.automation?.reviewGeneration,
+        },
       },
     };
   } catch {
@@ -118,6 +137,17 @@ export function getDefaultSettings(): SystemSettings {
     },
     coupang: { enabled: false, accessKey: "", secretKey: "" },
     topics: { goldboxEnabled: true, keywords: [], categories: COUPANG_CATEGORIES, coupangPLBrands: [] },
-    automation: { enabled: false, schedule: "0 8 * * *", maxProductsPerRun: 50 },
+    automation: {
+      enabled: false,
+      schedule: "0 8 * * *",
+      collectSchedule: "02:00",
+      maxProductsPerRun: 50,
+      reviewGeneration: {
+        enabled: false,
+        maxPerRun: 5,
+        schedule: "03:00",
+        pauseWhenDraftCountExceeds: 50,
+      },
+    },
   };
 }

@@ -1,5 +1,6 @@
 import express from 'express';
 import { getDb } from '../config/database.js';
+import { authenticateToken } from '../config/auth.js';
 import { notifySlack } from '../services/slack.js';
 import { getSystemSettings } from '../services/settingsService.js';
 import { generateText } from '../services/aiProviders.js';
@@ -260,7 +261,7 @@ router.get('/reviews/:slug', async (req, res) => {
  * POST /api/review/generate
  * AI 기반 리뷰 생성 파이프라인
  */
-router.post('/generate', async (req, res) => {
+router.post('/generate', authenticateToken, async (req, res) => {
   const db = getDb();
   let product = null;
 
@@ -494,7 +495,7 @@ router.post('/generate', async (req, res) => {
  * POST /api/review/publish
  * 리뷰 게시
  */
-router.post('/publish', async (req, res) => {
+router.post('/publish', authenticateToken, async (req, res) => {
   try {
     const { reviewId } = req.body;
 

@@ -31,6 +31,10 @@ type SettingsStore = {
   setAutomationEnabled: (enabled: boolean) => void;
   setCollectSchedule: (schedule: string) => void;
   setMaxProductsPerRun: (max: number) => void;
+  setReviewGenerationEnabled: (enabled: boolean) => void;
+  setReviewGenerationSchedule: (schedule: string) => void;
+  setReviewGenerationMaxPerRun: (max: number) => void;
+  setPauseWhenDraftCountExceeds: (count: number) => void;
 
   // 주제 설정
   setCategories: (categories: CoupangCategory[]) => void;
@@ -111,6 +115,62 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
       settings: {
         ...state.settings,
         automation: { ...state.settings.automation, maxProductsPerRun },
+      },
+      hasUnsavedChanges: true,
+    })),
+  setReviewGenerationEnabled: (enabled) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        automation: {
+          ...state.settings.automation,
+          reviewGeneration: {
+            ...state.settings.automation.reviewGeneration,
+            enabled,
+          },
+        },
+      },
+      hasUnsavedChanges: true,
+    })),
+  setReviewGenerationSchedule: (schedule) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        automation: {
+          ...state.settings.automation,
+          reviewGeneration: {
+            ...state.settings.automation.reviewGeneration,
+            schedule,
+          },
+        },
+      },
+      hasUnsavedChanges: true,
+    })),
+  setReviewGenerationMaxPerRun: (maxPerRun) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        automation: {
+          ...state.settings.automation,
+          reviewGeneration: {
+            ...state.settings.automation.reviewGeneration,
+            maxPerRun,
+          },
+        },
+      },
+      hasUnsavedChanges: true,
+    })),
+  setPauseWhenDraftCountExceeds: (pauseWhenDraftCountExceeds) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        automation: {
+          ...state.settings.automation,
+          reviewGeneration: {
+            ...state.settings.automation.reviewGeneration,
+            pauseWhenDraftCountExceeds,
+          },
+        },
       },
       hasUnsavedChanges: true,
     })),

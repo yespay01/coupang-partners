@@ -105,7 +105,7 @@ app.listen(PORT, async () => {
 
   // Initialize cron jobs
   const { initCronJobs } = await import('./cron/scheduler.js');
-  initCronJobs();
+  await initCronJobs();
   console.log('✅ Cron jobs initialized');
 });
 

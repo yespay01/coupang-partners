@@ -191,6 +191,24 @@ export function useSettingsValidation() {
       }
     }
 
+    const reviewGeneration = automation.reviewGeneration;
+    if (reviewGeneration) {
+      if (typeof reviewGeneration.maxPerRun === 'number' && (reviewGeneration.maxPerRun < 1 || reviewGeneration.maxPerRun > 50)) {
+        errors.push("1회 최대 리뷰 생성 수는 1~50 사이여야 합니다.");
+      }
+
+      if (reviewGeneration.schedule) {
+        const scheduleRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!scheduleRegex.test(reviewGeneration.schedule)) {
+          errors.push("리뷰 생성 스케줄 형식이 올바르지 않습니다. (HH:mm)");
+        }
+      }
+
+      if (typeof reviewGeneration.pauseWhenDraftCountExceeds === 'number' && reviewGeneration.pauseWhenDraftCountExceeds < 0) {
+        errors.push("검수 대기 상한선은 0 이상이어야 합니다.");
+      }
+    }
+
     return errors;
   }, [settings]);
 

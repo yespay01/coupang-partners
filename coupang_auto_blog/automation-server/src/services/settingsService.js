@@ -85,6 +85,12 @@ const DEFAULT_SETTINGS = {
     enabled: false,
     schedule: "0 8 * * *",
     maxProductsPerRun: 50,
+    reviewGeneration: {
+      enabled: false,
+      maxPerRun: 5,
+      schedule: "03:00",
+      pauseWhenDraftCountExceeds: 50,
+    },
   },
 };
 
@@ -133,7 +139,14 @@ export async function getSystemSettings() {
       },
       coupang: { ...DEFAULT_SETTINGS.coupang, ...(systemData.coupang || {}) },
       topics: { ...DEFAULT_SETTINGS.topics, ...(systemData.topics || {}) },
-      automation: { ...DEFAULT_SETTINGS.automation, ...(systemData.automation || {}) },
+      automation: {
+        ...DEFAULT_SETTINGS.automation,
+        ...(systemData.automation || {}),
+        reviewGeneration: {
+          ...DEFAULT_SETTINGS.automation.reviewGeneration,
+          ...(systemData.automation?.reviewGeneration || {}),
+        },
+      },
     };
     cacheTimestamp = now;
 

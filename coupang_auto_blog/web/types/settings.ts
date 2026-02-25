@@ -62,6 +62,12 @@ export type AutomationSettings = {
   enabled: boolean;
   collectSchedule: string; // "HH:mm" 형식
   maxProductsPerRun: number;
+  reviewGeneration: {
+    enabled: boolean;
+    maxPerRun: number;
+    schedule: string; // "HH:mm" 형식 (표시/관리용)
+    pauseWhenDraftCountExceeds: number;
+  };
 };
 
 // ==================== Topics ====================
@@ -191,6 +197,12 @@ export const DEFAULT_SETTINGS: SystemSettings = {
     enabled: false,
     collectSchedule: "02:00",
     maxProductsPerRun: 10,
+    reviewGeneration: {
+      enabled: false,
+      maxPerRun: 5,
+      schedule: "03:00",
+      pauseWhenDraftCountExceeds: 50,
+    },
   },
   topics: {
     categories: COUPANG_CATEGORIES,
