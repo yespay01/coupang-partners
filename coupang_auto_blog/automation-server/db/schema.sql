@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_products_status ON products(status);
-CREATE INDEX idx_products_created_at ON products(created_at);
+CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
+CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
 
 -- Reviews Table (생성된 리뷰)
 CREATE TABLE IF NOT EXISTS reviews (
@@ -55,9 +55,9 @@ CREATE TABLE IF NOT EXISTS reviews (
   published_at TIMESTAMP
 );
 
-CREATE INDEX idx_reviews_status ON reviews(status);
-CREATE INDEX idx_reviews_slug ON reviews(slug);
-CREATE INDEX idx_reviews_published_at ON reviews(published_at);
+CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(status);
+CREATE INDEX IF NOT EXISTS idx_reviews_slug ON reviews(slug);
+CREATE INDEX IF NOT EXISTS idx_reviews_published_at ON reviews(published_at);
 
 -- Settings Table (시스템 설정)
 CREATE TABLE IF NOT EXISTS settings (
@@ -127,9 +127,9 @@ CREATE TABLE IF NOT EXISTS logs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_logs_type ON logs(type);
-CREATE INDEX idx_logs_level ON logs(level);
-CREATE INDEX idx_logs_created_at ON logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_logs_type ON logs(type);
+CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
+CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at);
 
 -- Insert default settings
 INSERT INTO settings (key, value, description) VALUES
