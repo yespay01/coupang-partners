@@ -26,12 +26,20 @@ export function DashboardNav() {
       <Link href="/admin" className="hover:text-white">
         대시보드
       </Link>
+      <span className="text-slate-500/60">|</span>
       <Link href="/admin/reviews" className="hover:text-white">
         후기 승인
       </Link>
       <Link href="/admin/products" className="hover:text-white">
         수집 상품
       </Link>
+      <Link href="/admin/test-collect" className="hover:text-white">
+        상품 수집
+      </Link>
+      <Link href="/admin/deeplink" className="hover:text-white">
+        딥링크
+      </Link>
+      <span className="text-slate-500/60">|</span>
       <Link href="/admin/recipes" className="hover:text-white">
         요리
       </Link>
@@ -41,9 +49,7 @@ export function DashboardNav() {
       <Link href="/admin/news" className="hover:text-white">
         뉴스
       </Link>
-      <Link href="/admin/deeplink" className="hover:text-white">
-        딥링크
-      </Link>
+      <span className="text-slate-500/60">|</span>
       <Link href="/admin/logs" className="hover:text-white">
         로그 뷰어
       </Link>

@@ -10,12 +10,12 @@ import { ImageSettings } from "./ImageSettings";
 import { CoupangSettings } from "./CoupangSettings";
 
 const TABS = [
-  { id: "automation", label: "자동 수집" },
+  { id: "coupang", label: "쿠팡 API" },
+  { id: "automation", label: "자동화" },
   { id: "topics", label: "주제 설정" },
   { id: "ai", label: "AI 설정" },
-  { id: "templates", label: "프롬프트 템플릿" },
+  { id: "templates", label: "프롬프트" },
   { id: "images", label: "이미지 설정" },
-  { id: "coupang", label: "쿠팡 API" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -71,7 +71,7 @@ export function SettingsView() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">시스템 설정</h1>
           <p className="mt-1 text-sm text-slate-500">
-            자동 수집, AI 모델, 프롬프트 등 시스템 설정을 관리합니다.
+            쿠팡 API, 자동화, 생성 품질 설정을 한 곳에서 관리합니다.
           </p>
         </div>
         <div className="flex items-center gap-3">

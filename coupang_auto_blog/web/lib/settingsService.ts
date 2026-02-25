@@ -23,7 +23,13 @@ export type SystemSettings = {
     toneScoreThreshold: number;
   };
   images: {
-    stockImages: { enabled: boolean; provider: string; apiKey: string; count: number };
+    stockImages: {
+      enabled: boolean;
+      provider: string;
+      apiKey?: string;
+      apiKeys?: { unsplash: string; pexels: string };
+      count: number;
+    };
     aiImages: { enabled: boolean; provider: string; count: number; quality: string };
     coupangDetailImages: { enabled: boolean; maxCount: number; delayMs: number };
   };
@@ -58,7 +64,7 @@ export async function getSystemSettings(): Promise<SystemSettings> {
         ? dbCategories
         : defaults.topics.categories;
 
-    return {
+    const merged = {
       ...defaults,
       ...db,
       topics: {
@@ -75,6 +81,19 @@ export async function getSystemSettings(): Promise<SystemSettings> {
         },
       },
     };
+
+    // 레거시 stockImages.apiKey -> provider별 apiKeys로 호환 이관
+    const stockImages = merged.images?.stockImages;
+    if (stockImages) {
+      const provider = (stockImages.provider as "unsplash" | "pexels") || "unsplash";
+      const legacyApiKey = stockImages.apiKey || "";
+      merged.images.stockImages.apiKeys = {
+        unsplash: stockImages.apiKeys?.unsplash || (provider === "unsplash" ? legacyApiKey : ""),
+        pexels: stockImages.apiKeys?.pexels || (provider === "pexels" ? legacyApiKey : ""),
+      };
+    }
+
+    return merged;
   } catch {
     return getDefaultSettings();
   }
@@ -131,7 +150,16 @@ export function getDefaultSettings(): SystemSettings {
       toneScoreThreshold: 0.4,
     },
     images: {
-      stockImages: { enabled: false, provider: "unsplash", apiKey: "", count: 2 },
+      stockImages: {
+        enabled: false,
+        provider: "unsplash",
+        apiKey: "",
+        apiKeys: {
+          unsplash: "",
+          pexels: "",
+        },
+        count: 2,
+      },
       aiImages: { enabled: false, provider: "dalle", count: 1, quality: "standard" },
       coupangDetailImages: { enabled: false, maxCount: 3, delayMs: 2000 },
     },

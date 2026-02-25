@@ -68,6 +68,11 @@ export function ReviewTable({
     [onRowSelect]
   );
 
+  const truncateProduct = (text: string, max = 20) => {
+    if (!text) return "-";
+    return text.length > max ? `${text.slice(0, max)}...` : text;
+  };
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-100">
       <table className="min-w-full divide-y divide-slate-200 text-left text-sm text-slate-700">
@@ -83,9 +88,8 @@ export function ReviewTable({
               />
             </th>
             <th className="px-4 py-3">상품</th>
-            <th className="px-4 py-3">작성자</th>
-            <th className="px-4 py-3">상태</th>
-            <th className="px-4 py-3">업데이트</th>
+            <th className="px-6 py-3 whitespace-nowrap">상태</th>
+            <th className="px-6 py-3 whitespace-nowrap">업데이트</th>
             <th className="px-4 py-3 text-right">조치</th>
           </tr>
         </thead>
@@ -111,19 +115,20 @@ export function ReviewTable({
                   <span className="text-xs text-slate-400">-</span>
                 )}
               </td>
-              <td className="px-4 py-3 font-medium text-slate-900">{item.product}</td>
-              <td className="px-4 py-3 text-sm text-slate-600">{item.author}</td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-2.5 font-medium text-slate-900">
+                <span title={item.product}>{truncateProduct(item.product)}</span>
+              </td>
+              <td className="px-6 py-2.5 whitespace-nowrap">
                 <span
                   className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClass[item.status]}`}
                 >
                   {statusLabel[item.status] ?? item.status}
                 </span>
               </td>
-              <td className="px-4 py-3 text-xs text-slate-500">
+              <td className="px-6 py-2.5 whitespace-nowrap text-xs text-slate-500">
                 {formatKoreanDate(item.updatedAt)}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-2.5">
                 <div className="flex flex-wrap justify-end gap-2">
                   {/* 발행된 리뷰의 블로그 링크 */}
                   {item.status === "published" && item.slug && (
@@ -134,7 +139,7 @@ export function ReviewTable({
                       className="rounded-full border border-green-200 px-3 py-1 text-xs font-semibold text-green-600 transition hover:bg-green-50"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      블로그 보기 →
+                      보기 →
                     </a>
                   )}
                   {item.id && (
@@ -187,7 +192,7 @@ export function ReviewTable({
           ))}
           {reviews.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-6 text-center text-xs text-slate-500">
+              <td colSpan={5} className="px-4 py-6 text-center text-xs text-slate-500">
                 선택된 필터에 해당하는 리뷰가 없습니다.
               </td>
             </tr>

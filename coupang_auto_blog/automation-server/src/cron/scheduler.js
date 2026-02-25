@@ -4,6 +4,14 @@ import { generateToken } from '../config/auth.js';
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:4000';
 const CRON_REVIEW_LIMIT = parseInt(process.env.CRON_REVIEW_GENERATION_LIMIT || '5', 10);
+const CRON_SCHEDULE_SYNC_MS = parseInt(process.env.CRON_SCHEDULE_SYNC_MS || '30000', 10);
+
+let productCollectionTask = null;
+let reviewGenerationTask = null;
+let logCleanupTask = null;
+let currentScheduleSnapshot = null;
+let scheduleSyncTimer = null;
+let isSyncingSchedules = false;
 
 function hhmmToCronExpression(hhmm, fallback = '0 3 * * *') {
   if (typeof hhmm !== 'string') return fallback;
@@ -157,63 +165,129 @@ async function generateReviewsForPendingProducts(limit = CRON_REVIEW_LIMIT) {
   };
 }
 
+async function runScheduledProductCollection() {
+  console.log('⏰ Running scheduled product collection...');
+
+  try {
+    const response = await axios.post(`${API_BASE}/api/collect/auto`, {}, {
+      headers: getCronAuthHeaders(),
+    });
+    console.log('✅ Product collection completed:', response.data);
+  } catch (error) {
+    console.error('❌ Product collection failed:', getErrorMessage(error));
+  }
+}
+
+async function runScheduledReviewGeneration() {
+  console.log('⏰ Running scheduled review generation...');
+
+  try {
+    const result = await generateReviewsForPendingProducts();
+    console.log('✅ Review generation completed:', result);
+  } catch (error) {
+    console.error('❌ Review generation failed:', getErrorMessage(error));
+  }
+}
+
+async function runScheduledLogCleanup() {
+  console.log('⏰ Running scheduled log cleanup...');
+
+  try {
+    const response = await axios.post(`${API_BASE}/api/admin/cleanup-logs`, {
+      daysToKeep: 30
+    }, {
+      headers: getCronAuthHeaders(),
+    });
+    console.log('✅ Log cleanup completed:', response.data);
+  } catch (error) {
+    console.error('❌ Log cleanup failed:', getErrorMessage(error));
+  }
+}
+
+function stopTask(task) {
+  if (!task) return;
+  try {
+    task.stop();
+    task.destroy?.();
+  } catch (error) {
+    console.error('⚠️ Failed to stop cron task:', getErrorMessage(error));
+  }
+}
+
+function scheduleKeyFromSnapshot(snapshot) {
+  return `${snapshot.collect.expr}|${snapshot.review.expr}`;
+}
+
+function applyCronSchedules(schedules) {
+  stopTask(productCollectionTask);
+  stopTask(reviewGenerationTask);
+
+  productCollectionTask = cron.schedule(schedules.collect.expr, runScheduledProductCollection, {
+    timezone: 'Asia/Seoul'
+  });
+
+  reviewGenerationTask = cron.schedule(schedules.review.expr, runScheduledReviewGeneration, {
+    timezone: 'Asia/Seoul'
+  });
+
+  currentScheduleSnapshot = schedules;
+
+  console.log('✅ Cron schedules applied:');
+  console.log(`   - Product collection: Every day at ${schedules.collect.label} KST`);
+  console.log(`   - Review generation: Every day at ${schedules.review.label} KST`);
+}
+
+async function syncCronSchedulesIfNeeded() {
+  if (isSyncingSchedules) return;
+  isSyncingSchedules = true;
+
+  try {
+    const nextSchedules = await resolveCronSchedules();
+
+    if (!currentScheduleSnapshot) {
+      applyCronSchedules(nextSchedules);
+      return;
+    }
+
+    const prevKey = scheduleKeyFromSnapshot(currentScheduleSnapshot);
+    const nextKey = scheduleKeyFromSnapshot(nextSchedules);
+
+    if (prevKey !== nextKey) {
+      console.log('🔄 Cron schedule change detected from settings. Reapplying...');
+      applyCronSchedules(nextSchedules);
+    }
+  } catch (error) {
+    console.error('⚠️ Failed to sync cron schedules:', getErrorMessage(error));
+  } finally {
+    isSyncingSchedules = false;
+  }
+}
+
 /**
  * Cron 작업 초기화
  */
 export async function initCronJobs() {
   console.log('📅 Initializing cron jobs...');
-  const schedules = await resolveCronSchedules();
+  await syncCronSchedulesIfNeeded();
 
-  // 매일 새벽 2시 - 상품 자동 수집
-  cron.schedule(schedules.collect.expr, async () => {
-    console.log('⏰ Running scheduled product collection...');
-
-    try {
-      const response = await axios.post(`${API_BASE}/api/collect/auto`, {}, {
-        headers: getCronAuthHeaders(),
-      });
-      console.log('✅ Product collection completed:', response.data);
-    } catch (error) {
-      console.error('❌ Product collection failed:', error.message);
-    }
-  }, {
+  // 매주 일요일 자정 - 로그 정리 (고정)
+  stopTask(logCleanupTask);
+  logCleanupTask = cron.schedule('0 0 * * 0', runScheduledLogCleanup, {
     timezone: 'Asia/Seoul'
   });
 
-  // 매일 새벽 3시 - 리뷰 자동 생성 (pending 상품에 대해)
-  cron.schedule(schedules.review.expr, async () => {
-    console.log('⏰ Running scheduled review generation...');
-
-    try {
-      const result = await generateReviewsForPendingProducts();
-      console.log('✅ Review generation completed:', result);
-    } catch (error) {
-      console.error('❌ Review generation failed:', getErrorMessage(error));
-    }
-  }, {
-    timezone: 'Asia/Seoul'
-  });
-
-  // 매주 일요일 자정 - 로그 정리
-  cron.schedule('0 0 * * 0', async () => {
-    console.log('⏰ Running scheduled log cleanup...');
-
-    try {
-      const response = await axios.post(`${API_BASE}/api/admin/cleanup-logs`, {
-        daysToKeep: 30
-      }, {
-        headers: getCronAuthHeaders(),
-      });
-      console.log('✅ Log cleanup completed:', response.data);
-    } catch (error) {
-      console.error('❌ Log cleanup failed:', error.message);
-    }
-  }, {
-    timezone: 'Asia/Seoul'
-  });
+  if (scheduleSyncTimer) {
+    clearInterval(scheduleSyncTimer);
+  }
+  scheduleSyncTimer = setInterval(() => {
+    syncCronSchedulesIfNeeded().catch(() => {});
+  }, CRON_SCHEDULE_SYNC_MS);
 
   console.log('✅ Cron jobs initialized:');
-  console.log(`   - Product collection: Every day at ${schedules.collect.label} KST`);
-  console.log(`   - Review generation: Every day at ${schedules.review.label} KST`);
+  if (currentScheduleSnapshot) {
+    console.log(`   - Product collection: Every day at ${currentScheduleSnapshot.collect.label} KST`);
+    console.log(`   - Review generation: Every day at ${currentScheduleSnapshot.review.label} KST`);
+  }
   console.log('   - Log cleanup: Every Sunday at 12:00 AM KST');
+  console.log(`   - Schedule sync: Every ${Math.floor(CRON_SCHEDULE_SYNC_MS / 1000)}s`);
 }

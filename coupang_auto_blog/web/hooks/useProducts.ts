@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
 import type { Product, ProductFilters, ProductPageResult, DatePreset, ProductStatus } from "@/types";
@@ -104,11 +104,16 @@ export function useProducts(filters: Partial<ProductFilters> = {}) {
     setPageIndex(0);
   }, []);
 
+  useEffect(() => {
+    setPageIndex(0);
+  }, [filters.statuses, filters.search, filters.source, filters.dateRange, filters.limit]);
+
   return {
     ...queryResult,
     pageIndex,
     goToNextPage,
     goToPrevPage,
+    goToFirstPage: resetPagination,
     resetPagination,
     hasPrevPage: pageIndex > 0,
     hasNextPage: queryResult.data?.hasMore ?? false,

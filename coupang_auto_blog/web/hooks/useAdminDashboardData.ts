@@ -144,6 +144,8 @@ type DashboardOptions = {
   defaultReviewLimit?: number;
   onReviewPageChange?: (index: number) => void;
   onLogPageChange?: (index: number) => void;
+  enableReviews?: boolean;
+  enableLogs?: boolean;
   reviewStatusFilter?: Record<ReviewStatus, boolean>;
   reviewDateRange?: DatePreset;
   logLevelFilter?: Record<LogLevel, boolean>;
@@ -152,6 +154,8 @@ type DashboardOptions = {
 
 export function useAdminDashboardData(options?: DashboardOptions): DashboardData {
   const { status } = useAuth();
+  const enableReviews = options?.enableReviews ?? true;
+  const enableLogs = options?.enableLogs ?? true;
 
   const [metrics, setMetrics] = useState<EarningsMetric[]>(FALLBACK_METRICS);
   const [workflow, setWorkflow] = useState<WorkflowItem[]>(FALLBACK_WORKFLOW);
@@ -250,10 +254,14 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
   useEffect(() => {
     if (status === "authenticated") {
       setMetrics(FALLBACK_METRICS);
-      loadReviews();
-      loadLogs();
+      if (enableReviews) {
+        loadReviews();
+      }
+      if (enableLogs) {
+        loadLogs();
+      }
     }
-  }, [status, loadReviews, loadLogs]);
+  }, [status, loadReviews, loadLogs, enableReviews, enableLogs]);
 
   const goToNextReviewPage = useCallback(async () => {
     // TODO: API 호출
@@ -276,12 +284,14 @@ export function useAdminDashboardData(options?: DashboardOptions): DashboardData
   }, []);
 
   const refreshReviews = useCallback(async () => {
+    if (!enableReviews) return;
     await loadReviews();
-  }, [loadReviews]);
+  }, [loadReviews, enableReviews]);
 
   const refreshLogs = useCallback(async () => {
+    if (!enableLogs) return;
     await loadLogs();
-  }, [loadLogs]);
+  }, [loadLogs, enableLogs]);
 
   return useMemo(
     () => ({

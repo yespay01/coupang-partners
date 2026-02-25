@@ -117,7 +117,11 @@ export type ImageSettings = {
   stockImages: {
     enabled: boolean;
     provider: StockImageProvider;
-    apiKey: string;
+    apiKey?: string; // 레거시 단일 키 (호환용)
+    apiKeys: {
+      unsplash: string;
+      pexels: string;
+    };
     count: number; // 추가할 이미지 개수
   };
 
@@ -240,6 +244,10 @@ export const DEFAULT_SETTINGS: SystemSettings = {
       enabled: false,
       provider: "unsplash",
       apiKey: "",
+      apiKeys: {
+        unsplash: "",
+        pexels: "",
+      },
       count: 3,
     },
     aiImages: {

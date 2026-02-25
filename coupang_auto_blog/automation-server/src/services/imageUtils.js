@@ -249,7 +249,9 @@ function getKeywordForCategory(categoryId, categoryName) {
  * 1단계: Unsplash에서 스톡 이미지 가져오기
  */
 export async function fetchUnsplashImages(product, settings) {
-  const { apiKey, count } = settings.images.stockImages;
+  const stockSettings = settings.images.stockImages;
+  const { count } = stockSettings;
+  const apiKey = stockSettings.apiKeys?.unsplash || stockSettings.apiKey;
 
   if (!apiKey) {
     logger.warn("Unsplash API 키가 설정되지 않았습니다");
@@ -324,7 +326,9 @@ export async function fetchUnsplashImages(product, settings) {
  * 1단계: Pexels에서 스톡 이미지 가져오기
  */
 export async function fetchPexelsImages(product, settings) {
-  const { apiKey, count } = settings.images.stockImages;
+  const stockSettings = settings.images.stockImages;
+  const { count } = stockSettings;
+  const apiKey = stockSettings.apiKeys?.pexels || stockSettings.apiKey;
 
   if (!apiKey) {
     logger.warn("Pexels API 키가 설정되지 않았습니다");
@@ -583,7 +587,10 @@ export async function collectAllImages(product, settings) {
     logger.info("스톡 이미지 설정 확인", {
       enabled: settings.images?.stockImages?.enabled,
       provider: settings.images?.stockImages?.provider,
-      hasApiKey: !!settings.images?.stockImages?.apiKey,
+      hasApiKey: !!(
+        settings.images?.stockImages?.apiKeys?.[settings.images?.stockImages?.provider || "unsplash"] ||
+        settings.images?.stockImages?.apiKey
+      ),
     });
 
     if (settings.images?.stockImages?.enabled) {

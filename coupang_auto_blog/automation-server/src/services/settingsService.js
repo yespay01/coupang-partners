@@ -56,6 +56,10 @@ const DEFAULT_SETTINGS = {
       enabled: false,
       provider: "unsplash",
       apiKey: "",
+      apiKeys: {
+        unsplash: "",
+        pexels: "",
+      },
       count: 2,
     },
     aiImages: {
@@ -148,6 +152,16 @@ export async function getSystemSettings() {
         },
       },
     };
+
+    const stockImages = cachedSettings.images?.stockImages;
+    if (stockImages) {
+      const provider = stockImages.provider || "unsplash";
+      const legacyApiKey = stockImages.apiKey || "";
+      stockImages.apiKeys = {
+        unsplash: stockImages.apiKeys?.unsplash || (provider === "unsplash" ? legacyApiKey : ""),
+        pexels: stockImages.apiKeys?.pexels || (provider === "pexels" ? legacyApiKey : ""),
+      };
+    }
     cacheTimestamp = now;
 
     return cachedSettings;

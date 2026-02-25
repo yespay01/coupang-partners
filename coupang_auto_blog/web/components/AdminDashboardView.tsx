@@ -34,6 +34,12 @@ import { AdsReportsOverview } from "./admin/AdsReportsOverview";
 import { EcpmChart } from "./admin/EcpmChart";
 
 const dateOptionValues = dateOptions.map((option) => option.value);
+const LOG_PAGE_SIZE = 10;
+const LOG_LEVEL_LABELS: Record<LogEntry["level"], string> = {
+  info: "정보",
+  warn: "경고",
+  error: "오류",
+};
 
 export type { DashboardView };
 
@@ -58,6 +64,7 @@ function AdminDashboardViewContent({
     logLevels,
     logSearch,
     logDateFilter,
+    logPageIndex: storeLogPageIndex,
     setReviewStatus,
     setReviewLimitFilter,
     setReviewSearch,
@@ -77,7 +84,7 @@ function AdminDashboardViewContent({
   const pageDescription = description ?? headerCopy.description;
   const showMetrics = resolvedView === "overview";
   const showReviews = resolvedView === "overview" || resolvedView === "reviews";
-  const showLogs = resolvedView === "overview" || resolvedView === "logs";
+  const showLogs = resolvedView === "logs";
 
   const router = useRouter();
   const pathname = usePathname();
@@ -128,17 +135,19 @@ function AdminDashboardViewContent({
     goToPrevReviewPage,
     reviewPageIndex,
     totalReviewCount,
-    hasNextLogPage,
-    hasPrevLogPage,
-    goToNextLogPage,
-    goToPrevLogPage,
-    logPageIndex,
+    hasNextLogPage: _hasNextLogPage,
+    hasPrevLogPage: _hasPrevLogPage,
+    goToNextLogPage: _goToNextLogPage,
+    goToPrevLogPage: _goToPrevLogPage,
+    logPageIndex: _serverLogPageIndex,
     totalLogCount,
     refreshReviews,
   } = useAdminDashboardData({
     defaultReviewLimit: reviewLimitFilter,
     onReviewPageChange: setReviewPageIndex,
     onLogPageChange: setLogPageIndex,
+    enableReviews: showReviews,
+    enableLogs: showLogs,
     reviewStatusFilter: reviewStatuses,
     reviewDateRange: reviewDateFilter,
     logLevelFilter: logLevels,
@@ -300,6 +309,21 @@ function AdminDashboardViewContent({
       return message.includes(normalizedQuery) || context.includes(normalizedQuery);
     });
   }, [logDateFilter, logLevels, logSearch, logs]);
+
+  const pagedLogs = useMemo(() => {
+    const start = storeLogPageIndex * LOG_PAGE_SIZE;
+    return filteredLogs.slice(start, start + LOG_PAGE_SIZE);
+  }, [filteredLogs, storeLogPageIndex]);
+
+  const hasPrevLogPageLocal = storeLogPageIndex > 0;
+  const hasNextLogPageLocal = (storeLogPageIndex + 1) * LOG_PAGE_SIZE < filteredLogs.length;
+
+  useEffect(() => {
+    const maxPageIndex = Math.max(0, Math.ceil(filteredLogs.length / LOG_PAGE_SIZE) - 1);
+    if (storeLogPageIndex > maxPageIndex) {
+      setLogPageIndex(maxPageIndex);
+    }
+  }, [filteredLogs.length, storeLogPageIndex, setLogPageIndex]);
 
   // 선택된 리뷰 동기화
   useEffect(() => {
@@ -610,11 +634,6 @@ function AdminDashboardViewContent({
                 {actionError}
               </div>
             )}
-            {actionMessage && (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 shadow-sm">
-                {actionMessage}
-              </div>
-            )}
           </>
         )}
 
@@ -628,9 +647,9 @@ function AdminDashboardViewContent({
               {/* 헤더 */}
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">후기 승인 워크플로</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">후기 승인</h2>
                   <p className="mt-1 text-xs text-slate-500">
-                    `reviews` 컬렉션의 상태 값(draft → needs_revision → approved → published)을 가이드합니다.
+                    리뷰 상태 흐름(초안 → 재검수 필요 → 승인 완료 → 게시 완료)을 관리합니다.
                   </p>
                 </div>
                 <button
@@ -657,7 +676,7 @@ function AdminDashboardViewContent({
                       }`}
                       onClick={() => setReviewStatus(workflowStatus, !active)}
                     >
-                      {workflowStatus.replace("_", " ")}
+                      {statusLabel[workflowStatus] ?? workflowStatus}
                     </button>
                   );
                 })}
@@ -666,13 +685,13 @@ function AdminDashboardViewContent({
               {/* 검색 & 기간 필터 */}
               <div className="mt-4 flex flex-col gap-3 text-xs text-slate-500 lg:flex-row lg:items-end lg:justify-between">
                 <div className="flex flex-col gap-2 lg:max-w-sm">
-                  <span className="font-semibold text-slate-600">상품/작성자 검색</span>
+                  <span className="font-semibold text-slate-600">상품/본문 검색</span>
                   <div className="flex items-center gap-2">
                     <input
                       type="search"
                       value={reviewSearch}
                       onChange={handleReviewSearchChange}
-                      placeholder="상품명, 작성자, 본문 키워드"
+                      placeholder="상품명, 본문 키워드"
                       className="flex-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300/40"
                     />
                     {reviewSearch && (
@@ -799,7 +818,7 @@ function AdminDashboardViewContent({
                     }`}
                     onClick={() => setLogLevel(level, !logLevels[level])}
                   >
-                    {level}
+                    {LOG_LEVEL_LABELS[level] ?? level}
                   </button>
                 ))}
               </div>
@@ -850,16 +869,16 @@ function AdminDashboardViewContent({
             </div>
 
             <div className="mt-5">
-              <LogList logs={filteredLogs} />
+              <LogList logs={pagedLogs} />
             </div>
 
             <div className="mt-4">
               <Pagination
-                pageIndex={logPageIndex}
-                hasNext={hasNextLogPage}
-                hasPrev={hasPrevLogPage}
-                onNext={goToNextLogPage}
-                onPrev={goToPrevLogPage}
+                pageIndex={storeLogPageIndex}
+                hasNext={hasNextLogPageLocal}
+                hasPrev={hasPrevLogPageLocal}
+                onNext={() => setLogPageIndex(storeLogPageIndex + 1)}
+                onPrev={() => setLogPageIndex(Math.max(0, storeLogPageIndex - 1))}
               />
             </div>
           </section>

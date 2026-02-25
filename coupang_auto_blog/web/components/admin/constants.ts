@@ -90,7 +90,7 @@ export type DashboardView = "overview" | "reviews" | "logs";
 export const headerDefaults: Record<DashboardView, { title: string; description: string }> = {
   overview: {
     title: "쿠팡 파트너스 자동화 대시보드",
-    description: "수집–생성–검수–발행까지 이어지는 AI 리뷰 파이프라인과 로그를 한 화면에서 점검하세요.",
+    description: "수집–생성–검수–발행까지 이어지는 AI 리뷰 파이프라인을 한 화면에서 점검하세요.",
   },
   reviews: {
     title: "리뷰 승인 워크플로우",
@@ -98,17 +98,17 @@ export const headerDefaults: Record<DashboardView, { title: string; description:
   },
   logs: {
     title: "자동화 로그 탐색",
-    description: "Cloud Functions, Firestore Trigger, Slack 알림 로그를 검색·필터링하며 안정성을 모니터링합니다.",
+    description: "자동화 서버 로그를 검색·필터링하며 안정성을 모니터링합니다.",
   },
 };
 
 // ==================== Automation Info ====================
 
 export const automationTimeline = [
-  { time: "02:00", title: "상품 자동 수집", description: "쿠팡 API에서 신규 상품 메타 데이터를 가져옵니다." },
-  { time: "02:10", title: "AI 후기 생성", description: "OpenAI를 호출해 초안을 만들고 품질 규칙을 통과한 것만 저장합니다." },
-  { time: "09:10", title: "승인 즉시 게시", description: "관리자 승인이 떨어지면 ISR 페이지와 sitemap을 자동 갱신합니다." },
-  { time: "18:00", title: "수익 통계 갱신", description: "클릭/주문 데이터를 Firestore에 집계하고 로그로 추적합니다." },
+  { id: "collect", time: "02:00", title: "상품 자동 수집", description: "쿠팡 API에서 신규 상품 메타 데이터를 가져옵니다." },
+  { id: "review", time: "03:00", title: "AI 후기 생성", description: "OpenAI를 호출해 초안을 만들고 품질 규칙을 통과한 것만 저장합니다." },
+  { id: "publish", time: "수동", title: "관리자 검수/게시", description: "관리자가 승인 후 게시 상태로 전환하면 공개 페이지에 노출됩니다." },
+  { id: "ops", time: "상시", title: "운영 모니터링", description: "수집/생성 결과와 오류 로그를 관리자 화면에서 점검합니다." },
 ];
 
 export const systemFeatures = [

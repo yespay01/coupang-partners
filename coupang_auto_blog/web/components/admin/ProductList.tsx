@@ -184,46 +184,48 @@ export function ProductList({
           </div>
         </form>
 
-        {/* 날짜 범위 */}
-        <div className="mb-4">
-          <label className="mb-2 block text-sm font-medium text-slate-700">기간</label>
-          <div className="flex gap-2">
-            {DATE_PRESETS.map((preset) => (
-              <button
-                key={preset.value}
-                onClick={() => handleDateChange(preset.value)}
-                className={`rounded-lg border px-3 py-1 text-sm font-medium ${
-                  filters.dateRange === preset.value
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 상태 필터 */}
-        <div>
-          <label className="mb-2 block text-sm font-medium text-slate-700">상태</label>
-          <div className="flex gap-2">
-            {(Object.keys(STATUS_LABELS) as ProductStatus[]).map((status) => {
-              const isActive = filters.statuses?.[status] ?? true;
-              return (
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
+          {/* 날짜 범위 */}
+          <div className="min-w-0">
+            <label className="mb-2 block text-sm font-medium text-slate-700">기간</label>
+            <div className="flex flex-wrap gap-2">
+              {DATE_PRESETS.map((preset) => (
                 <button
-                  key={status}
-                  onClick={() => handleStatusToggle(status)}
-                  className={`rounded-lg border px-3 py-1 text-sm font-medium ${
-                    isActive
+                  key={preset.value}
+                  onClick={() => handleDateChange(preset.value)}
+                  className={`rounded-lg border px-3 py-1 text-sm font-medium whitespace-nowrap ${
+                    filters.dateRange === preset.value
                       ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-slate-300 bg-white text-slate-400 hover:bg-slate-50"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
-                  {STATUS_LABELS[status]}
+                  {preset.label}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+
+          {/* 상태 필터 */}
+          <div className="min-w-0 flex-1">
+            <label className="mb-2 block text-sm font-medium text-slate-700">상태</label>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(STATUS_LABELS) as ProductStatus[]).map((status) => {
+                const isActive = filters.statuses?.[status] ?? true;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => handleStatusToggle(status)}
+                    className={`rounded-lg border px-3 py-1 text-sm font-medium whitespace-nowrap ${
+                      isActive
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-slate-300 bg-white text-slate-400 hover:bg-slate-50"
+                    }`}
+                  >
+                    {STATUS_LABELS[status]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

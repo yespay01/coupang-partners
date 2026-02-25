@@ -14,6 +14,12 @@ type LogListProps = {
   logs: LogEntry[];
 };
 
+const LOG_LEVEL_LABELS: Record<LogEntry["level"], string> = {
+  info: "정보",
+  warn: "경고",
+  error: "오류",
+};
+
 // 한국 시간으로 포맷팅
 function formatKoreanTime(isoString: string): string {
   try {
@@ -143,7 +149,7 @@ export function LogList({ logs }: LogListProps) {
             onClick={() => shouldShowMore && toggleExpand(index)}
           >
             <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide">
-              <span>{entry.level}</span>
+              <span>{LOG_LEVEL_LABELS[entry.level] ?? entry.level}</span>
               <span className="font-mono text-[11px] opacity-70">
                 {formatKoreanTime(entry.createdAt)}
               </span>

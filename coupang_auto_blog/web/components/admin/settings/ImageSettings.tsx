@@ -7,21 +7,51 @@ export function ImageSettings() {
   const { settings } = useSettingsStore();
   // images 필드가 없을 수 있으므로 기본값 사용
   const images = settings.images || DEFAULT_SETTINGS.images;
+  const stockProvider = images.stockImages.provider;
+  const stockApiKeys = images.stockImages.apiKeys || DEFAULT_SETTINGS.images.stockImages.apiKeys;
+  const currentStockApiKey = stockApiKeys[stockProvider] || "";
 
   const updateStockImages = (updates: Partial<typeof images.stockImages>) => {
-    useSettingsStore.setState((state) => ({
-      settings: {
-        ...state.settings,
-        images: {
-          ...(state.settings.images || DEFAULT_SETTINGS.images),
-          stockImages: {
-            ...(state.settings.images?.stockImages || DEFAULT_SETTINGS.images.stockImages),
-            ...updates
+    useSettingsStore.setState((state) => {
+      const nextStockImages = {
+        ...(state.settings.images?.stockImages || DEFAULT_SETTINGS.images.stockImages),
+        ...updates,
+      };
+      return {
+        settings: {
+          ...state.settings,
+          images: {
+            ...(state.settings.images || DEFAULT_SETTINGS.images),
+            stockImages: nextStockImages,
           },
         },
+        hasUnsavedChanges: true,
+      };
+    });
+  };
+
+  const updateStockApiKeyByProvider = (provider: "unsplash" | "pexels", apiKey: string) => {
+    const baseStockImages = images.stockImages || DEFAULT_SETTINGS.images.stockImages;
+    const baseKeys = baseStockImages.apiKeys || DEFAULT_SETTINGS.images.stockImages.apiKeys;
+
+    updateStockImages({
+      apiKeys: {
+        ...baseKeys,
+        [provider]: apiKey,
       },
-      hasUnsavedChanges: true,
-    }));
+      // 레거시 단일 필드도 현재 선택 provider 기준 값으로 동기화 (호환용)
+      apiKey: provider === (baseStockImages.provider || "unsplash") ? apiKey : baseStockImages.apiKey,
+    });
+  };
+
+  const updateStockProvider = (provider: "unsplash" | "pexels") => {
+    const baseStockImages = images.stockImages || DEFAULT_SETTINGS.images.stockImages;
+    const baseKeys = baseStockImages.apiKeys || DEFAULT_SETTINGS.images.stockImages.apiKeys;
+    updateStockImages({
+      provider,
+      // 레거시 단일 필드도 현재 선택 provider의 키로 동기화 (호환용)
+      apiKey: baseKeys[provider] || "",
+    });
   };
 
   const updateAIImages = (updates: Partial<typeof images.aiImages>) => {
@@ -99,7 +129,7 @@ export function ImageSettings() {
               <select
                 id="stockProvider"
                 value={images.stockImages.provider}
-                onChange={(e) => updateStockImages({ provider: e.target.value as "unsplash" | "pexels" })}
+                onChange={(e) => updateStockProvider(e.target.value as "unsplash" | "pexels")}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="unsplash">Unsplash (추천)</option>
@@ -137,8 +167,8 @@ export function ImageSettings() {
               <input
                 id="stockApiKey"
                 type="text"
-                value={images.stockImages.apiKey}
-                onChange={(e) => updateStockImages({ apiKey: e.target.value })}
+                value={currentStockApiKey}
+                onChange={(e) => updateStockApiKeyByProvider(stockProvider, e.target.value)}
                 placeholder={images.stockImages.provider === "unsplash"
                   ? "Unsplash Access Key를 입력하세요"
                   : "Pexels API Key를 입력하세요"}

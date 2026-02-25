@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useCoupangConnectionTest } from "@/hooks/useSystemSettings";
 
 export function CoupangSettings() {
-  const router = useRouter();
   const {
     settings,
     setCoupangEnabled,
@@ -163,14 +161,6 @@ export function CoupangSettings() {
             {isTestingConnection ? "테스트 중..." : "연결 테스트"}
           </button>
 
-          <button
-            onClick={() => router.push("/admin/test-collect")}
-            disabled={!isConfigured}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            상품 수집 테스트
-          </button>
-
           {testResult && (
             <div
               className={`flex items-center gap-2 text-sm ${
@@ -210,12 +200,6 @@ export function CoupangSettings() {
               테스트 실패: {testError instanceof Error ? testError.message : "알 수 없는 오류"}
             </span>
           )}
-        </div>
-
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-          <p className="text-sm text-blue-700">
-            💡 <strong>상품 수집 테스트</strong>를 클릭하면 골드박스, 쿠팡 PL, 카테고리 베스트, 키워드 검색 등 4가지 API를 직접 테스트할 수 있습니다.
-          </p>
         </div>
       </div>
 
