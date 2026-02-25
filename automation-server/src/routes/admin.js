@@ -1,0 +1,1289 @@
+import express from 'express';
+import { getDb } from '../config/database.js';
+import { notifySlack } from '../services/slack.js';
+import { authenticateToken, requireAdmin } from '../config/auth.js';
+import { invalidateSettingsCache, getSystemSettings } from '../services/settingsService.js';
+import { generateText } from '../services/aiProviders.js';
+import { searchProducts } from '../services/coupang/products.js';
+import { createDeeplinks } from '../services/coupang/deeplink.js';
+import fetch from 'node-fetch';
+
+const router = express.Router();
+
+// 모든 admin 라우트에 인증 미들웨어 적용
+router.use(authenticateToken);
+
+/**
+ * 제목으로 고유 slug 생성 (중복 시 -2, -3, ... 자동 부여)
+ */
+async function generateUniqueSlug(db, table, title) {
+  const base = title
+    .replace(/[^\w\uAC00-\uD7A3\u3040-\u309F\u30A0-\u30FF]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80)
+    .toLowerCase();
+
+  const existing = await db.query(
+    `SELECT slug FROM ${table} WHERE slug = $1 OR slug ~ $2`,
+    [base, `^${base}-[0-9]+$`]
+  );
+
+  if (existing.rows.length === 0) return base;
+
+  const usedSlugs = new Set(existing.rows.map(r => r.slug));
+  let counter = 2;
+  while (usedSlugs.has(`${base}-${counter}`)) counter++;
+  return `${base}-${counter}`;
+}
+
+// ==================== Reviews ====================
+
+/**
+ * GET /api/admin/reviews
+ * 리뷰 목록 조회
+ */
+router.get('/reviews', async (req, res) => {
+  try {
+    const db = getDb();
+    const { limit = 20, offset = 0, statuses, search, dateRange } = req.query;
+
+    let query = 'SELECT * FROM reviews';
+    let countQuery = 'SELECT COUNT(*) as count FROM reviews';
+    const conditions = [];
+    const params = [];
+    let paramIdx = 1;
+
+    if (statuses) {
+      const statusList = statuses.split(',');
+      conditions.push(`status = ANY($${paramIdx}::text[])`);
+      params.push(statusList);
+      paramIdx++;
+    }
+
+    if (search) {
+      conditions.push(`(product_name ILIKE $${paramIdx} OR content ILIKE $${paramIdx} OR title ILIKE $${paramIdx})`);
+      params.push(`%${search}%`);
+      paramIdx++;
+    }
+
+    if (dateRange && dateRange !== 'all') {
+      const hours = dateRange === '24h' ? 24 : dateRange === '7d' ? 168 : dateRange === '30d' ? 720 : 0;
+      if (hours > 0) {
+        conditions.push(`created_at >= NOW() - INTERVAL '${hours} hours'`);
+      }
+    }
+
+    const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+    query += where + ` ORDER BY created_at DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    countQuery += where;
+
+    const countParams = [...params];
+    params.push(parseInt(limit), parseInt(offset));
+
+    const [reviewsResult, countResult] = await Promise.all([
+      db.query(query, params),
+      db.query(countQuery, countParams),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        reviews: reviewsResult.rows.map(mapReviewRow),
+        totalCount: parseInt(countResult.rows[0].count),
+        hasMore: parseInt(offset) + reviewsResult.rows.length < parseInt(countResult.rows[0].count),
+      },
+    });
+  } catch (error) {
+    console.error('리뷰 목록 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/reviews/:id
+ * 리뷰 상세 조회
+ */
+router.get('/reviews/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query('SELECT * FROM reviews WHERE id = $1', [req.params.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '리뷰를 찾을 수 없습니다.' });
+    }
+
+    res.json({ success: true, data: mapReviewRow(result.rows[0]) });
+  } catch (error) {
+    console.error('리뷰 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/reviews/:id
+ * 리뷰 수정
+ */
+router.put('/reviews/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const { content, status, productName, category, affiliateUrl } = req.body;
+    const fields = [];
+    const params = [];
+    let idx = 1;
+
+    if (content !== undefined) { fields.push(`content = $${idx++}`); params.push(content); }
+    if (status !== undefined) { fields.push(`status = $${idx++}`); params.push(status); }
+    if (productName !== undefined) { fields.push(`product_name = $${idx++}`); params.push(productName); }
+    if (category !== undefined) { fields.push(`category = $${idx++}`); params.push(category); }
+    if (affiliateUrl !== undefined) { fields.push(`affiliate_url = $${idx++}`); params.push(affiliateUrl); }
+
+    if (status === 'published') {
+      fields.push(`published_at = NOW()`);
+
+      // slug가 없으면 상품명 기반으로 생성
+      const existing = await db.query(
+        'SELECT slug, product_name FROM reviews WHERE id = $1',
+        [req.params.id]
+      );
+      if (existing.rows.length > 0 && !existing.rows[0].slug) {
+        const pName = productName || existing.rows[0].product_name || '';
+        const titleForSlug = pName
+          .replace(/[^\w\uAC00-\uD7A3\u3040-\u309F\u30A0-\u30FF]/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '')
+          .slice(0, 60)
+          .toLowerCase();
+        const newSlug = `${titleForSlug}-${Date.now()}`;
+        fields.push(`slug = $${idx++}`);
+        params.push(newSlug);
+      }
+    }
+
+    fields.push('updated_at = NOW()');
+    params.push(req.params.id);
+
+    const result = await db.query(
+      `UPDATE reviews SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      params
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '리뷰를 찾을 수 없습니다.' });
+    }
+
+    res.json({ success: true, data: mapReviewRow(result.rows[0]) });
+  } catch (error) {
+    console.error('리뷰 수정 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/reviews/:id
+ * 리뷰 삭제 (쿼리 파라미터 resetProduct=true 시 연관 상품을 pending으로 리셋)
+ */
+router.delete('/reviews/:id', async (req, res) => {
+  const db = getDb();
+  try {
+    const result = await db.query(
+      'DELETE FROM reviews WHERE id = $1 RETURNING id, product_id',
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '리뷰를 찾을 수 없습니다.' });
+    }
+
+    // resetProduct=true이면 연관 상품을 pending으로 리셋
+    if (req.query.resetProduct === 'true') {
+      const productId = result.rows[0].product_id;
+      if (productId) {
+        await db.query(
+          "UPDATE products SET status = 'pending', updated_at = NOW() WHERE product_id = $1",
+          [productId]
+        );
+      }
+    }
+
+    res.json({ success: true, message: '리뷰가 삭제되었습니다.' });
+  } catch (error) {
+    console.error('리뷰 삭제 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Products ====================
+
+/**
+ * GET /api/admin/products
+ * 상품 목록 조회
+ */
+router.get('/products', async (req, res) => {
+  try {
+    const db = getDb();
+    const { limit = 20, offset = 0, statuses, search, source, dateRange } = req.query;
+
+    let query = 'SELECT * FROM products';
+    let countQuery = 'SELECT COUNT(*) as count FROM products';
+    const conditions = [];
+    const params = [];
+    let paramIdx = 1;
+
+    if (statuses) {
+      const statusList = statuses.split(',');
+      conditions.push(`status = ANY($${paramIdx}::text[])`);
+      params.push(statusList);
+      paramIdx++;
+    }
+
+    if (search) {
+      conditions.push(`(product_name ILIKE $${paramIdx} OR product_id ILIKE $${paramIdx})`);
+      params.push(`%${search}%`);
+      paramIdx++;
+    }
+
+    if (source) {
+      conditions.push(`source ILIKE $${paramIdx}`);
+      params.push(`%${source}%`);
+      paramIdx++;
+    }
+
+    if (dateRange && dateRange !== 'all') {
+      const hours = dateRange === '24h' ? 24 : dateRange === '7d' ? 168 : dateRange === '30d' ? 720 : 0;
+      if (hours > 0) {
+        conditions.push(`created_at >= NOW() - INTERVAL '${hours} hours'`);
+      }
+    }
+
+    const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+    query += where + ` ORDER BY created_at DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    countQuery += where;
+
+    const countParams = [...params];
+    params.push(parseInt(limit), parseInt(offset));
+
+    const [productsResult, countResult] = await Promise.all([
+      db.query(query, params),
+      db.query(countQuery, countParams),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        products: productsResult.rows.map(mapProductRow),
+        totalCount: parseInt(countResult.rows[0].count),
+        hasMore: parseInt(offset) + productsResult.rows.length < parseInt(countResult.rows[0].count),
+      },
+    });
+  } catch (error) {
+    console.error('상품 목록 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/products/stats
+ * 상품 통계
+ */
+router.get('/products/stats', async (req, res) => {
+  try {
+    const db = getDb();
+
+    const [totalResult, sourceResult, statusResult] = await Promise.all([
+      db.query('SELECT COUNT(*) as count FROM products'),
+      db.query(`
+        SELECT
+          CASE
+            WHEN source LIKE 'keyword:%' THEN 'keyword'
+            WHEN source LIKE 'category:%' THEN 'category'
+            WHEN source LIKE 'coupangPL:%' THEN 'coupangPL'
+            WHEN source = 'goldbox' THEN 'goldbox'
+            ELSE 'other'
+          END as source_group,
+          COUNT(*) as count
+        FROM products
+        GROUP BY source_group
+      `),
+      db.query('SELECT status, COUNT(*) as count FROM products GROUP BY status'),
+    ]);
+
+    const bySource = {};
+    sourceResult.rows.forEach(row => { bySource[row.source_group] = parseInt(row.count); });
+
+    const byStatus = {};
+    statusResult.rows.forEach(row => { byStatus[row.status] = parseInt(row.count); });
+
+    res.json({
+      success: true,
+      data: {
+        total: parseInt(totalResult.rows[0].count),
+        bySource,
+        byStatus,
+      },
+    });
+  } catch (error) {
+    console.error('상품 통계 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/products/:id
+ * 상품 삭제
+ */
+router.delete('/products/:id', async (req, res) => {
+  const db = getDb();
+  try {
+    const { id } = req.params;
+
+    // 상품 존재 확인
+    const productResult = await db.query(
+      'SELECT id, product_id, product_name FROM products WHERE id = $1',
+      [id]
+    );
+
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '상품을 찾을 수 없습니다.' });
+    }
+
+    const product = productResult.rows[0];
+
+    // 연관 리뷰 먼저 삭제 (외래키 제약 해소)
+    const reviewDeleteResult = await db.query(
+      'DELETE FROM reviews WHERE product_id = $1 RETURNING id',
+      [product.product_id]
+    );
+
+    // 상품 삭제
+    await db.query('DELETE FROM products WHERE id = $1', [id]);
+
+    res.json({
+      success: true,
+      message: `상품이 삭제되었습니다: ${product.product_name}`,
+      deletedReviews: reviewDeleteResult.rows.length,
+    });
+  } catch (error) {
+    console.error('상품 삭제 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Logs ====================
+
+/**
+ * GET /api/admin/logs
+ * 로그 목록 조회
+ */
+router.get('/logs', async (req, res) => {
+  try {
+    const db = getDb();
+    const { limit = 50, offset = 0, levels, search, dateRange } = req.query;
+
+    let query = 'SELECT * FROM logs';
+    let countQuery = 'SELECT COUNT(*) as count FROM logs';
+    const conditions = [];
+    const params = [];
+    let paramIdx = 1;
+
+    if (levels) {
+      const levelList = levels.split(',');
+      conditions.push(`level = ANY($${paramIdx}::text[])`);
+      params.push(levelList);
+      paramIdx++;
+    }
+
+    if (search) {
+      conditions.push(`(message ILIKE $${paramIdx} OR type ILIKE $${paramIdx})`);
+      params.push(`%${search}%`);
+      paramIdx++;
+    }
+
+    if (dateRange && dateRange !== 'all') {
+      const hours = dateRange === '24h' ? 24 : dateRange === '7d' ? 168 : dateRange === '30d' ? 720 : 0;
+      if (hours > 0) {
+        conditions.push(`created_at >= NOW() - INTERVAL '${hours} hours'`);
+      }
+    }
+
+    const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+    query += where + ` ORDER BY created_at DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    countQuery += where;
+
+    const countParams = [...params];
+    params.push(parseInt(limit), parseInt(offset));
+
+    const [logsResult, countResult] = await Promise.all([
+      db.query(query, params),
+      db.query(countQuery, countParams),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        logs: logsResult.rows.map(row => ({
+          id: String(row.id),
+          level: row.level || 'info',
+          message: row.message,
+          type: row.type,
+          createdAt: row.created_at?.toISOString(),
+          context: row.type || '',
+          payload: row.payload,
+        })),
+        totalCount: parseInt(countResult.rows[0].count),
+        hasMore: parseInt(offset) + logsResult.rows.length < parseInt(countResult.rows[0].count),
+      },
+    });
+  } catch (error) {
+    console.error('로그 목록 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/logs/stats
+ * 로그 통계 조회
+ */
+router.get('/logs/stats', async (req, res) => {
+  try {
+    const db = getDb();
+
+    const [totalResult, byLevelResult, byTypeResult, byDateResult] = await Promise.all([
+      db.query('SELECT COUNT(*) as count FROM logs'),
+      db.query('SELECT level, COUNT(*) as count FROM logs GROUP BY level'),
+      db.query('SELECT type, COUNT(*) as count FROM logs GROUP BY type'),
+      db.query(`SELECT DATE(created_at) as date, COUNT(*) as count FROM logs
+                WHERE created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(created_at) ORDER BY date DESC`),
+    ]);
+
+    const byLevel = {};
+    byLevelResult.rows.forEach(row => { byLevel[row.level || 'unknown'] = parseInt(row.count); });
+
+    const byType = {};
+    byTypeResult.rows.forEach(row => { byType[row.type || 'unknown'] = parseInt(row.count); });
+
+    const byDate = {};
+    byDateResult.rows.forEach(row => { byDate[row.date.toISOString().split('T')[0]] = parseInt(row.count); });
+
+    res.json({
+      success: true,
+      data: {
+        total: parseInt(totalResult.rows[0].count),
+        byLevel,
+        byType,
+        byDate,
+      },
+    });
+  } catch (error) {
+    console.error('로그 통계 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/log
+ * 프론트엔드에서 보내는 로그를 DB에 저장
+ */
+router.post('/log', async (req, res) => {
+  try {
+    const { level = 'info', message, context, type } = req.body;
+    const db = getDb();
+
+    await db.query(
+      'INSERT INTO logs (level, message, type, payload) VALUES ($1, $2, $3, $4)',
+      [level, message || '', type || context || 'frontend', req.body.payload ? JSON.stringify(req.body.payload) : null]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('로그 저장 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Earnings ====================
+
+/**
+ * GET /api/admin/earnings
+ * 수익 지표 조회
+ */
+router.get('/earnings', async (req, res) => {
+  try {
+    const db = getDb();
+    const reviewCount = await db.query("SELECT COUNT(*) as count FROM reviews WHERE status = 'published'");
+    const viewCount = await db.query("SELECT COALESCE(SUM(view_count), 0) as total FROM reviews");
+
+    res.json({
+      success: true,
+      data: [
+        { id: '1', label: '발행된 리뷰', value: reviewCount.rows[0].count, trend: '' },
+        { id: '2', label: '총 조회수', value: String(viewCount.rows[0].total), trend: '' },
+      ],
+    });
+  } catch (error) {
+    console.error('수익 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Settings ====================
+
+/**
+ * GET /api/admin/settings
+ * 시스템 설정 조회
+ */
+router.get('/settings', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query("SELECT value FROM settings WHERE key = 'system'");
+
+    if (result.rows.length === 0) {
+      return res.json({ success: true, data: {} });
+    }
+
+    res.json({ success: true, data: result.rows[0].value });
+  } catch (error) {
+    console.error('설정 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/settings
+ * 시스템 설정 업데이트
+ */
+router.put('/settings', requireAdmin, async (req, res) => {
+  try {
+    const db = getDb();
+    const settings = req.body;
+
+    await db.query(
+      `INSERT INTO settings (key, value) VALUES ('system', $1::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = settings.value || $1::jsonb, updated_at = NOW()`,
+      [JSON.stringify(settings)]
+    );
+
+    // 설정 캐시 즉시 무효화 (다음 조회 시 DB에서 새로 로드)
+    invalidateSettingsCache();
+
+    res.json({ success: true, message: '설정이 업데이트되었습니다.' });
+  } catch (error) {
+    console.error('설정 업데이트 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Recipes ====================
+
+function mapRecipeRow(row) {
+  return {
+    id: String(row.id),
+    title: row.title,
+    description: row.description,
+    cookingTime: row.cooking_time || '',
+    difficulty: row.difficulty || '',
+    ingredients: row.ingredients || [],
+    instructions: row.instructions,
+    coupangProducts: row.coupang_products || [],
+    imageUrl: row.image_url,
+    slug: row.slug,
+    status: row.status,
+    viewCount: row.view_count || 0,
+    createdAt: row.created_at?.toISOString(),
+    updatedAt: row.updated_at?.toISOString(),
+  };
+}
+
+/**
+ * GET /api/admin/recipes
+ */
+router.get('/recipes', async (req, res) => {
+  try {
+    const db = getDb();
+    const { limit = 20, offset = 0, status } = req.query;
+
+    let query = 'SELECT * FROM recipes';
+    let countQuery = 'SELECT COUNT(*) as count FROM recipes';
+    const conditions = [];
+    const params = [];
+    let idx = 1;
+
+    if (status) {
+      conditions.push(`status = $${idx++}`);
+      params.push(status);
+    }
+
+    const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+    query += where + ` ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+    countQuery += where;
+
+    const countParams = [...params];
+    params.push(parseInt(limit), parseInt(offset));
+
+    const [recipesResult, countResult] = await Promise.all([
+      db.query(query, params),
+      db.query(countQuery, countParams),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        recipes: recipesResult.rows.map(mapRecipeRow),
+        totalCount: parseInt(countResult.rows[0].count),
+        hasMore: parseInt(offset) + recipesResult.rows.length < parseInt(countResult.rows[0].count),
+      },
+    });
+  } catch (error) {
+    console.error('레시피 목록 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/recipes/:id
+ */
+router.get('/recipes/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query('SELECT * FROM recipes WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '레시피를 찾을 수 없습니다.' });
+    }
+    res.json({ success: true, data: mapRecipeRow(result.rows[0]) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/recipes/generate
+ * AI 레시피 생성 + 쿠팡 재료 검색
+ */
+router.post('/recipes/generate', async (req, res) => {
+  try {
+    const { dishName } = req.body;
+    if (!dishName || !dishName.trim()) {
+      return res.status(400).json({ success: false, message: '요리명을 입력해주세요.' });
+    }
+
+    const settings = await getSystemSettings();
+
+    // DB에서 레시피 프롬프트 설정 확인
+    const db = getDb();
+    const promptSettingsResult = await db.query("SELECT value FROM settings WHERE key = 'system'");
+    const dbSettings = promptSettingsResult.rows.length > 0 ? promptSettingsResult.rows[0].value : {};
+    const customPrompt = dbSettings?.recipePrompt;
+
+    // 기본 프롬프트
+    const defaultSystemPrompt = `당신은 10년 경력의 전문 요리 블로거이자 요리 연구가입니다. 한국어로 상세한 레시피를 작성합니다.
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력합니다.
+절대 마크다운 서식을 사용하지 마세요. 별표(**), 샵(#), 대시(-) 등 마크다운 기호 금지. 순수 텍스트만 작성하세요.`;
+
+    const defaultUserPrompt = `"${dishName.trim()}" 레시피를 JSON으로 작성해주세요.
+
+형식:
+{
+  "title": "요리 제목",
+  "description": "요리 소개 (2-3문장)",
+  "cookingTime": "총 조리시간 (예: 30분, 1시간)",
+  "difficulty": "난이도 (쉬움/보통/어려움)",
+  "ingredients": [
+    {"name": "재료명", "amount": "양", "searchKeyword": "쿠팡 검색용 키워드"}
+  ],
+  "instructions": "조리법을 상세하게 작성"
+}
+
+규칙:
+- 재료는 5~12개
+- searchKeyword는 쿠팡 검색용 구체적 상품명 (예: "양파" → "양파 1kg")
+- 조리법은 번호로 단계를 구분하고 각 단계를 상세하게 작성:
+  * 시간과 불세기 명시 (예: "중불에서 3분간 볶아주세요")
+  * 재료 넣는 순서와 타이밍 설명
+  * 팁이나 포인트 포함 (예: "(뚜껑을 덮으면 더 빨리 익어요)")
+  * 완성 징후 설명 (예: "국물이 보글보글 끓어오르면")
+- 구어체로 자연스럽게 작성
+- 마크다운 서식 절대 금지 (**, ##, - 등 사용하지 말 것). 순수 텍스트만 작성`;
+
+    const systemPrompt = customPrompt?.systemPrompt || defaultSystemPrompt;
+    const userPrompt = customPrompt?.userPrompt
+      ? customPrompt.userPrompt.replace(/\{dishName\}/g, dishName.trim())
+      : defaultUserPrompt;
+
+    const aiResult = await generateText(settings.ai, userPrompt, systemPrompt);
+    let parsed;
+    try {
+      const jsonMatch = aiResult.text.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : aiResult.text);
+    } catch (parseErr) {
+      return res.status(500).json({ success: false, message: 'AI 응답을 파싱할 수 없습니다.' });
+    }
+
+    // 대표 이미지 검색 (AI로 요리명 → 영어 번역 후 Unsplash/Pexels 검색)
+    let imageUrl = null;
+    try {
+      const stockConfig = settings.images?.stockImages;
+      if (stockConfig?.enabled && stockConfig?.apiKey) {
+        let englishKeyword = '';
+        try {
+          const translateResult = await generateText(
+            { ...settings.ai, maxTokens: 50, temperature: 0.1 },
+            `"${dishName.trim()}" → English food keywords (2-3 words only):`,
+            'Output ONLY English words, nothing else. No explanation, no quotes, no punctuation.'
+          );
+          englishKeyword = translateResult.text.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+        } catch (e) {
+          console.error('요리명 번역 실패:', e);
+        }
+
+        const searchQuery = englishKeyword || dishName.trim();
+        const provider = stockConfig.provider || 'unsplash';
+
+        if (provider === 'unsplash') {
+          const resp = await fetch(
+            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery + ' food')}&per_page=1&orientation=landscape`,
+            { headers: { Authorization: `Client-ID ${stockConfig.apiKey}` } }
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.results && data.results.length > 0) {
+              imageUrl = data.results[0].urls.regular;
+            }
+          }
+        } else if (provider === 'pexels') {
+          const resp = await fetch(
+            `https://api.pexels.com/v1/search?query=${encodeURIComponent(searchQuery + ' food')}&per_page=1&orientation=landscape`,
+            { headers: { Authorization: stockConfig.apiKey } }
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.photos && data.photos.length > 0) {
+              imageUrl = data.photos[0].src.large;
+            }
+          }
+        }
+      }
+    } catch (imgErr) {
+      console.error('레시피 이미지 검색 실패:', imgErr);
+    }
+
+    // 쿠팡 재료 검색 (전체 재료)
+    let coupangProducts = [];
+    const { accessKey, secretKey, subId } = settings.coupang || {};
+
+    if (accessKey && secretKey && parsed.ingredients) {
+      const searchPromises = parsed.ingredients.map(async (ingredient) => {
+        try {
+          const result = await searchProducts(
+            { keyword: ingredient.searchKeyword || ingredient.name, limit: 1, subId },
+            { accessKey, secretKey }
+          );
+          if (result.success && result.products && result.products.length > 0) {
+            const product = result.products[0];
+            return {
+              ingredientName: ingredient.name,
+              productId: product.productId,
+              productName: product.productName,
+              productPrice: product.productPrice,
+              productImage: product.productImage,
+              productUrl: product.productUrl,
+              affiliateUrl: product.productUrl,
+            };
+          }
+        } catch (err) {
+          console.error(`재료 검색 실패 (${ingredient.name}):`, err);
+        }
+        return null;
+      });
+
+      const results = await Promise.all(searchPromises);
+      coupangProducts = results.filter(Boolean);
+    }
+
+    const slug = await generateUniqueSlug(db, 'recipes', parsed.title || dishName.trim());
+    const insertResult = await db.query(
+      `INSERT INTO recipes (title, description, cooking_time, difficulty, ingredients, instructions, coupang_products, image_url, slug, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+      [
+        parsed.title || dishName.trim(),
+        parsed.description || '',
+        parsed.cookingTime || '',
+        parsed.difficulty || '',
+        JSON.stringify(parsed.ingredients || []),
+        parsed.instructions || '',
+        JSON.stringify(coupangProducts),
+        imageUrl,
+        slug,
+        'draft',
+      ]
+    );
+
+    res.json({
+      success: true,
+      message: '레시피가 생성되었습니다.',
+      data: {
+        recipeId: insertResult.rows[0].id,
+        title: parsed.title,
+        ingredientCount: (parsed.ingredients || []).length,
+        coupangProductCount: coupangProducts.length,
+        imageUrl,
+      },
+    });
+  } catch (error) {
+    console.error('레시피 생성 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/recipes/:id
+ */
+router.put('/recipes/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const { title, description, cookingTime, difficulty, ingredients, instructions, coupangProducts, status, imageUrl } = req.body;
+    const fields = [];
+    const params = [];
+    let idx = 1;
+
+    if (title !== undefined) { fields.push(`title = $${idx++}`); params.push(title); }
+    if (description !== undefined) { fields.push(`description = $${idx++}`); params.push(description); }
+    if (cookingTime !== undefined) { fields.push(`cooking_time = $${idx++}`); params.push(cookingTime); }
+    if (difficulty !== undefined) { fields.push(`difficulty = $${idx++}`); params.push(difficulty); }
+    if (ingredients !== undefined) { fields.push(`ingredients = $${idx++}`); params.push(JSON.stringify(ingredients)); }
+    if (instructions !== undefined) { fields.push(`instructions = $${idx++}`); params.push(instructions); }
+    if (coupangProducts !== undefined) { fields.push(`coupang_products = $${idx++}`); params.push(JSON.stringify(coupangProducts)); }
+    if (imageUrl !== undefined) { fields.push(`image_url = $${idx++}`); params.push(imageUrl); }
+    if (status !== undefined) { fields.push(`status = $${idx++}`); params.push(status); }
+
+    fields.push('updated_at = NOW()');
+    params.push(req.params.id);
+
+    const result = await db.query(
+      `UPDATE recipes SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      params
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '레시피를 찾을 수 없습니다.' });
+    }
+
+    res.json({ success: true, data: mapRecipeRow(result.rows[0]) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/recipes/:id
+ */
+router.delete('/recipes/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query('DELETE FROM recipes WHERE id = $1 RETURNING id', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '레시피를 찾을 수 없습니다.' });
+    }
+    res.json({ success: true, message: '레시피가 삭제되었습니다.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== News (Admin) ====================
+
+function mapNewsRow(row) {
+  return {
+    id: String(row.id),
+    title: row.title,
+    summary: row.summary,
+    content: row.content,
+    category: row.category,
+    imageUrl: row.image_url,
+    slug: row.slug,
+    status: row.status,
+    viewCount: row.view_count || 0,
+    publishedAt: row.published_at?.toISOString(),
+    createdAt: row.created_at?.toISOString(),
+    updatedAt: row.updated_at?.toISOString(),
+  };
+}
+
+/**
+ * GET /api/admin/news
+ */
+router.get('/news', async (req, res) => {
+  try {
+    const db = getDb();
+    const { limit = 20, offset = 0, status } = req.query;
+
+    let query = 'SELECT * FROM news';
+    let countQuery = 'SELECT COUNT(*) as count FROM news';
+    const conditions = [];
+    const params = [];
+    let idx = 1;
+
+    if (status) {
+      conditions.push(`status = $${idx++}`);
+      params.push(status);
+    }
+
+    const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+    query += where + ` ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+    countQuery += where;
+
+    const countParams = [...params];
+    params.push(parseInt(limit), parseInt(offset));
+
+    const [newsResult, countResult] = await Promise.all([
+      db.query(query, params),
+      db.query(countQuery, countParams),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        news: newsResult.rows.map(mapNewsRow),
+        totalCount: parseInt(countResult.rows[0].count),
+        hasMore: parseInt(offset) + newsResult.rows.length < parseInt(countResult.rows[0].count),
+      },
+    });
+  } catch (error) {
+    console.error('뉴스 목록 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/news/:id
+ */
+router.get('/news/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query('SELECT * FROM news WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '뉴스를 찾을 수 없습니다.' });
+    }
+    res.json({ success: true, data: mapNewsRow(result.rows[0]) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/news/generate
+ * AI 뉴스 기사 생성
+ */
+router.post('/news/generate', async (req, res) => {
+  try {
+    const { topic, category } = req.body;
+    if (!topic || !topic.trim()) {
+      return res.status(400).json({ success: false, message: '뉴스 주제를 입력해주세요.' });
+    }
+
+    const settings = await getSystemSettings();
+
+    const systemPrompt = `당신은 전문 소비/트렌드 뉴스 기자입니다. 한국어로 기사를 작성합니다.
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력합니다.`;
+
+    const userPrompt = `"${topic.trim()}" 주제로 뉴스 기사를 JSON으로 작성해주세요.
+
+형식:
+{
+  "title": "기사 제목 (클릭하고 싶은 매력적인 제목)",
+  "summary": "기사 요약 (2-3문장)",
+  "content": "기사 본문 (800~1500자, HTML 태그 없이 순수 텍스트, 단락 구분은 줄바꿈으로)",
+  "category": "${category || '트렌드'}"
+}
+
+규칙:
+- 객관적이면서도 읽기 쉬운 문체
+- 구체적인 수치나 사례를 포함
+- 소비자 관점에서 유용한 정보 제공
+- 과장이나 낚시성 제목 금지`;
+
+    const aiResult = await generateText(settings.ai, userPrompt, systemPrompt);
+    let parsed;
+    try {
+      const jsonMatch = aiResult.text.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : aiResult.text);
+    } catch (parseErr) {
+      return res.status(500).json({ success: false, message: 'AI 응답을 파싱할 수 없습니다.' });
+    }
+
+    const db = getDb();
+    const slug = await generateUniqueSlug(db, 'news', parsed.title || topic.trim());
+    const insertResult = await db.query(
+      `INSERT INTO news (title, summary, content, category, slug, status)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [
+        parsed.title || topic.trim(),
+        parsed.summary || '',
+        parsed.content || '',
+        parsed.category || category || '트렌드',
+        slug,
+        'draft',
+      ]
+    );
+
+    res.json({
+      success: true,
+      message: '뉴스가 생성되었습니다.',
+      data: {
+        newsId: insertResult.rows[0].id,
+        title: parsed.title,
+      },
+    });
+  } catch (error) {
+    console.error('뉴스 생성 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/news/:id
+ */
+router.put('/news/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const { title, summary, content, category, status, imageUrl } = req.body;
+    const fields = [];
+    const params = [];
+    let idx = 1;
+
+    if (title !== undefined) { fields.push(`title = $${idx++}`); params.push(title); }
+    if (summary !== undefined) { fields.push(`summary = $${idx++}`); params.push(summary); }
+    if (content !== undefined) { fields.push(`content = $${idx++}`); params.push(content); }
+    if (category !== undefined) { fields.push(`category = $${idx++}`); params.push(category); }
+    if (imageUrl !== undefined) { fields.push(`image_url = $${idx++}`); params.push(imageUrl); }
+    if (status !== undefined) {
+      fields.push(`status = $${idx++}`); params.push(status);
+      if (status === 'published') {
+        fields.push('published_at = NOW()');
+      }
+    }
+
+    fields.push('updated_at = NOW()');
+    params.push(req.params.id);
+
+    const result = await db.query(
+      `UPDATE news SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      params
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '뉴스를 찾을 수 없습니다.' });
+    }
+
+    res.json({ success: true, data: mapNewsRow(result.rows[0]) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/news/:id
+ */
+router.delete('/news/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query('DELETE FROM news WHERE id = $1 RETURNING id', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '뉴스를 찾을 수 없습니다.' });
+    }
+    res.json({ success: true, message: '뉴스가 삭제되었습니다.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Deeplink ====================
+
+/**
+ * POST /api/admin/deeplink
+ * 일반 쿠팡 URL을 제휴 딥링크(단축 URL)로 변환
+ */
+router.post('/deeplink', async (req, res) => {
+  try {
+    const { urls } = req.body;
+
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+      return res.status(400).json({ success: false, message: 'URL 배열을 입력해주세요.' });
+    }
+
+    if (urls.length > 20) {
+      return res.status(400).json({ success: false, message: '한 번에 최대 20개 URL만 변환할 수 있습니다.' });
+    }
+
+    const settings = await getSystemSettings();
+    const { accessKey, secretKey, subId } = settings.coupang || {};
+
+    if (!accessKey || !secretKey) {
+      return res.status(503).json({ success: false, message: '쿠팡 API가 설정되지 않았습니다.' });
+    }
+
+    const result = await createDeeplinks({ urls, subId }, { accessKey, secretKey });
+
+    if (!result.success) {
+      return res.status(502).json({ success: false, message: result.message || '딥링크 변환 실패' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        deeplinks: (result.deeplinks || []).map((dl, i) => ({
+          originalUrl: urls[i] || '',
+          shortenUrl: dl.shortenUrl || '',
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('딥링크 변환 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Upload ====================
+
+/**
+ * POST /api/admin/upload
+ * 파일 업로드 (placeholder)
+ */
+router.post('/upload', async (req, res) => {
+  // TODO: MinIO 파일 업로드 구현
+  res.status(501).json({ success: false, message: '파일 업로드는 아직 구현되지 않았습니다.' });
+});
+
+// ==================== Helper Functions ====================
+
+function mapReviewRow(row) {
+  return {
+    id: String(row.id),
+    productId: row.product_id,
+    productName: row.product_name,
+    title: row.title,
+    content: row.content,
+    slug: row.slug,
+    status: row.status,
+    category: row.category,
+    affiliateUrl: row.affiliate_url,
+    author: row.author,
+    media: row.media,
+    toneScore: row.tone_score ? parseFloat(row.tone_score) : undefined,
+    charCount: row.char_count,
+    viewCount: row.view_count,
+    createdAt: row.created_at?.toISOString(),
+    updatedAt: row.updated_at?.toISOString(),
+    publishedAt: row.published_at?.toISOString(),
+  };
+}
+
+function mapProductRow(row) {
+  return {
+    id: String(row.id),
+    productId: row.product_id,
+    productName: row.product_name,
+    productPrice: row.product_price,
+    productImage: row.product_image,
+    productUrl: row.product_url,
+    categoryId: row.category_id,
+    categoryName: row.category_name,
+    affiliateUrl: row.affiliate_url,
+    source: row.source,
+    status: row.status,
+    createdAt: row.created_at?.toISOString(),
+    updatedAt: row.updated_at?.toISOString(),
+  };
+}
+
+/**
+ * POST /api/admin/cleanup-logs
+ * 오래된 로그 정리
+ */
+router.post('/cleanup-logs', async (req, res) => {
+  try {
+    const { daysToKeep = 30 } = req.body;
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+
+    const db = getDb();
+
+    // 삭제할 로그 수 조회
+    const countResult = await db.query(
+      'SELECT COUNT(*) as count FROM logs WHERE created_at < $1',
+      [cutoffDate]
+    );
+    const deletedCount = parseInt(countResult.rows[0].count);
+
+    // 오래된 로그 삭제
+    await db.query(
+      'DELETE FROM logs WHERE created_at < $1',
+      [cutoffDate]
+    );
+
+    await notifySlack({
+      route: 'cleanup',
+      level: 'info',
+      title: '로그 정리 완료',
+      text: `${deletedCount}개의 오래된 로그가 삭제되었습니다.`,
+      fields: [
+        { label: '보관 기간', value: `${daysToKeep}일` },
+        { label: '삭제된 로그', value: `${deletedCount}개` },
+      ],
+    });
+
+    res.json({
+      success: true,
+      message: `${deletedCount}개의 로그가 삭제되었습니다.`,
+      data: {
+        deletedCount,
+        cutoffDate: cutoffDate.toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('로그 정리 중 오류:', error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/stats
+ * 시스템 통계
+ */
+router.get('/stats', async (req, res) => {
+  try {
+    const db = getDb();
+
+    const [productsResult, reviewsResult, logsResult] = await Promise.all([
+      db.query('SELECT COUNT(*) as count FROM products'),
+      db.query('SELECT COUNT(*) as count FROM reviews'),
+      db.query('SELECT COUNT(*) as count FROM logs'),
+    ]);
+
+    const stats = {
+      products: parseInt(productsResult.rows[0].count),
+      reviews: parseInt(reviewsResult.rows[0].count),
+      logs: parseInt(logsResult.rows[0].count),
+      timestamp: new Date().toISOString(),
+    };
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    console.error('통계 조회 중 오류:', error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+export default router;

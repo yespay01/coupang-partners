@@ -1,0 +1,122 @@
+hmacGenerator.js
+
+const crypto = require('crypto');
+const moment = require('moment');
+
+module.exports = {
+    generateHmac: (method, url, secretKey, accessKey) => {
+        const parts = url.split(/\?/);
+        const [path, query = ''] = parts;
+
+        const datetime = moment.utc().format('YYMMDD[T]HHmmss[Z]');
+        const message = datetime + method + path + query;
+
+        const signature = crypto.createHmac('sha256', secretKey)
+            .update(message)
+            .digest('hex');
+
+        return `CEA algorithm=HmacSHA256, access-key=${accessKey}, signed-date=${datetime}, signature=${signature}`;
+    }
+};
+HTTP 신호를 보내기 전에 Authorization 헤더를 이용하여 HMAC signature를 설정해야합니다.
+
+app.js
+
+const axios = require('axios');
+const { generateHmac } = require('./hmacGenerator');
+
+const REQUEST_METHOD = "POST";
+const DOMAIN = "https://api-gateway.coupang.com";
+const URL = "/v2/providers/affiliate_open_api/apis/openapi/v1/deeplink";
+
+// Replace with your own ACCESS_KEY and SECRET_KEY
+const ACCESS_KEY = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
+const SECRET_KEY = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+
+const REQUEST = { "coupangUrls": [
+        "https://www.coupang.com/np/search?component=&q=good&channel=user", 
+        "https://www.coupang.com/np/coupangglobal"
+]};
+
+(async () => {
+    const authorization = generateHmac(REQUEST_METHOD, URL, SECRET_KEY, ACCESS_KEY);
+    axios.defaults.baseURL = DOMAIN;
+
+    try {       
+        const response = await axios.request({
+            method: REQUEST_METHOD,
+            url: URL,
+            headers: { Authorization: authorization },
+            data: REQUEST
+        });
+        console.log(response.data);
+    } catch (err) {
+        console.error(err.response.data);
+    }    
+})();
+정상적으로 작동되었다면 콘솔에서 아래 결과를 확인 할 수 있습니다.
+
+{
+    "rCode": "0",
+    "rMessage": "",
+    "data": [
+        {
+            "originalUrl": "https://www.coupang.com/np/search?component=&q=good&channel=user",
+            "shortenUrl": "https://coupa.ng/bgQjht"
+        },
+        {
+            "originalUrl": "https://www.coupang.com/np/coupangglobal",
+            "shortenUrl": "https://coupa.ng/bgQjjb"
+        }
+    ]
+}
+파트너스 API 사용
+이제 파트너스 API를 사용할 준비가 되었습니다. 각 API에 대한 문서와 세부 사항은 파트너스 API 가이드에서 문서 탭을 확인해 주시기 바랍니다.
+
+자주 발생하는 문제
+API 사용이 처음이라면 인증과 관련한 아래와 같은 문제가 발생 할 수 있습니다.
+
+Unknown error occurred
+Access Key가 잘못 입력되었을 때 아래와 같은 메시지가 출력됩니다.
+
+{
+    "code": "ERROR",
+    "message": "Unknown error occurred, please contact api-gateway channel for the details.",
+    "transactionId": "f57c356c-e3f5-4b71-b45f-3db19f6b092b"
+}
+Invalid signature
+Signature 생성이 잘못되었을 때 아래와 같은 메시지가 출력됩니다.
+
+{
+    "code": "ERROR",
+    "message": "Invalid signature.",
+    "transactionId": "78dcba12-7e64-400a-8f1d-0c185a1f3ce1"
+}
+Request is not authorized
+Authorization 헤더가 없거나 잘못된 값을 설정했을 때 아래와 같은 메시지가 출력됩니다.
+
+{
+    "code": "ERROR",
+    "message": "Request is not authorized.",
+    "transactionId": "9fa11d4c-bcbd-4702-a994-b699f5968d8a",
+    "messages": {
+        "korean": "미인증된 요청은 허용되지 않습니다. 클라이언트의 정보가 정상적으로 설정되어 있는지 확인 부탁드립니다. (CMDB, 컨수머 토큰 또는 HMAC)",
+        "english": "Unauthorized request is denied. Check if the client's credential meets the requirements (CMDB, consumer token or HMAC)."
+    }
+}
+HMAC signature is expired
+HMAC signature가 만료 되었을 때 아래와 같은 메시지가 출력됩니다. HMAC signature를 다시 생성해야 합니다.
+
+{
+    "code": "ERROR",
+    "message": "Specified signature is expired.",
+    "transactionId": "2d2ccd2b-2e3f-480b-966d-e9ceedaaa91f"
+}
+HMAC format is invalid
+HMAC signature의 포맷이 올바르지 않을 때 아래와 같은 메시지가 출력됩니다. 위 예시를 사용하여 HMAC signature를 생성하십시오.
+
+{
+    "code": "ERROR",
+    "message": "HMAC format is invalid.",
+    "transactionId": "b806c1f1-1b6c-4ca6-9040-0418f695a315"
+}

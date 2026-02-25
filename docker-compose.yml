@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: coupang-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: coupang_blog
+      POSTGRES_USER: coupang_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your-secure-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - coupang-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coupang_user -d coupang_blog"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: coupang-minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - coupang-network
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Web 앱 (Next.js)
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: coupang-blog-web
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./web/.env.production
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://coupang_user:${POSTGRES_PASSWORD:-your-secure-password}@postgres:5432/coupang_blog
+      - AUTOMATION_SERVER_URL=http://automation-server:4000
+    networks:
+      - coupang-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      automation-server:
+        condition: service_healthy
+
+  # Automation Server
+  automation-server:
+    build:
+      context: ./automation-server
+      dockerfile: Dockerfile
+    container_name: coupang-automation
+    restart: always
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./automation-server/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - API_BASE_URL=http://automation-server:4000
+      - DATABASE_URL=postgresql://coupang_user:${POSTGRES_PASSWORD:-your-secure-password}@postgres:5432/coupang_blog
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+    networks:
+      - coupang-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+networks:
+  coupang-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  minio_data:

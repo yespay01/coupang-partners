@@ -1,0 +1,39 @@
+# 설치형/관리형 단독 인스턴스 배포용 예시
+# 사용법:
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#   필요한 포트/볼륨명/컨테이너명/도메인 환경값을 수정 후 사용
+
+services:
+  postgres:
+    container_name: customer-postgres
+    ports:
+      - "5434:5432"
+
+  minio:
+    container_name: customer-minio
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+
+  web:
+    container_name: customer-blog-web
+    ports:
+      - "3100:3000"
+    env_file:
+      - ./web/.env.production
+    environment:
+      - NEXT_PUBLIC_SITE_URL=https://example.com
+      - AUTOMATION_SERVER_URL=http://automation-server:4000
+
+  automation-server:
+    container_name: customer-automation
+    ports:
+      - "4100:4000"
+    env_file:
+      - ./automation-server/.env
+
+volumes:
+  postgres_data:
+    name: customer_postgres_data
+  minio_data:
+    name: customer_minio_data

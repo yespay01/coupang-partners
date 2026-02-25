@@ -1,0 +1,43 @@
+Base URL:https://api-gateway.coupang.com/v2/providers/affiliate_open_api/apis/openapi/v1/
+products
+쿠팡 상품의 상세 정보를 생성합니다.
+
+
+reports
+쿠팡 파트너스 회원의 실적 정보를 생성합니다 (1시간당 최대 500번 호출 가능합니다.)
+
+
+GET
+​/reports​/clicks
+일 별 클릭 수에 대한 정보를 생성합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+GET
+​/reports​/orders
+일 별 주문 정보를 생성합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+GET
+​/reports​/cancels
+일 별 취소 정보를 생성합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+GET
+​/reports​/commission
+일 별 수익 정보를 생성합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+GET
+​/reports​/ads​/impression-click
+카테고리 배너와 다이나믹 배너에 대한 광고 요청 (request), 응답 (response), 노출 (impression), 광고 클릭 (click) 수치를 조회합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+GET
+​/reports​/ads​/orders
+카테고리 배너와 다이나믹 배너에 대한 주문 리포트를 조회합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+GET
+​/reports​/ads​/cancels
+카테고리 배너와 다이나믹 배너에 대한 취소 리포트를 조회합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+GET
+​/reports​/ads​/performance
+카테고리 배너와 다이나믹 배너에 대한 일별 eCPM 값을 조회합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+GET
+​/reports​/ads​/commission
+카테고리 배너와 다이나믹 배너에 대한 수익 리포트를 조회합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+links
+입력된 쿠팡 상품 링크를 파트너스 회원의 링크로 변환합니다.
+
+
+POST
+​/deeplink
+쿠팡 URL을 회원 트래킹 코드가 포함된 단축 URL로 변환합니다.

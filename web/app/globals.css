@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --accent: #c5a059;
+  /* Deep Gold */
+  --accent-soft: #fcf9f2;
+  /* Soft Cream */
+  --secondary: #717171;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans), sans-serif;
+  font-size: 1rem;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif), serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+
+  50% {
+    transform: translateY(-20px) translateX(10px);
+  }
+}
+
+@keyframes glow {
+
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+    filter: blur(40px);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+    filter: blur(60px);
+  }
+}
+
+.animate-float {
+  animation: float 8s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 10s ease-in-out infinite;
+}
+
+/* Typography Enhancements for Editorial Feel */
+.font-serif {
+  font-family: var(--font-serif), serif;
+}
+
+.italic {
+  font-style: italic;
+}
+
+/* TipTap & Content Styles */
+.review-content {
+  font-family: var(--font-serif), serif;
+  font-size: 1.125rem;
+  line-height: 1.9;
+  color: #333;
+}
+
+.review-content h1,
+.review-content h2,
+.review-content h3 {
+  margin-top: 2.5rem;
+  margin-bottom: 1.5rem;
+  color: #1a1a1a;
+}
+
+.review-content p {
+  margin-bottom: 1.5rem;
+}
+
+.review-content img {
+  width: 100%;
+  height: auto;
+  margin: 3rem 0;
+}
+
+.review-content strong {
+  color: #000;
+  font-weight: 700;
+}

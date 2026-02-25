@@ -1,0 +1,532 @@
+GET
+​/reports​/clicks
+일 별 클릭 수에 대한 정보를 생성합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+Parameters
+Name	Description
+startDate *
+string
+(query)
+시작일, 형식: yyyyMMdd, 20181101 보다 같거나 커야 합니다.
+
+endDate *
+string
+(query)
+종료일, 형식: yyyyMMdd, 시작일과의 차이가 30일 보다 같거나 작아야 합니다.
+
+subId
+string
+(query)
+채널 아이디
+
+page
+int
+(query)
+페이지 번호. 기본 값은 0 입니다. 한 페이지에 최대 1000개의 결과 값이 존재합니다. 만약 페이지의 레코드 수가 1000개라면 그 다음 페이지에 대해서 호출해야 합니다.
+
+Responses
+rCode	Description
+0	
+Successfully get click reports
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "date": "20190307",
+      "trackingCode": "AF1234567",
+      "subId": "A1234567890",
+      "addtag": "400",
+      "ctag": "Home",
+      "click": 888
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+GET
+​/reports​/orders
+일 별 주문 정보를 생성합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+Parameters
+Name	Description
+startDate *
+string
+(query)
+시작일, 형식: yyyyMMdd, 20181101 보다 같거나 커야 합니다.
+
+endDate *
+string
+(query)
+종료일, 형식: yyyyMMdd, 시작일과의 차이가 30일 보다 같거나 작아야 합니다.
+
+subId
+string
+(query)
+채널 아이디
+
+page
+int
+(query)
+페이지 번호. 기본 값은 0 입니다. 한 페이지에 최대 1000개의 결과 값이 존재합니다. 만약 페이지의 레코드 수가 1000개라면 그 다음 페이지에 대해서 호출해야 합니다.
+
+Responses
+rCode	Description
+0	
+Successfully get orders
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "date": "20190307",
+      "trackingCode": "AF1234567",
+      "subId": "A1234567890",
+      "addtag": "400",
+      "ctag": "Home",
+      "orderId": 12345678901234,
+      "productId": 1234567,
+      "productName": "상품명",
+      "quantity": 2,
+      "gmv": 8900,
+      "commissionRate": 3,
+      "commission": 267,
+      "categoryName": "패션의류"
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+GET
+​/reports​/cancels
+일 별 취소 정보를 생성합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+Parameters
+Name	Description
+startDate *
+string
+(query)
+시작일, 형식: yyyyMMdd, 20181101 보다 같거나 커야 합니다.
+
+endDate *
+string
+(query)
+종료일, 형식: yyyyMMdd, 시작일과의 차이가 30일 보다 같거나 작아야 합니다.
+
+subId
+string
+(query)
+채널 아이디
+
+page
+int
+(query)
+페이지 번호. 기본 값은 0 입니다. 한 페이지에 최대 1000개의 결과 값이 존재합니다. 만약 페이지의 레코드 수가 1000개라면 그 다음 페이지에 대해서 호출해야 합니다.
+
+Responses
+rCode	Description
+0	
+Successfully get cancelled orders
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "orderDate": "20190306",
+      "date": "20190307",
+      "trackingCode": "AF1234567",
+      "subId": "A1234567890",
+      "addtag": "400",
+      "ctag": "Home",
+      "orderId": 12345678901234,
+      "productId": 1234567,
+      "productName": "상품명",
+      "quantity": 2,
+      "gmv": 8900,
+      "commissionRate": 3,
+      "commission": 267,
+      "categoryName": "패션의류"
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+GET
+​/reports​/commission
+일 별 수익 정보를 생성합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+Parameters
+Name	Description
+startDate *
+string
+(query)
+시작일, 형식: yyyyMMdd, 20181101 보다 같거나 커야 합니다.
+
+endDate *
+string
+(query)
+종료일, 형식: yyyyMMdd, 시작일과의 차이가 30일 보다 같거나 작아야 합니다.
+
+subId
+string
+(query)
+채널 아이디
+
+page
+int
+(query)
+페이지 번호. 기본 값은 0 입니다. 한 페이지에 최대 1000개의 결과 값이 존재합니다. 만약 페이지의 레코드 수가 1000개라면 그 다음 페이지에 대해서 호출해야 합니다.
+
+Responses
+rCode	Description
+0	
+Successfully get orders commission
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "date": "20190307",
+      "trackingCode": "AF1234567",
+      "subId": "A1234567890",
+      "commission": 267,
+      "click": 888,
+      "order": 888,
+      "cancel": 888,
+      "gmv": 8900
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+GET
+​/reports​/ads​/impression-click
+카테고리 배너와 다이나믹 배너에 대한 광고 요청 (request), 응답 (response), 노출 (impression), 광고 클릭 (click) 수치를 조회합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+Parameters
+Name	Description
+startDate *
+string
+(query)
+시작일, 형식: yyyyMMdd, 20211025 보다 같거나 커야 합니다.
+
+endDate *
+string
+(query)
+종료일, 형식: yyyyMMdd, 시작일과의 차이가 14일 보다 같거나 작아야 합니다.
+
+subId
+string
+(query)
+채널 아이디
+
+page
+int
+(query)
+페이지 번호. 기본 값은 0 입니다. 한 페이지에 최대 1000개의 결과 값이 존재합니다. 만약 페이지의 레코드 수가 1000개라면 그 다음 페이지에 대해서 호출해야 합니다.
+
+Responses
+rCode	Description
+0	
+Successfully get click reports
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "date": "20210307",
+      "hour": "10",
+      "trackingCode": "AF1234567",
+      "subId": "A1234567890",
+      "pageId": "abc.com",
+      "subParam": "abc",
+      "widgetId": 12345,
+      "widgetType": "STATIC",
+      "request": 888,
+      "response": 888,
+      "impression": 888,
+      "click": 888
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+GET
+​/reports​/ads​/orders
+카테고리 배너와 다이나믹 배너에 대한 주문 리포트를 조회합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+Parameters
+Name	Description
+startDate *
+string
+(query)
+시작일, 형식: yyyyMMdd, 20211025 보다 같거나 커야 합니다.
+
+endDate *
+string
+(query)
+종료일, 형식: yyyyMMdd, 시작일과의 차이가 14일 보다 같거나 작아야 합니다.
+
+subId
+string
+(query)
+채널 아이디
+
+page
+int
+(query)
+페이지 번호. 기본 값은 0 입니다. 한 페이지에 최대 1000개의 결과 값이 존재합니다. 만약 페이지의 레코드 수가 1000개라면 그 다음 페이지에 대해서 호출해야 합니다.
+
+Responses
+rCode	Description
+0	
+Successfully get cancelled orders
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "date": "20210307",
+      "trackingCode": "AF1234567",
+      "subId": "A1234567890",
+      "pageId": "abc.com",
+      "subParam": "abc",
+      "widgetId": 12345,
+      "widgetType": "STATIC",
+      "orderId": 12345678901234,
+      "productId": 1234567,
+      "productName": "상품명",
+      "quantity": 2,
+      "gmv": 8900,
+      "commissionRate": 3,
+      "commission": 267
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+GET
+​/reports​/ads​/cancels
+카테고리 배너와 다이나믹 배너에 대한 취소 리포트를 조회합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+Parameters
+Name	Description
+startDate *
+string
+(query)
+시작일, 형식: yyyyMMdd, 20211025 보다 같거나 커야 합니다.
+
+endDate *
+string
+(query)
+종료일, 형식: yyyyMMdd, 시작일과의 차이가 14일 보다 같거나 작아야 합니다.
+
+subId
+string
+(query)
+채널 아이디
+
+page
+int
+(query)
+페이지 번호. 기본 값은 0 입니다. 한 페이지에 최대 1000개의 결과 값이 존재합니다. 만약 페이지의 레코드 수가 1000개라면 그 다음 페이지에 대해서 호출해야 합니다.
+
+Responses
+rCode	Description
+0	
+Successfully get cancelled orders
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "orderDate": "20210307",
+      "date": "20210307",
+      "trackingCode": "AF1234567",
+      "subId": "A1234567890",
+      "pageId": "abc.com",
+      "subParam": "abc",
+      "widgetId": 12345,
+      "widgetType": "STATIC",
+      "orderId": 12345678901234,
+      "productId": 1234567,
+      "productName": "상품명",
+      "quantity": 2,
+      "gmv": 8900,
+      "commissionRate": 3,
+      "commission": 267
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+GET
+​/reports​/ads​/performance
+카테고리 배너와 다이나믹 배너에 대한 일별 eCPM 값을 조회합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+Parameters
+Name	Description
+startDate *
+string
+(query)
+시작일, 형식: yyyyMMdd, 20211025 보다 같거나 커야 합니다.
+
+endDate *
+string
+(query)
+종료일, 형식: yyyyMMdd, 시작일과의 차이가 14일 보다 같거나 작아야 합니다.
+
+subId
+string
+(query)
+채널 아이디
+
+page
+int
+(query)
+페이지 번호. 기본 값은 0 입니다. 한 페이지에 최대 1000개의 결과 값이 존재합니다. 만약 페이지의 레코드 수가 1000개라면 그 다음 페이지에 대해서 호출해야 합니다.
+
+Responses
+rCode	Description
+0	
+Successfully get cancelled orders
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "date": 20210307,
+      "trackingCode": "AF1234567",
+      "subId": "A1234567890",
+      "pageId": "abc.com",
+      "ecpm": 888
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+GET
+​/reports​/ads​/commission
+카테고리 배너와 다이나믹 배너에 대한 수익 리포트를 조회합니다. (일 별 실적은 매일 오후 15:00에 업데이트 됩니다)
+Parameters
+Name	Description
+startDate *
+string
+(query)
+시작일, 형식: yyyyMMdd, 20211025 보다 같거나 커야 합니다.
+
+endDate *
+string
+(query)
+종료일, 형식: yyyyMMdd, 시작일과의 차이가 14일 보다 같거나 작아야 합니다.
+
+subId
+string
+(query)
+채널 아이디
+
+page
+int
+(query)
+페이지 번호. 기본 값은 0 입니다. 한 페이지에 최대 1000개의 결과 값이 존재합니다. 만약 페이지의 레코드 수가 1000개라면 그 다음 페이지에 대해서 호출해야 합니다.
+
+Responses
+rCode	Description
+0	
+Successfully get orders commission
+Example Value
+Model
+{
+  "rCode": "0",
+  "rMessage": "",
+  "data": [
+    {
+      "date": "20210307",
+      "trackingCode": "AF1234567",
+      "subId": "A1234567890",
+      "pageId": "abc.com",
+      "subParam": "abc",
+      "widgetId": 12345,
+      "widgetType": "STATIC",
+      "commission": 267
+    }
+  ]
+}
+400	
+Bad Request
+403	
+Forbidden
+429	
+Too Many Requests
+500	
+Internal Server Error
+
+
+
+
+
+
