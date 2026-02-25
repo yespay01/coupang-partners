@@ -163,3 +163,35 @@ export function requireAdmin(req, res, next) {
   }
   next();
 }
+
+/**
+ * 환경변수 기준 초기 관리자 계정 보장 (idempotent)
+ * - 없으면 생성
+ * - 있으면 role이 admin이 아니어도 admin으로 승격
+ */
+export async function ensureAdminUserFromEnv() {
+  const email = (process.env.ADMIN_EMAIL || '').trim();
+  const password = process.env.ADMIN_PASSWORD || '';
+  const name = (process.env.ADMIN_NAME || 'Administrator').trim() || 'Administrator';
+
+  if (!email || !password) {
+    console.warn('⚠️ ADMIN_EMAIL/ADMIN_PASSWORD 미설정: 초기 관리자 자동 생성/승격을 건너뜁니다.');
+    return;
+  }
+
+  const db = getDb();
+  const existing = await getUserByEmail(email);
+
+  if (!existing) {
+    const created = await createUser(email, password, name, 'admin');
+    console.log(`✅ Initial admin created from env: ${created.email}`);
+    return;
+  }
+
+  if (existing.role !== 'admin') {
+    await db.query('UPDATE users SET role = $1 WHERE id = $2', ['admin', existing.id]);
+    console.log(`✅ Existing user promoted to admin from env: ${email}`);
+  } else {
+    console.log(`✅ Admin user verified from env: ${email}`);
+  }
+}

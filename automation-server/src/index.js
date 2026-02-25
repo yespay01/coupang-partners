@@ -52,6 +52,14 @@ async function initializeServices() {
     await initializeSchema();
     console.log('✅ Database schema initialized');
 
+    // Ensure bootstrap admin from env (idempotent)
+    try {
+      const { ensureAdminUserFromEnv } = await import('./config/auth.js');
+      await ensureAdminUserFromEnv();
+    } catch (error) {
+      console.warn('⚠️ Admin bootstrap skipped:', error?.message || error);
+    }
+
     // Initialize storage
     console.log('🔄 Initializing storage...');
     initializeStorage();

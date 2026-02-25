@@ -4,7 +4,7 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: coupang-postgres
+    container_name: ${STACK_NAME:-coupang}-postgres
     restart: always
     environment:
       POSTGRES_DB: coupang_blog
@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
     networks:
       - coupang-network
     healthcheck:
@@ -25,7 +25,7 @@ services:
   # MinIO Object Storage
   minio:
     image: minio/minio:latest
-    container_name: coupang-minio
+    container_name: ${STACK_NAME:-coupang}-minio
     restart: always
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
@@ -33,8 +33,8 @@ services:
     volumes:
       - minio_data:/data
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     networks:
       - coupang-network
     command: server /data --console-address ":9001"
@@ -49,10 +49,10 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
-    container_name: coupang-blog-web
+    container_name: ${STACK_NAME:-coupang}-blog-web
     restart: always
     ports:
-      - "3000:3000"
+      - "${WEB_HOST_PORT:-3000}:3000"
     env_file:
       - ./web/.env.production
     environment:
@@ -74,10 +74,10 @@ services:
     build:
       context: ./automation-server
       dockerfile: Dockerfile
-    container_name: coupang-automation
+    container_name: ${STACK_NAME:-coupang}-automation
     restart: always
     ports:
-      - "4000:4000"
+      - "${AUTOMATION_HOST_PORT:-4000}:4000"
     env_file:
       - ./automation-server/.env
     environment:
@@ -108,4 +108,6 @@ networks:
 
 volumes:
   postgres_data:
+    name: ${STACK_NAME:-coupang}_postgres_data
   minio_data:
+    name: ${STACK_NAME:-coupang}_minio_data
