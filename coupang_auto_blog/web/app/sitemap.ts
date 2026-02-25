@@ -46,9 +46,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
     if (res.ok) {
       const data = await res.json();
-      const recipes: { id: string; updatedAt?: string }[] = data.data?.recipes || [];
+      const recipes: { id: string; slug?: string; updatedAt?: string }[] = data.data?.recipes || [];
       recipePages = recipes.map((r) => ({
-        url: `${SITE_URL}/recipes/${r.id}`,
+        url: `${SITE_URL}/recipes/${r.slug || r.id}`,
         lastModified: r.updatedAt ? new Date(r.updatedAt) : new Date(),
         changeFrequency: "weekly" as const,
         priority: 0.7,
@@ -66,9 +66,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
     if (res.ok) {
       const data = await res.json();
-      const newsList: { id: string; updatedAt?: string }[] = data.data?.news || [];
+      const newsList: { id: string; slug?: string; updatedAt?: string }[] = data.data?.news || [];
       newsPages = newsList.map((n) => ({
-        url: `${SITE_URL}/news/${n.id}`,
+        url: `${SITE_URL}/news/${n.slug || n.id}`,
         lastModified: n.updatedAt ? new Date(n.updatedAt) : new Date(),
         changeFrequency: "weekly" as const,
         priority: 0.6,
