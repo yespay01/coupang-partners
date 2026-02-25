@@ -28,7 +28,7 @@ export function CoupangSettings() {
   const isConfigured = coupang.accessKey && coupang.secretKey && coupang.partnerId;
 
   return (
-    <div className="space-y-6">
+    <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
       <div>
         <h2 className="text-lg font-semibold text-slate-900">쿠팡 파트너스 API</h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -45,6 +45,7 @@ export function CoupangSettings() {
           </p>
         </div>
         <button
+          type="button"
           onClick={() => setCoupangEnabled(!coupang.enabled)}
           disabled={!isConfigured}
           className={`relative h-6 w-11 rounded-full transition-colors ${
@@ -109,6 +110,7 @@ export function CoupangSettings() {
             className="flex-1 rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <button
+            type="button"
             onClick={() => setShowSecretKey(!showSecretKey)}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
           >
@@ -154,6 +156,7 @@ export function CoupangSettings() {
       <div className="space-y-4">
         <div className="flex items-center gap-4 flex-wrap">
           <button
+            type="button"
             onClick={handleTest}
             disabled={!isConfigured || isTestingConnection}
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
@@ -264,6 +267,6 @@ export function CoupangSettings() {
           </div>
         </div>
       </div>
-    </div>
+    </form>
   );
 }

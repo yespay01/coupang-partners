@@ -215,9 +215,6 @@ function ReviewsPageContent() {
               </div>
               <span className="font-bold text-slate-900">쿠팡 리뷰</span>
             </Link>
-            <Link href="/admin" className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition">
-              관리자
-            </Link>
           </div>
         </div>
       </header>

@@ -67,22 +67,6 @@ function formatSource(source: string): string {
 export function LogList({ logs }: LogListProps) {
   const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set());
 
-  // 디버깅 강화 - 전체 구조 출력 (클라이언트에서만)
-  if (typeof window !== "undefined" && logs.length > 0) {
-    console.log("🔍 LogList 렌더링됨", {
-      totalLogs: logs.length,
-      firstLog: logs[0],
-      hasPayload: logs[0]?.payload !== undefined,
-      messageLength: logs[0]?.message?.length,
-      contextLength: logs[0]?.context?.length,
-      contextPreview: logs[0]?.context?.substring(0, 200),
-    });
-
-    // 전역에서 접근 가능하도록 window에 저장 (클라이언트에서만)
-    (window as any).__debugLogs = logs;
-    console.log("💡 콘솔에서 window.__debugLogs로 접근 가능합니다");
-  }
-
   const toggleExpand = (index: number) => {
     const newExpanded = new Set(expandedLogs);
     if (newExpanded.has(index)) {

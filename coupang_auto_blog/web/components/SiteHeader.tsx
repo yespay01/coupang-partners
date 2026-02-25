@@ -51,12 +51,6 @@ export function SiteHeader() {
           </nav>
 
           <div className="flex items-center gap-4">
-            <Link
-              href="/admin"
-              className="hidden lg:block text-[15px] font-serif italic text-slate-400 hover:text-slate-900 transition-colors"
-            >
-              관리자
-            </Link>
             {/* 모바일 햄버거 버튼 */}
             <button
               className="lg:hidden flex flex-col justify-center items-center w-8 h-8 gap-[5px]"
@@ -101,15 +95,6 @@ export function SiteHeader() {
                 {item.label}
               </Link>
             ))}
-            <div className="mt-2 pt-2 border-t border-slate-100">
-              <Link
-                href="/admin"
-                className="block px-3 py-3 text-[12px] font-semibold tracking-widest uppercase text-slate-400 hover:text-slate-900"
-                onClick={() => setMobileOpen(false)}
-              >
-                관리자
-              </Link>
-            </div>
           </div>
         </div>
       )}

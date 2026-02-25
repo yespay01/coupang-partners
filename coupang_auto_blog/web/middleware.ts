@@ -13,22 +13,35 @@ export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAdminRoute = pathname.startsWith("/admin");
   const isLoginRoute = pathname.startsWith("/admin/login");
+  const isAdminRootRoute = pathname === "/admin";
 
   if (!isAdminRoute) {
     return NextResponse.next();
+  }
+
+  const hasSession = request.cookies.has(ADMIN_SESSION_COOKIE);
+
+  // 로그인 완료 상태에서 /admin/login 접근 시 대시보드로 이동
+  if (isLoginRoute && hasSession) {
+    return NextResponse.redirect(new URL("/admin", request.url));
+  }
+
+  // 비로그인 상태에서 /admin 접근 시 URL은 /admin 유지한 채 로그인 화면 표시
+  if (isAdminRootRoute && !hasSession) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/admin/login";
+    return NextResponse.rewrite(loginUrl);
   }
 
   if (isLoginRoute) {
     return NextResponse.next();
   }
 
-  const hasSession = request.cookies.has(ADMIN_SESSION_COOKIE);
-
   if (hasSession) {
     return NextResponse.next();
   }
 
-  const loginUrl = new URL("/admin/login", request.url);
+  const loginUrl = new URL("/admin", request.url);
   loginUrl.searchParams.set("redirect", request.nextUrl.pathname);
   return NextResponse.redirect(loginUrl);
 }
