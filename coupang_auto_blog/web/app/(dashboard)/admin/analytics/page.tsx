@@ -36,6 +36,24 @@ const DEVICE_COLORS: Record<string, string> = {
   unknown: "bg-slate-400",
 };
 
+const DEVICE_LABELS: Record<string, string> = {
+  mobile: "모바일",
+  tablet: "태블릿",
+  desktop: "데스크탑",
+  unknown: "알 수 없음",
+};
+
+const PAGE_TYPE_LABELS: Record<string, string> = {
+  home: "홈",
+  review: "리뷰",
+  recipe: "레시피",
+  news: "뉴스",
+  reviews: "리뷰 목록",
+  recipes: "레시피 목록",
+  "news-list": "뉴스 목록",
+  other: "기타",
+};
+
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -170,7 +188,7 @@ export default function AnalyticsPage() {
                     DEVICE_COLORS[d.device] || "bg-slate-400"
                   }`}
                 >
-                  {d.device}
+                  {DEVICE_LABELS[d.device] || d.device}
                 </div>
                 <div className="mt-2 text-2xl font-bold text-slate-800">
                   {Number(d.count).toLocaleString()}
@@ -247,8 +265,8 @@ export default function AnalyticsPage() {
                 key={p.page_type}
                 className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center"
               >
-                <div className="text-xs font-semibold uppercase text-slate-500">
-                  {p.page_type}
+                <div className="text-xs font-semibold text-slate-500">
+                  {PAGE_TYPE_LABELS[p.page_type] || p.page_type}
                 </div>
                 <div className="mt-1 text-xl font-bold text-slate-800">
                   {Number(p.count).toLocaleString()}
@@ -259,11 +277,14 @@ export default function AnalyticsPage() {
         </div>
 
         {/* 검색 키워드 Top 20 */}
-        {stats.byKeyword.length > 0 && (
-          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-900">
               검색 키워드 Top 20
             </h2>
+            <span className="text-xs text-slate-400">네이버 검색만 수집 가능 (구글은 보안 정책상 미지원)</span>
+          </div>
+          {stats.byKeyword.length > 0 ? (
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {stats.byKeyword.map((k, i) => (
                 <div
@@ -282,8 +303,12 @@ export default function AnalyticsPage() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="mt-4 text-sm text-slate-400">
+              아직 수집된 키워드가 없습니다. 네이버 검색을 통해 방문한 경우에만 표시됩니다.
+            </p>
+          )}
+        </div>
 
         {/* 최근 방문 로그 */}
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -308,11 +333,13 @@ export default function AnalyticsPage() {
                     </td>
                     <td className="py-2 pr-4">
                       <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
-                        {v.page_type}
+                        {PAGE_TYPE_LABELS[v.page_type] || v.page_type}
                       </span>
-                      <span className="ml-1 text-xs text-slate-500 truncate max-w-[120px] inline-block align-bottom">
-                        {v.page_url}
-                      </span>
+                      {v.page_slug && (
+                        <span className="ml-1 text-xs text-slate-500 truncate max-w-[120px] inline-block align-bottom">
+                          {v.page_slug}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-4 text-xs text-slate-600">
                       {v.referrer_domain || "direct"}
@@ -326,7 +353,7 @@ export default function AnalyticsPage() {
                           DEVICE_COLORS[v.device_type] || "bg-slate-400"
                         }`}
                       >
-                        {v.device_type || "?"}
+                        {DEVICE_LABELS[v.device_type] || v.device_type || "?"}
                       </span>
                     </td>
                     <td className="py-2 text-xs text-slate-400">
