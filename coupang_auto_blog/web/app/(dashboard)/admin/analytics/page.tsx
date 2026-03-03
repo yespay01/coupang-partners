@@ -337,7 +337,7 @@ export default function AnalyticsPage() {
                       </span>
                       {v.page_slug && (
                         <span className="ml-1 text-xs text-slate-500 truncate max-w-[120px] inline-block align-bottom">
-                          {v.page_slug}
+                          {(() => { try { return decodeURIComponent(v.page_slug); } catch { return v.page_slug; } })()}
                         </span>
                       )}
                     </td>

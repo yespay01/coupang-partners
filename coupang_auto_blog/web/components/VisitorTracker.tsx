@@ -54,7 +54,8 @@ function getPageType(pathname: string): string {
 
 function getPageSlug(pathname: string): string {
   const segments = pathname.split("/").filter(Boolean);
-  return segments[segments.length - 1] || "";
+  const raw = segments[segments.length - 1] || "";
+  try { return decodeURIComponent(raw); } catch { return raw; }
 }
 
 export function VisitorTracker() {
