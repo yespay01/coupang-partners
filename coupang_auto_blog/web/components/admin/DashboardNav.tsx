@@ -53,6 +53,9 @@ export function DashboardNav() {
       <Link href="/admin/logs" className="hover:text-white">
         로그 뷰어
       </Link>
+      <Link href="/admin/analytics" className="hover:text-white">
+        방문자 분석
+      </Link>
       <Link href="/admin/settings" className="hover:text-white">
         설정
       </Link>

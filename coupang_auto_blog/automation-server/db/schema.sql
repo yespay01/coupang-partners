@@ -131,6 +131,27 @@ CREATE INDEX IF NOT EXISTS idx_logs_type ON logs(type);
 CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
 CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at);
 
+-- Visitor Logs Table (방문자 접속 로그)
+CREATE TABLE IF NOT EXISTS visitor_logs (
+  id SERIAL PRIMARY KEY,
+  page_type VARCHAR(50),
+  page_slug VARCHAR(255),
+  page_url TEXT,
+  referrer TEXT,
+  referrer_domain VARCHAR(255),
+  keyword TEXT,
+  utm_source VARCHAR(255),
+  utm_medium VARCHAR(255),
+  utm_campaign VARCHAR(255),
+  ip_address VARCHAR(45),
+  device_type VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_visitor_logs_created_at ON visitor_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_visitor_logs_page_type ON visitor_logs(page_type);
+CREATE INDEX IF NOT EXISTS idx_visitor_logs_referrer_domain ON visitor_logs(referrer_domain);
+
 -- Insert default settings
 INSERT INTO settings (key, value, description) VALUES
 ('system', '{

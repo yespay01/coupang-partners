@@ -68,6 +68,44 @@ async function initializeServices() {
 // Initialize services and start server
 await initializeServices();
 
+// Public tracking endpoint (인증 불필요 - 서비스 초기화 후, 라우트 등록 전)
+app.post('/api/track', async (req, res) => {
+  try {
+    const {
+      page_type, page_slug, page_url, referrer, referrer_domain,
+      keyword, utm_source, utm_medium, utm_campaign, ip_address, device_type,
+    } = req.body;
+
+    // Bot 필터링
+    const userAgent = req.headers['user-agent'] || '';
+    if (/bot|crawler|spider|crawling/i.test(userAgent)) {
+      return res.json({ success: true, tracked: false });
+    }
+
+    // 자체 방문 필터링
+    const ip = ip_address || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
+    if (ip === '127.0.0.1' || ip === '::1' || ip === 'localhost') {
+      return res.json({ success: true, tracked: false });
+    }
+
+    const { getDb } = await import('./config/database.js');
+    const db = getDb();
+    await db.query(
+      `INSERT INTO visitor_logs
+        (page_type, page_slug, page_url, referrer, referrer_domain, keyword,
+         utm_source, utm_medium, utm_campaign, ip_address, device_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [page_type, page_slug, page_url, referrer, referrer_domain, keyword,
+       utm_source, utm_medium, utm_campaign, ip || null, device_type]
+    );
+
+    res.json({ success: true, tracked: true });
+  } catch (error) {
+    console.error('Tracking error:', error);
+    res.json({ success: false });
+  }
+});
+
 // Dynamic import routes AFTER services initialization
 const routes = await Promise.all([
   import('./routes/auth.js'),

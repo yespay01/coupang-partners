@@ -1,6 +1,7 @@
 import { Noto_Serif_KR, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
+import { VisitorTracker } from "@/components/VisitorTracker";
 import { Metadata } from "next";
 
 const notoSerif = Noto_Serif_KR({
@@ -51,6 +52,7 @@ export default function RootLayout({
         className={`${notoSerif.variable} ${notoSans.variable} font-sans antialiased`}
       >
         <Providers>
+          <VisitorTracker />
           <div className="flex min-h-screen flex-col">
             <div className="flex-1">{children}</div>
           </div>

@@ -1286,4 +1286,132 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// ==================== Visitor Analytics ====================
+
+/**
+ * GET /api/admin/analytics/visitors
+ * 방문자 로그 목록 (페이징, 필터)
+ */
+router.get('/analytics/visitors', async (req, res) => {
+  try {
+    const db = getDb();
+    const { limit = 50, offset = 0, dateRange, page_type, referrer_domain } = req.query;
+
+    let query = 'SELECT * FROM visitor_logs';
+    let countQuery = 'SELECT COUNT(*) as count FROM visitor_logs';
+    const conditions = [];
+    const params = [];
+    let idx = 1;
+
+    if (dateRange && dateRange !== 'all') {
+      const hours = dateRange === '24h' ? 24 : dateRange === '7d' ? 168 : dateRange === '30d' ? 720 : 0;
+      if (hours > 0) {
+        conditions.push(`created_at >= NOW() - INTERVAL '${hours} hours'`);
+      }
+    }
+    if (page_type) {
+      conditions.push(`page_type = $${idx++}`);
+      params.push(page_type);
+    }
+    if (referrer_domain) {
+      conditions.push(`referrer_domain = $${idx++}`);
+      params.push(referrer_domain);
+    }
+
+    const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+    const countParams = [...params];
+    query += where + ` ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+    countQuery += where;
+    params.push(parseInt(limit), parseInt(offset));
+
+    const [logsResult, countResult] = await Promise.all([
+      db.query(query, params),
+      db.query(countQuery, countParams),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        visitors: logsResult.rows,
+        totalCount: parseInt(countResult.rows[0].count),
+        hasMore: parseInt(offset) + logsResult.rows.length < parseInt(countResult.rows[0].count),
+      },
+    });
+  } catch (error) {
+    console.error('방문자 로그 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/analytics/stats
+ * 방문자 집계 통계
+ */
+router.get('/analytics/stats', async (req, res) => {
+  try {
+    const db = getDb();
+    const { dateRange = '30d' } = req.query;
+
+    const hours = dateRange === '24h' ? 24 : dateRange === '7d' ? 168 : dateRange === '30d' ? 720 : null;
+    const whereClause = hours ? `WHERE created_at >= NOW() - INTERVAL '${hours} hours'` : '';
+
+    const [
+      totalResult,
+      byDateResult,
+      byReferrerResult,
+      byKeywordResult,
+      byDeviceResult,
+      byPageTypeResult,
+      recentResult,
+    ] = await Promise.all([
+      db.query(`SELECT COUNT(*) as count FROM visitor_logs ${whereClause}`),
+      db.query(`
+        SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date, COUNT(*) as count
+        FROM visitor_logs ${whereClause}
+        GROUP BY date ORDER BY date DESC LIMIT 30
+      `),
+      db.query(`
+        SELECT COALESCE(referrer_domain, 'direct') as domain, COUNT(*) as count
+        FROM visitor_logs ${whereClause}
+        GROUP BY domain ORDER BY count DESC LIMIT 10
+      `),
+      db.query(`
+        SELECT keyword, COUNT(*) as count
+        FROM visitor_logs
+        ${whereClause ? whereClause + ' AND' : 'WHERE'} keyword IS NOT NULL AND keyword != ''
+        GROUP BY keyword ORDER BY count DESC LIMIT 20
+      `),
+      db.query(`
+        SELECT COALESCE(device_type, 'unknown') as device, COUNT(*) as count
+        FROM visitor_logs ${whereClause}
+        GROUP BY device ORDER BY count DESC
+      `),
+      db.query(`
+        SELECT COALESCE(page_type, 'unknown') as page_type, COUNT(*) as count
+        FROM visitor_logs ${whereClause}
+        GROUP BY page_type ORDER BY count DESC
+      `),
+      db.query(`
+        SELECT * FROM visitor_logs ORDER BY created_at DESC LIMIT 20
+      `),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        total: parseInt(totalResult.rows[0].count),
+        byDate: byDateResult.rows,
+        byReferrer: byReferrerResult.rows,
+        byKeyword: byKeywordResult.rows,
+        byDevice: byDeviceResult.rows,
+        byPageType: byPageTypeResult.rows,
+        recentVisitors: recentResult.rows,
+      },
+    });
+  } catch (error) {
+    console.error('방문자 통계 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 export default router;
