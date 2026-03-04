@@ -20,7 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let reviewPages: MetadataRoute.Sitemap = [];
   try {
     const res = await fetch(`${AUTOMATION_SERVER_URL}/api/reviews?limit=1000`, {
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
     if (res.ok) {
       const data = await res.json();
@@ -42,7 +42,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let recipePages: MetadataRoute.Sitemap = [];
   try {
     const res = await fetch(`${AUTOMATION_SERVER_URL}/api/recipes?limit=1000`, {
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
     if (res.ok) {
       const data = await res.json();
@@ -62,7 +62,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let newsPages: MetadataRoute.Sitemap = [];
   try {
     const res = await fetch(`${AUTOMATION_SERVER_URL}/api/news?limit=1000`, {
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
     if (res.ok) {
       const data = await res.json();
