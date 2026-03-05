@@ -175,9 +175,10 @@ function AdminDashboardViewContent({
 
   const isInteractive = status === "ready";
 
-  // URL 파라미터 동기화
+  // URL 파라미터 → 스토어 단방향 동기화 (URL에 값이 있을 때만 적용, 없으면 스토어 유지)
   useEffect(() => {
     const params = new URLSearchParams(searchParamsString);
+
     const searchValue = params.get("reviewSearch") ?? "";
     if (searchValue !== reviewSearch) {
       setReviewSearch(searchValue);
@@ -185,9 +186,7 @@ function AdminDashboardViewContent({
 
     const dateValue = params.get("reviewDate");
     const isValidDateValue = dateOptionValues.includes(dateValue as DateFilter);
-    if (!dateValue || !isValidDateValue) {
-      if (reviewDateFilter !== "all") setReviewDateFilter("all");
-    } else if (dateValue !== reviewDateFilter) {
+    if (dateValue && isValidDateValue && dateValue !== reviewDateFilter) {
       setReviewDateFilter(dateValue as DateFilter);
     }
 
@@ -198,37 +197,26 @@ function AdminDashboardViewContent({
 
     const logDateValue = params.get("logDate");
     const isValidLogDateValue = dateOptionValues.includes(logDateValue as DateFilter);
-    if (!logDateValue || !isValidLogDateValue) {
-      if (logDateFilter !== "all") setLogDateFilter("all");
-    } else if (logDateValue !== logDateFilter) {
+    if (logDateValue && isValidLogDateValue && logDateValue !== logDateFilter) {
       setLogDateFilter(logDateValue as DateFilter);
     }
 
     const logLevelsValue = params.get("logLevels");
-    let nextLogLevels: Record<LogEntry["level"], boolean> | null = null;
     if (logLevelsValue) {
       const requestedLevels = logLevelsValue
         .split(",")
         .map((value) => value.trim())
         .filter((value): value is LogEntry["level"] => logLevelOrder.includes(value as LogEntry["level"]));
       if (requestedLevels.length > 0) {
-        nextLogLevels = logLevelOrder.reduce<Record<LogEntry["level"], boolean>>((acc, level) => {
+        const nextLogLevels = logLevelOrder.reduce<Record<LogEntry["level"], boolean>>((acc, level) => {
           acc[level] = requestedLevels.includes(level);
           return acc;
         }, {} as Record<LogEntry["level"], boolean>);
+        const isLogLevelChanged = logLevelOrder.some((level) => (logLevels[level] ?? false) !== nextLogLevels[level]);
+        if (isLogLevelChanged) {
+          setLogLevels(nextLogLevels);
+        }
       }
-    }
-
-    const resolvedLogLevels =
-      nextLogLevels ??
-      logLevelOrder.reduce<Record<LogEntry["level"], boolean>>((acc, level) => {
-        acc[level] = true;
-        return acc;
-      }, {} as Record<LogEntry["level"], boolean>);
-
-    const isLogLevelChanged = logLevelOrder.some((level) => (logLevels[level] ?? false) !== resolvedLogLevels[level]);
-    if (isLogLevelChanged) {
-      setLogLevels(resolvedLogLevels);
     }
   }, [
     searchParamsString,
