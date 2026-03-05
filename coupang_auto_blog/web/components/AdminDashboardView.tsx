@@ -347,14 +347,10 @@ function AdminDashboardViewContent({
     );
   }, [selectableReviews]);
 
-  // 리뷰 제한 동기화
+  // 리뷰 제한 동기화 (스토어 → 훅 단방향)
   useEffect(() => {
     if (reviewLimitFilter !== reviewLimit) setReviewLimit(reviewLimitFilter);
   }, [reviewLimitFilter, reviewLimit, setReviewLimit]);
-
-  useEffect(() => {
-    if (reviewLimit !== reviewLimitFilter) setReviewLimitFilter(reviewLimit);
-  }, [reviewLimit, reviewLimitFilter, setReviewLimitFilter]);
 
   // 이벤트 핸들러
   const handleReviewSearchChange = useCallback(
