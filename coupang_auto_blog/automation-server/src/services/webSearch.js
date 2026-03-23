@@ -50,35 +50,35 @@ export function formatNaverResults(items, type = 'news') {
 }
 
 /**
- * 동행복권 로또 최신 당첨번호 조회
+ * 동행복권 로또 최신 당첨번호 조회 (2026년 1월 개편 후 새 API)
  * 공개 API, 인증 불필요
  */
 export async function getLatestLottoNumbers() {
-  // 1회차: 2002-12-07 (토요일) 기준으로 현재 회차 계산
+  // 1회차: 2002-12-07 기준으로 현재 회차 계산
   const firstDraw = new Date('2002-12-07');
   const now = new Date();
-  const weeksDiff = Math.floor((now - firstDraw) / (7 * 24 * 60 * 60 * 1000));
-  const estimatedRound = weeksDiff + 1;
+  const estimatedRound = Math.floor((now - firstDraw) / (7 * 24 * 60 * 60 * 1000)) + 1;
 
-  // 최신 회차 시도 → 실패 시 이전 회차
-  for (let round = estimatedRound; round >= estimatedRound - 2; round--) {
+  // 최신 회차 시도 → 실패 시 최대 3회차 이전까지
+  for (let round = estimatedRound; round >= estimatedRound - 3; round--) {
     try {
       const response = await fetch(
-        `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${round}`
+        `https://www.dhlottery.co.kr/lt645/selectPstLt645Info.do?srchLtEpsd=${round}`
       );
       if (!response.ok) continue;
 
       const data = await response.json();
-      if (data.returnValue !== 'success') continue;
+      const item = data?.data?.list?.[0];
+      if (!item) continue;
 
-      logger.info(`로또 ${data.drwNo}회차 당첨번호 조회 성공`);
+      logger.info(`로또 ${item.ltEpsd}회차 당첨번호 조회 성공`);
       return {
-        round: data.drwNo,
-        date: data.drwNoDate,
-        numbers: [data.drwtNo1, data.drwtNo2, data.drwtNo3, data.drwtNo4, data.drwtNo5, data.drwtNo6],
-        bonus: data.bnusNo,
-        firstWinAmount: data.firstWinamnt,
-        firstWinCount: data.firstPrzwnerCo,
+        round: item.ltEpsd,
+        date: item.ltRflYmd,
+        numbers: [item.tm1WnNo, item.tm2WnNo, item.tm3WnNo, item.tm4WnNo, item.tm5WnNo, item.tm6WnNo],
+        bonus: item.bnsWnNo,
+        firstWinAmount: item.rnk1WnAmt,
+        firstWinCount: item.rnk1WnNope,
       };
     } catch (err) {
       logger.warn(`로또 ${round}회차 조회 실패: ${err.message}`);
@@ -92,7 +92,10 @@ export async function getLatestLottoNumbers() {
  * 로또 데이터를 AI 컨텍스트용 텍스트로 변환
  */
 export function formatLottoData(lotto) {
-  return `제${lotto.round}회 로또 당첨번호 (${lotto.date})
+  const dateStr = lotto.date
+    ? `${lotto.date.slice(0,4)}-${lotto.date.slice(4,6)}-${lotto.date.slice(6,8)}`
+    : '';
+  return `제${lotto.round}회 로또 당첨번호 (${dateStr})
 당첨번호: ${lotto.numbers.join(', ')} + 보너스 ${lotto.bonus}
 1등 당첨금액: ${lotto.firstWinAmount?.toLocaleString()}원
 1등 당첨자 수: ${lotto.firstWinCount}명`;

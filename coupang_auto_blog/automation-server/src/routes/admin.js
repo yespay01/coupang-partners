@@ -988,10 +988,16 @@ router.post('/news/generate', async (req, res) => {
     let searchContext = '';
     try {
       if (isLottoTopic(topic)) {
-        // 로또 관련 → 동행복권 공식 API
-        const lotto = await getLatestLottoNumbers();
-        searchContext = `[최신 로또 당첨정보]\n${formatLottoData(lotto)}`;
-        logger.info(`로또 API 컨텍스트 수집 완료: ${lotto.round}회차`);
+        // 로또 관련 → 동행복권 공식 API (1차) → 실패 시 네이버 검색 (폴백)
+        try {
+          const lotto = await getLatestLottoNumbers();
+          searchContext = `[최신 로또 당첨정보]\n${formatLottoData(lotto)}`;
+          logger.info(`로또 API 컨텍스트 수집 완료: ${lotto.round}회차`);
+        } catch (lottoErr) {
+          logger.warn(`동행복권 API 실패, 네이버 검색으로 폴백: ${lottoErr.message}`);
+          const newsItems = await naverSearch('로또 당첨번호 이번주', 'news', 3);
+          searchContext = `[네이버 최신 로또 뉴스]\n${formatNaverResults(newsItems, 'news')}`;
+        }
       } else {
         // 일반 주제 → 네이버 뉴스 검색
         const newsItems = await naverSearch(topic, 'news', 5);
