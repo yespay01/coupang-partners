@@ -40,7 +40,7 @@ async function fetchInitialReviews(): Promise<{
   try {
     const res = await fetch(
       `${AUTOMATION_SERVER_URL}/api/reviews?limit=${PAGE_SIZE}&offset=0`,
-      { next: { revalidate: 3600 } }
+      { cache: 'no-store' }
     );
     if (!res.ok) return { reviews: [], hasMore: false };
     const data = await res.json();

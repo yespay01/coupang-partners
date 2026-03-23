@@ -32,7 +32,7 @@ async function fetchPublishedReviews(): Promise<PublishedReview[]> {
   try {
     const res = await fetch(
       `${AUTOMATION_SERVER_URL}/api/reviews?limit=100`,
-      { next: { revalidate: 3600 } }
+      { cache: 'no-store' }
     );
     if (!res.ok) return [];
     const data = await res.json();
