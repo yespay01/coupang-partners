@@ -1002,13 +1002,20 @@ router.post('/news/generate', async (req, res) => {
           }
         }
       } else {
-        // 일반 주제 → 네이버 뉴스 검색
-        const newsItems = await naverSearch(topic, 'news', 5);
+        // 일반 주제 → 네이버 뉴스 검색 (지시 문구 제거 후 키워드만 추출)
+        const searchQuery = topic
+          .replace(/검색해서?|종합해서?|만들어봐?|작성해줘?|써줘?|알려줘?|정리해줘?|분석해줘?|요약해줘?/g, '')
+          .replace(/뉴스를?\s*(만들어|작성|써|생성|검색)/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 30) || topic.slice(0, 30);
+        logger.info(`네이버 검색 쿼리: "${searchQuery}"`);
+        const newsItems = await naverSearch(searchQuery, 'news', 5);
         if (newsItems.length > 0) {
           searchContext = `[네이버 최신 뉴스 검색결과]\n${formatNaverResults(newsItems, 'news')}`;
           logger.info(`네이버 검색 컨텍스트 수집 완료: ${newsItems.length}건`);
         } else {
-          logger.warn(`네이버 검색 결과 없음: "${topic}"`);
+          logger.warn(`네이버 검색 결과 없음: "${searchQuery}"`);
         }
       }
     } catch (searchErr) {
@@ -1037,7 +1044,9 @@ router.post('/news/generate', async (req, res) => {
 - 소비자 관점에서 유용한 정보 제공
 - 과장이나 낚시성 제목 금지`;
 
-    const aiResult = await generateText(settings.ai, userPrompt, systemPrompt);
+    // 뉴스 본문은 길어서 maxTokens 최소 4096 보장
+    const newsAiSettings = { ...settings.ai, maxTokens: Math.max(settings.ai?.maxTokens || 2048, 4096) };
+    const aiResult = await generateText(newsAiSettings, userPrompt, systemPrompt);
     let parsed;
     try {
       const jsonMatch = aiResult.text.match(/\{[\s\S]*\}/);
