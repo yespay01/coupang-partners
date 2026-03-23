@@ -40,6 +40,7 @@ async function fetchInitialNews(): Promise<{
   news: NewsItem[];
   hasMore: boolean;
 }> {
+  if (process.env.NEXT_PHASE === 'phase-production-build') return { news: [], hasMore: false };
   try {
     const res = await fetch(
       `${AUTOMATION_SERVER_URL}/api/news?limit=${PAGE_SIZE}&offset=0`,

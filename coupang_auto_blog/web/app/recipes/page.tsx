@@ -40,6 +40,7 @@ async function fetchInitialRecipes(): Promise<{
   recipes: Recipe[];
   hasMore: boolean;
 }> {
+  if (process.env.NEXT_PHASE === 'phase-production-build') return { recipes: [], hasMore: false };
   try {
     const res = await fetch(
       `${AUTOMATION_SERVER_URL}/api/recipes?limit=${PAGE_SIZE}&offset=0`,

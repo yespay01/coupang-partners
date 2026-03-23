@@ -28,6 +28,7 @@ interface PublishedReview {
 }
 
 async function fetchPublishedReviews(): Promise<PublishedReview[]> {
+  if (process.env.NEXT_PHASE === 'phase-production-build') return [];
   try {
     const res = await fetch(
       `${AUTOMATION_SERVER_URL}/api/reviews?limit=100`,
