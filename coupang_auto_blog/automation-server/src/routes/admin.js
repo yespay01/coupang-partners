@@ -997,13 +997,19 @@ router.post('/news/generate', async (req, res) => {
         } catch (lottoErr) {
           logger.warn(`동행복권 API 실패, 네이버 검색으로 폴백: ${lottoErr.message}`);
           const newsItems = await naverSearch('로또 당첨번호 이번주', 'news', 3);
-          searchContext = `[네이버 최신 로또 뉴스]\n${formatNaverResults(newsItems, 'news')}`;
+          if (newsItems.length > 0) {
+            searchContext = `[네이버 최신 로또 뉴스]\n${formatNaverResults(newsItems, 'news')}`;
+          }
         }
       } else {
         // 일반 주제 → 네이버 뉴스 검색
         const newsItems = await naverSearch(topic, 'news', 5);
-        searchContext = `[네이버 최신 뉴스 검색결과]\n${formatNaverResults(newsItems, 'news')}`;
-        logger.info(`네이버 검색 컨텍스트 수집 완료: ${newsItems.length}건`);
+        if (newsItems.length > 0) {
+          searchContext = `[네이버 최신 뉴스 검색결과]\n${formatNaverResults(newsItems, 'news')}`;
+          logger.info(`네이버 검색 컨텍스트 수집 완료: ${newsItems.length}건`);
+        } else {
+          logger.warn(`네이버 검색 결과 없음: "${topic}"`);
+        }
       }
     } catch (searchErr) {
       logger.warn(`웹 검색 실패 (컨텍스트 없이 진행): ${searchErr.message}`);
