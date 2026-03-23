@@ -1,5 +1,6 @@
 import express from 'express';
 import { getDb } from '../config/database.js';
+import { logger } from '../utils/logger.js';
 import { notifySlack } from '../services/slack.js';
 import { authenticateToken, requireAdmin } from '../config/auth.js';
 import { invalidateSettingsCache, getSystemSettings } from '../services/settingsService.js';
