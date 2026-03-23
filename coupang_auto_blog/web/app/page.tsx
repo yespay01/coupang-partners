@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 const AUTOMATION_SERVER_URL =
   process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
