@@ -36,6 +36,7 @@ async function fetchInitialReviews(): Promise<{
   reviews: PublishedReview[];
   hasMore: boolean;
 }> {
+  if (process.env.NEXT_PHASE === 'phase-production-build') return { reviews: [], hasMore: false };
   try {
     const res = await fetch(
       `${AUTOMATION_SERVER_URL}/api/reviews?limit=${PAGE_SIZE}&offset=0`,

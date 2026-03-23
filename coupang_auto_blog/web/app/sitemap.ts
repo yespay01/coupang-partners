@@ -7,6 +7,7 @@ const AUTOMATION_SERVER_URL =
 export const revalidate = 3600; // 1시간마다 재생성
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  if (process.env.NEXT_PHASE === 'phase-production-build') return [];
   // 정적 페이지
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL, lastModified: new Date(), changeFrequency: "daily", priority: 1.0 },
