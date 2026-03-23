@@ -5,6 +5,7 @@ import { authenticateToken, requireAdmin } from '../config/auth.js';
 import { invalidateSettingsCache, getSystemSettings } from '../services/settingsService.js';
 import { generateText } from '../services/aiProviders.js';
 import { searchProducts } from '../services/coupang/products.js';
+import { naverSearch, formatNaverResults, getLatestLottoNumbers, formatLottoData, isLottoTopic } from '../services/webSearch.js';
 import { createDeeplinks } from '../services/coupang/deeplink.js';
 import fetch from 'node-fetch';
 
@@ -983,11 +984,32 @@ router.post('/news/generate', async (req, res) => {
 
     const settings = await getSystemSettings();
 
+    // 웹 검색으로 최신 컨텍스트 수집
+    let searchContext = '';
+    try {
+      if (isLottoTopic(topic)) {
+        // 로또 관련 → 동행복권 공식 API
+        const lotto = await getLatestLottoNumbers();
+        searchContext = `[최신 로또 당첨정보]\n${formatLottoData(lotto)}`;
+        logger.info(`로또 API 컨텍스트 수집 완료: ${lotto.round}회차`);
+      } else {
+        // 일반 주제 → 네이버 뉴스 검색
+        const newsItems = await naverSearch(topic, 'news', 5);
+        searchContext = `[네이버 최신 뉴스 검색결과]\n${formatNaverResults(newsItems, 'news')}`;
+        logger.info(`네이버 검색 컨텍스트 수집 완료: ${newsItems.length}건`);
+      }
+    } catch (searchErr) {
+      logger.warn(`웹 검색 실패 (컨텍스트 없이 진행): ${searchErr.message}`);
+    }
+
     const systemPrompt = `당신은 전문 소비/트렌드 뉴스 기자입니다. 한국어로 기사를 작성합니다.
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력합니다.`;
 
-    const userPrompt = `"${topic.trim()}" 주제로 뉴스 기사를 JSON으로 작성해주세요.
+    const contextSection = searchContext
+      ? `\n\n아래는 실제 최신 데이터입니다. 반드시 이 정보를 기반으로 기사를 작성하세요:\n${searchContext}\n`
+      : '';
 
+    const userPrompt = `"${topic.trim()}" 주제로 뉴스 기사를 JSON으로 작성해주세요.${contextSection}
 형식:
 {
   "title": "기사 제목 (클릭하고 싶은 매력적인 제목)",
