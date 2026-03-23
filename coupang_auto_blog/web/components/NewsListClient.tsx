@@ -88,7 +88,7 @@ export function NewsListClient({
                 {news.summary}
               </p>
               <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-                <span>
+                <span suppressHydrationWarning>
                   {new Date(
                     news.publishedAt || news.createdAt
                   ).toLocaleDateString("ko-KR")}

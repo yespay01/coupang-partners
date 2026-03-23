@@ -78,7 +78,7 @@ function ReviewCard({ review }: { review: PublishedReview }) {
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-          <span>{formatDate(review.createdAt || "")}</span>
+          <span suppressHydrationWarning>{formatDate(review.createdAt || "")}</span>
           <span className="inline-flex items-center gap-1 font-medium text-blue-600 group-hover:text-blue-700 transition">
             자세히 보기
             <svg

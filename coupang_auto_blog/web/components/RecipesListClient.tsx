@@ -89,7 +89,7 @@ export function RecipesListClient({
                 {recipe.description}
               </p>
               <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-                <span>
+                <span suppressHydrationWarning>
                   {new Date(recipe.createdAt).toLocaleDateString("ko-KR")}
                 </span>
                 <span className="inline-flex items-center gap-1 font-medium text-amber-600 group-hover:text-amber-700 transition">
