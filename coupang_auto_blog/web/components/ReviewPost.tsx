@@ -95,7 +95,7 @@ export default function ReviewPost({ review }: ReviewPostProps) {
               rel="noopener noreferrer nofollow"
               className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
             >
-              쿠팡에서 보기
+              자세히 보기
             </Link>
           )}
         </div>
