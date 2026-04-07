@@ -5,9 +5,9 @@ const AUTOMATION_SERVER_URL =
   process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
 export const revalidate = 3600; // 1시간마다 재생성
+export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  if (process.env.NEXT_PHASE === 'phase-production-build') return [];
   // 정적 페이지
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL, lastModified: new Date(), changeFrequency: "daily", priority: 1.0 },
@@ -16,6 +16,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/news`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
     { url: `${SITE_URL}/search`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.5 },
   ];
+
+  const shouldSkipDynamicFetch = process.env.NEXT_PHASE === "phase-production-build";
+  if (shouldSkipDynamicFetch) return staticPages;
 
   // 리뷰 목록 (published)
   let reviewPages: MetadataRoute.Sitemap = [];

@@ -12,10 +12,11 @@ export async function GET(request: NextRequest) {
   revalidatePath('/reviews', 'page');
   revalidatePath('/news', 'page');
   revalidatePath('/recipes', 'page');
+  revalidatePath('/sitemap.xml');
 
   return NextResponse.json({
     revalidated: true,
-    paths: ['/', '/reviews', '/news', '/recipes'],
+    paths: ['/', '/reviews', '/news', '/recipes', '/sitemap.xml'],
     timestamp: new Date().toISOString(),
   });
 }
