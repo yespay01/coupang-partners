@@ -54,6 +54,42 @@ router.get('/recipes', async (req, res) => {
 });
 
 /**
+ * GET /api/recipes/sitemap
+ * 사이트맵용 공개 레시피 목록 조회 (id/slug/updatedAt만)
+ */
+router.get('/recipes/sitemap', async (req, res) => {
+  try {
+    const db = getDb();
+    const { limit = 1000, offset = 0 } = req.query;
+
+    const result = await db.query(
+      `
+        SELECT id, slug, updated_at
+        FROM recipes
+        WHERE status = 'published'
+        ORDER BY created_at DESC
+        LIMIT $1 OFFSET $2
+      `,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        recipes: result.rows.map((row) => ({
+          id: String(row.id),
+          slug: row.slug,
+          updatedAt: row.updated_at?.toISOString(),
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('사이트맵 레시피 목록 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
  * GET /api/recipes/id/:id
  * 공개 레시피 상세 조회 + 조회수 증가
  */

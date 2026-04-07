@@ -74,6 +74,44 @@ router.get('/reviews', async (req, res) => {
 });
 
 /**
+ * GET /api/reviews/sitemap
+ * 사이트맵용 공개 리뷰 목록 조회 (slug/updatedAt만)
+ */
+router.get('/reviews/sitemap', async (req, res) => {
+  try {
+    const db = getDb();
+    const { limit = 1000, offset = 0 } = req.query;
+
+    const result = await db.query(
+      `
+        SELECT slug, updated_at
+        FROM reviews
+        WHERE status = 'published' AND slug IS NOT NULL AND slug <> ''
+        ORDER BY published_at DESC, created_at DESC
+        LIMIT $1 OFFSET $2
+      `,
+      [parseInt(limit), parseInt(offset)]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        reviews: result.rows.map((row) => ({
+          slug: row.slug,
+          updatedAt: row.updated_at?.toISOString(),
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('사이트맵 리뷰 목록 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/reviews/id/:id
  * 공개 리뷰 상세 조회 (ID 기반) + 조회수 증가
  * 반드시 /reviews/:slug 보다 먼저 등록해야 함

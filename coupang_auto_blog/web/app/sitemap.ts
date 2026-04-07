@@ -20,7 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 리뷰 목록 (published)
   let reviewPages: MetadataRoute.Sitemap = [];
   try {
-    const res = await fetch(`${AUTOMATION_SERVER_URL}/api/reviews?limit=1000`, {
+    const res = await fetch(`${AUTOMATION_SERVER_URL}/api/reviews/sitemap?limit=1000`, {
       cache: "no-store",
     });
     if (res.ok) {
@@ -42,7 +42,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 레시피 목록 (published)
   let recipePages: MetadataRoute.Sitemap = [];
   try {
-    const res = await fetch(`${AUTOMATION_SERVER_URL}/api/recipes?limit=1000`, {
+    const res = await fetch(`${AUTOMATION_SERVER_URL}/api/recipes/sitemap?limit=1000`, {
       cache: "no-store",
     });
     if (res.ok) {
@@ -62,7 +62,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 뉴스 목록 (published)
   let newsPages: MetadataRoute.Sitemap = [];
   try {
-    const res = await fetch(`${AUTOMATION_SERVER_URL}/api/news?limit=1000`, {
+    const res = await fetch(`${AUTOMATION_SERVER_URL}/api/news/sitemap?limit=1000`, {
       cache: "no-store",
     });
     if (res.ok) {
