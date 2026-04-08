@@ -28,7 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
     if (res.ok) {
       const data = await res.json();
-      const reviews: { slug: string; updatedAt?: string }[] = data.data?.reviews || [];
+      const reviews: { slug: string; updatedAt?: string; productImage?: string }[] = data.data?.reviews || [];
       reviewPages = reviews
         .filter((r) => r.slug)
         .map((r) => ({
@@ -36,6 +36,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           lastModified: r.updatedAt ? new Date(r.updatedAt) : new Date(),
           changeFrequency: "weekly" as const,
           priority: 0.8,
+          ...(r.productImage ? { images: [r.productImage] } : {}),
         }));
     }
   } catch {

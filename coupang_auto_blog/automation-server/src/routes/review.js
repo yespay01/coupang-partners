@@ -84,7 +84,7 @@ router.get('/reviews/sitemap', async (req, res) => {
 
     const result = await db.query(
       `
-        SELECT slug, updated_at
+        SELECT slug, updated_at, product_image
         FROM reviews
         WHERE status = 'published' AND slug IS NOT NULL AND slug <> ''
         ORDER BY published_at DESC, created_at DESC
@@ -99,6 +99,7 @@ router.get('/reviews/sitemap', async (req, res) => {
         reviews: result.rows.map((row) => ({
           slug: row.slug,
           updatedAt: row.updated_at?.toISOString(),
+          productImage: row.product_image || null,
         })),
       },
     });
