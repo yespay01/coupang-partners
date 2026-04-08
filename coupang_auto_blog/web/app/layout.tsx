@@ -3,6 +3,7 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { VisitorTracker } from "@/components/VisitorTracker";
 import { Metadata } from "next";
+import Script from "next/script";
 
 const notoSerif = Noto_Serif_KR({
   subsets: ["latin"],
@@ -48,6 +49,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=GT-K52R4F3K"
+          strategy="afterInteractive"
+        />
+        <Script id="google-tag" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'GT-K52R4F3K');
+          `}
+        </Script>
+      </head>
       <body
         className={`${notoSerif.variable} ${notoSans.variable} font-sans antialiased`}
       >
