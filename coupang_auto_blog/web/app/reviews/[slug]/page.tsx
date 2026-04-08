@@ -59,12 +59,19 @@ export async function generateMetadata({
     };
   }
 
+  // media 배열에서 첫 번째 이미지 URL 추출 (MinIO 로컬 이미지 우선)
+  const firstMediaImage = review.media?.[0]?.url || "";
+  const ogImage = firstMediaImage || review.productImage || "";
+
   const seoMeta = review.seoMeta || {
-    title: `${review.productName} 리뷰`,
+    title: `${review.productName} 쿠팡 최저가 리뷰`,
     description: review.content?.slice(0, 150) || "",
-    keywords: [review.category || "쿠팡", "리뷰"],
-    ogImage: review.productImage || "",
+    keywords: [review.productName, review.category || "쿠팡", "리뷰", "최저가"],
+    ogImage,
   };
+
+  // seoMeta에 저장된 ogImage보다 로컬 이미지를 우선 사용
+  const finalOgImage = ogImage || seoMeta.ogImage || "";
 
   return {
     title: seoMeta.title,
@@ -76,7 +83,7 @@ export async function generateMetadata({
     openGraph: {
       title: seoMeta.title,
       description: seoMeta.description,
-      images: seoMeta.ogImage ? [seoMeta.ogImage] : [],
+      images: finalOgImage ? [{ url: finalOgImage, width: 800, height: 600 }] : [],
       type: "article",
       publishedTime: review.publishedAt,
       modifiedTime: review.updatedAt,
@@ -85,7 +92,7 @@ export async function generateMetadata({
       card: "summary_large_image",
       title: seoMeta.title,
       description: seoMeta.description,
-      images: seoMeta.ogImage ? [seoMeta.ogImage] : [],
+      images: finalOgImage ? [finalOgImage] : [],
     },
   };
 }
