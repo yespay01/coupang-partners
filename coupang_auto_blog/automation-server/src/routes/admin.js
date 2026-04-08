@@ -150,13 +150,7 @@ router.put('/reviews/:id', async (req, res) => {
       );
       if (existing.rows.length > 0 && !existing.rows[0].slug) {
         const pName = productName || existing.rows[0].product_name || '';
-        const titleForSlug = pName
-          .replace(/[^\w\uAC00-\uD7A3\u3040-\u309F\u30A0-\u30FF]/g, '-')
-          .replace(/-+/g, '-')
-          .replace(/^-|-$/g, '')
-          .slice(0, 60)
-          .toLowerCase();
-        const newSlug = `${titleForSlug}-${Date.now()}`;
+        const newSlug = await generateUniqueSlug(db, 'reviews', pName);
         fields.push(`slug = $${idx++}`);
         params.push(newSlug);
       }
