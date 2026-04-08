@@ -68,13 +68,19 @@ export function VisitorTracker() {
     const referrer = document.referrer;
     const searchParams = new URLSearchParams(window.location.search);
 
+    // 네이버는 referrer에서 검색어를 제거하므로 랜딩 URL 파라미터도 확인
+    const naverQuery =
+      searchParams.get("nv_query") ||
+      searchParams.get("nv_keyword") ||
+      searchParams.get("query");
+
     const payload = {
       page_type: getPageType(pathname),
       page_slug: getPageSlug(pathname),
       page_url: pathname,
       referrer: referrer || null,
       referrer_domain: getReferrerDomain(referrer),
-      keyword: extractKeyword(referrer),
+      keyword: naverQuery || extractKeyword(referrer),
       utm_source: searchParams.get("utm_source"),
       utm_medium: searchParams.get("utm_medium"),
       utm_campaign: searchParams.get("utm_campaign"),
