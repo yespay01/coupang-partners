@@ -7,6 +7,7 @@ import { generateText } from '../services/aiProviders.js';
 import { buildPromptFromSettings, validateReviewContentWithSettings, analyzeToneScore } from '../services/reviewUtils.js';
 import { collectAllImages } from '../services/imageUtils.js';
 import { logger, dbLog } from '../utils/logger.js';
+import { cleanProductName } from '../utils/productName.js';
 
 const router = express.Router();
 
@@ -387,10 +388,14 @@ router.post('/generate', authenticateToken, async (req, res) => {
       },
     });
 
-    // 4. 프롬프트 빌드
+    // 4. 프롬프트 빌드 (상품명은 모델코드/불용어 제거된 정제 버전 사용)
+    const cleanedName = cleanProductName(product.product_name);
+    if (cleanedName !== product.product_name) {
+      logger.info(`상품명 정제: "${product.product_name}" → "${cleanedName}"`);
+    }
     const productForPrompt = {
-      name: product.product_name,
-      productName: product.product_name,
+      name: cleanedName,
+      productName: cleanedName,
       category: product.category_name,
       categoryName: product.category_name,
     };
