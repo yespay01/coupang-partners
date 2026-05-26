@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { CoupangDynamicBanner } from "@/components/CoupangDynamicBanner";
 
 export const metadata: Metadata = {
   title: "세모링크 - 쿠팡 최저가 비교·추천템 모음",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 const AUTOMATION_SERVER_URL =
   process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
@@ -28,11 +29,11 @@ interface PublishedReview {
 }
 
 async function fetchPublishedReviews(): Promise<PublishedReview[]> {
-  if (process.env.NEXT_PHASE === 'phase-production-build') return [];
+  if (process.env.NEXT_PHASE === "phase-production-build") return [];
   try {
     const res = await fetch(
       `${AUTOMATION_SERVER_URL}/api/reviews?limit=100`,
-      { cache: 'no-store' }
+      { cache: "no-store" }
     );
     if (!res.ok) return [];
     const data = await res.json();
@@ -43,94 +44,57 @@ async function fetchPublishedReviews(): Promise<PublishedReview[]> {
   }
 }
 
-function formatDate(dateString: string): string {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(date);
-}
-
-function stripHtmlTags(html: string): string {
-  if (!html) return "";
-  return html
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function truncateContent(content: string, maxLength = 90): string {
-  if (!content) return "";
-  const plainText = stripHtmlTags(content);
-  if (plainText.length <= maxLength) return plainText;
-  return plainText.slice(0, maxLength) + "...";
-}
-
-function ReviewCard({ review }: { review: PublishedReview }) {
+function ProductCard({ review }: { review: PublishedReview }) {
   const previewImage = review.media?.find((m) => m.type === "image")?.url;
   const href = review.slug ? `/reviews/${review.slug}` : `/review/${review.id}`;
 
   return (
-    <article className="group cursor-pointer flex flex-col h-full">
-      <Link href={href}>
-        <div className="relative aspect-[3/4] overflow-hidden bg-slate-50 mb-6 group-hover:shadow-2xl transition-shadow duration-1000">
-          {previewImage ? (
-            <img
-              src={previewImage}
-              alt={review.productName || ""}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-slate-200 bg-slate-50">
-              <span className="text-[10px] tracking-[0.2em] font-bold uppercase">
-                No Image Preview
-              </span>
-            </div>
-          )}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-500" />
-        </div>
-      </Link>
-
-      <div className="flex flex-col flex-grow">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-xs font-bold tracking-widest text-amber-700/80 uppercase">
-            {review.category || "추천템"}
+    <Link
+      href={href}
+      className="group flex flex-col rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <div className="relative aspect-square overflow-hidden bg-slate-100">
+        {previewImage ? (
+          <img
+            src={previewImage}
+            alt={review.productName || ""}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-xs">
+            이미지 준비중
+          </div>
+        )}
+        {review.category && (
+          <span className="absolute top-2 left-2 rounded-full bg-white/95 backdrop-blur px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-sm">
+            {review.category}
           </span>
-          <span className="w-4 h-[1px] bg-slate-200" />
-          <span className="text-xs font-medium tracking-tight text-slate-400">
-            {formatDate(review.createdAt || "")}
+        )}
+      </div>
+      <div className="flex flex-col flex-grow p-3 sm:p-4">
+        <h3 className="text-sm sm:text-[15px] font-medium text-slate-900 leading-snug line-clamp-2 group-hover:text-orange-600 transition-colors min-h-[2.5rem]">
+          {review.productName}
+        </h3>
+        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+          <span className="text-xs font-semibold text-orange-600 group-hover:text-orange-700">
+            쿠팡 최저가 보기
           </span>
-        </div>
-
-        <Link href={href} className="block mb-4">
-          <h3 className="text-xl md:text-2xl font-serif font-bold text-slate-900 leading-tight hover:text-amber-800 transition-colors line-clamp-2 h-[3.5rem] md:h-[4rem]">
-            {review.productName}
-          </h3>
-        </Link>
-
-        <p className="text-slate-500 line-clamp-2 text-base leading-relaxed font-serif italic opacity-80 mb-8 min-h-[3rem]">
-          &ldquo;{truncateContent(review.content || "", 90)}&rdquo;
-        </p>
-
-        <div className="mt-auto pt-4 border-t border-slate-50">
-          <Link
-            href={href}
-            className="text-xs font-bold tracking-widest uppercase border-b border-amber-200 pb-1 hover:border-slate-900 transition-all"
+          <svg
+            className="w-4 h-4 text-orange-500 transition-transform group-hover:translate-x-1"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            최저가·후기 보기 →
-          </Link>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2.5}
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
         </div>
       </div>
-    </article>
+    </Link>
   );
 }
 
@@ -138,64 +102,46 @@ export default async function HomePage() {
   const reviews = await fetchPublishedReviews();
 
   return (
-    <div className="min-h-screen bg-white selection:bg-amber-50">
+    <div className="min-h-screen bg-slate-50">
       <SiteHeader />
 
-      {/* Hero Section */}
-      <section className="relative pt-48 pb-24 lg:pt-60 lg:pb-36 text-center bg-[#fcf9f2]/50 overflow-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-amber-300/30 rounded-full blur-[120px] animate-glow pointer-events-none" />
-        <div className="absolute top-1/3 right-[15%] w-40 h-40 border-2 border-amber-400/30 rounded-full animate-float pointer-events-none" />
-        <div
-          className="absolute bottom-1/4 left-[10%] w-24 h-24 border-2 border-amber-500/25 rounded-full animate-float pointer-events-none"
-          style={{ animationDelay: "2s" }}
-        />
-        <div className="absolute top-1/2 left-[5%] w-12 h-12 bg-amber-200/40 rounded-full blur-xl animate-pulse pointer-events-none" />
+      <main className="pt-28 pb-16">
+        {/* 쿠팡 다이나믹 배너 */}
+        <section className="mx-auto max-w-6xl px-4 sm:px-6 py-4">
+          <CoupangDynamicBanner />
+        </section>
 
-        <div className="mx-auto max-w-5xl px-8 relative z-10">
-          <div className="flex flex-col items-center">
-            <div className="w-16 h-[1px] bg-amber-300 mb-10" />
-            <span className="text-[11px] font-black tracking-[0.4em] text-amber-800/70 mb-10 block uppercase">
-              COUPANG BEST PICK · DAILY UPDATE
-            </span>
-            <h1 className="text-4xl md:text-6xl font-serif font-bold text-slate-900 leading-[1.2] mb-12 tracking-tight">
-              세상의 모든 최저가, <br />
-              <span className="italic font-normal serif opacity-90">
-                한 눈에 비교하고 담아가세요.
-              </span>
-            </h1>
-            <p className="max-w-xl text-slate-500 font-serif italic text-lg md:text-xl leading-relaxed mb-16 opacity-80">
-              &ldquo;직접 써보고 골라낸 필수 아이템만. <br />
-              진짜만 추천하고, 수익은 솔직히 밝힙니다.&rdquo;
-            </p>
-            <div className="w-[1px] h-24 bg-gradient-to-b from-amber-200 to-transparent" />
-          </div>
-        </div>
-      </section>
-
-      {/* Main Grid */}
-      <main className="mx-auto max-w-7xl px-8 lg:px-16 py-24">
-        <div className="mb-16">
-          <h2 className="text-3xl md:text-5xl font-serif font-bold text-slate-900 mb-4">
-            이번 주 추천템
-          </h2>
-          <p className="text-slate-500 font-serif italic text-lg opacity-80">
-            가격·후기·배송까지 비교해서 골라낸 쿠팡 베스트 아이템.
+        {/* 페이지 타이틀 */}
+        <section className="mx-auto max-w-7xl px-4 sm:px-6 mt-4 mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+            오늘의 쿠팡 추천템
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            직접 써보고 골라낸 베스트 아이템, 최저가로 확인하세요.
           </p>
-        </div>
+        </section>
 
-        {reviews.length > 0 ? (
-          <div className="grid gap-x-12 gap-y-32 sm:grid-cols-2 lg:grid-cols-3">
-            {reviews.map((review) => (
-              <ReviewCard key={review.id} review={review} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-40 border-y border-slate-50">
-            <p className="text-slate-300 font-serif italic text-2xl">
-              곧 새로운 추천템이 올라옵니다.
-            </p>
-          </div>
-        )}
+        {/* 상품 그리드 */}
+        <section className="mx-auto max-w-7xl px-4 sm:px-6">
+          {reviews.length > 0 ? (
+            <div className="grid gap-4 sm:gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+              {reviews.map((review) => (
+                <ProductCard key={review.id} review={review} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20 rounded-2xl bg-white ring-1 ring-slate-100">
+              <p className="text-slate-400 text-sm">
+                곧 새로운 추천템이 올라옵니다.
+              </p>
+            </div>
+          )}
+
+          <p className="mt-10 text-center text-xs text-slate-400">
+            이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
+            수수료를 제공받습니다.
+          </p>
+        </section>
       </main>
 
       <SiteFooter />
