@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import axios from 'axios';
 import { generateToken } from '../config/auth.js';
+import { pickTrendingTopic } from '../services/trendingTopics.js';
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:4000';
 const CRON_REVIEW_LIMIT = parseInt(process.env.CRON_REVIEW_GENERATION_LIMIT || '5', 10);
@@ -8,10 +9,14 @@ const CRON_SCHEDULE_SYNC_MS = parseInt(process.env.CRON_SCHEDULE_SYNC_MS || '300
 
 let productCollectionTask = null;
 let reviewGenerationTask = null;
+let newsMorningTask = null;
+let newsAfternoonTask = null;
 let logCleanupTask = null;
 let currentScheduleSnapshot = null;
 let scheduleSyncTimer = null;
 let isSyncingSchedules = false;
+
+let lastNewsCategory = null;
 
 function hhmmToCronExpression(hhmm, fallback = '0 3 * * *') {
   if (typeof hhmm !== 'string') return fallback;
@@ -65,9 +70,12 @@ async function resolveCronSchedules() {
     const settings = await fetchAutomationSettings();
     const automation = settings?.automation || {};
     const reviewGeneration = automation?.reviewGeneration || {};
+    const newsGeneration = automation?.newsGeneration || {};
 
     const collectTime = automation.collectSchedule || '02:00';
     const reviewTime = reviewGeneration.schedule || '03:00';
+    const newsMorning = newsGeneration.morningSchedule || '07:00';
+    const newsAfternoon = newsGeneration.afternoonSchedule || '18:00';
 
     return {
       collect: {
@@ -78,12 +86,22 @@ async function resolveCronSchedules() {
         label: reviewTime,
         expr: hhmmToCronExpression(reviewTime, '0 3 * * *'),
       },
+      newsMorning: {
+        label: newsMorning,
+        expr: hhmmToCronExpression(newsMorning, '0 7 * * *'),
+      },
+      newsAfternoon: {
+        label: newsAfternoon,
+        expr: hhmmToCronExpression(newsAfternoon, '0 18 * * *'),
+      },
     };
   } catch (error) {
     console.error('⚠️ Failed to load cron schedules from settings. Using defaults:', getErrorMessage(error));
     return {
       collect: { label: '02:00', expr: '0 2 * * *' },
       review: { label: '03:00', expr: '0 3 * * *' },
+      newsMorning: { label: '07:00', expr: '0 7 * * *' },
+      newsAfternoon: { label: '18:00', expr: '0 18 * * *' },
     };
   }
 }
@@ -189,6 +207,41 @@ async function runScheduledReviewGeneration() {
   }
 }
 
+async function runScheduledNewsGeneration(slot) {
+  console.log(`⏰ Running scheduled news generation (${slot})...`);
+
+  try {
+    const settings = await fetchAutomationSettings();
+    const newsGen = settings?.automation?.newsGeneration || {};
+
+    if (newsGen.enabled === false) {
+      console.log('ℹ️ News auto-generation is disabled in settings.');
+      return;
+    }
+
+    const excludeCategories = lastNewsCategory ? [lastNewsCategory] : [];
+    const { topic, category } = await pickTrendingTopic({ excludeCategories });
+
+    if (!topic) {
+      console.warn('⚠️ No trending topic resolved. Skipping news generation.');
+      return;
+    }
+
+    console.log(`📰 [${slot}] 자동 뉴스 생성: [${category}] "${topic}"`);
+
+    const response = await axios.post(
+      `${API_BASE}/api/admin/news/generate`,
+      { topic, category, autoPublish: true },
+      { headers: getCronAuthHeaders() }
+    );
+
+    lastNewsCategory = category;
+    console.log(`✅ [${slot}] 자동 뉴스 게시 완료:`, response.data?.data);
+  } catch (error) {
+    console.error(`❌ News generation (${slot}) failed:`, getErrorMessage(error));
+  }
+}
+
 async function runScheduledLogCleanup() {
   console.log('⏰ Running scheduled log cleanup...');
 
@@ -215,12 +268,14 @@ function stopTask(task) {
 }
 
 function scheduleKeyFromSnapshot(snapshot) {
-  return `${snapshot.collect.expr}|${snapshot.review.expr}`;
+  return `${snapshot.collect.expr}|${snapshot.review.expr}|${snapshot.newsMorning.expr}|${snapshot.newsAfternoon.expr}`;
 }
 
 function applyCronSchedules(schedules) {
   stopTask(productCollectionTask);
   stopTask(reviewGenerationTask);
+  stopTask(newsMorningTask);
+  stopTask(newsAfternoonTask);
 
   productCollectionTask = cron.schedule(schedules.collect.expr, runScheduledProductCollection, {
     timezone: 'Asia/Seoul'
@@ -230,11 +285,25 @@ function applyCronSchedules(schedules) {
     timezone: 'Asia/Seoul'
   });
 
+  newsMorningTask = cron.schedule(
+    schedules.newsMorning.expr,
+    () => runScheduledNewsGeneration('morning'),
+    { timezone: 'Asia/Seoul' }
+  );
+
+  newsAfternoonTask = cron.schedule(
+    schedules.newsAfternoon.expr,
+    () => runScheduledNewsGeneration('afternoon'),
+    { timezone: 'Asia/Seoul' }
+  );
+
   currentScheduleSnapshot = schedules;
 
   console.log('✅ Cron schedules applied:');
   console.log(`   - Product collection: Every day at ${schedules.collect.label} KST`);
   console.log(`   - Review generation: Every day at ${schedules.review.label} KST`);
+  console.log(`   - News (morning): Every day at ${schedules.newsMorning.label} KST`);
+  console.log(`   - News (afternoon): Every day at ${schedules.newsAfternoon.label} KST`);
 }
 
 async function syncCronSchedulesIfNeeded() {
@@ -287,6 +356,8 @@ export async function initCronJobs() {
   if (currentScheduleSnapshot) {
     console.log(`   - Product collection: Every day at ${currentScheduleSnapshot.collect.label} KST`);
     console.log(`   - Review generation: Every day at ${currentScheduleSnapshot.review.label} KST`);
+    console.log(`   - News (morning): Every day at ${currentScheduleSnapshot.newsMorning.label} KST`);
+    console.log(`   - News (afternoon): Every day at ${currentScheduleSnapshot.newsAfternoon.label} KST`);
   }
   console.log('   - Log cleanup: Every Sunday at 12:00 AM KST');
   console.log(`   - Schedule sync: Every ${Math.floor(CRON_SCHEDULE_SYNC_MS / 1000)}s`);

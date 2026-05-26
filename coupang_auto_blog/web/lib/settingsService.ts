@@ -46,6 +46,11 @@ export type SystemSettings = {
       schedule: string;
       pauseWhenDraftCountExceeds: number;
     };
+    newsGeneration?: {
+      enabled: boolean;
+      morningSchedule: string;
+      afternoonSchedule: string;
+    };
   };
 };
 
@@ -78,6 +83,10 @@ export async function getSystemSettings(): Promise<SystemSettings> {
         reviewGeneration: {
           ...defaults.automation.reviewGeneration,
           ...db?.automation?.reviewGeneration,
+        },
+        newsGeneration: {
+          ...defaults.automation.newsGeneration,
+          ...db?.automation?.newsGeneration,
         },
       },
     };
@@ -175,6 +184,11 @@ export function getDefaultSettings(): SystemSettings {
         maxPerRun: 5,
         schedule: "03:00",
         pauseWhenDraftCountExceeds: 50,
+      },
+      newsGeneration: {
+        enabled: false,
+        morningSchedule: "07:00",
+        afternoonSchedule: "18:00",
       },
     },
   };

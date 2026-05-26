@@ -68,6 +68,11 @@ export type AutomationSettings = {
     schedule: string; // "HH:mm" 형식 (표시/관리용)
     pauseWhenDraftCountExceeds: number;
   };
+  newsGeneration: {
+    enabled: boolean;
+    morningSchedule: string; // "HH:mm"
+    afternoonSchedule: string; // "HH:mm"
+  };
 };
 
 // ==================== Topics ====================
@@ -206,6 +211,11 @@ export const DEFAULT_SETTINGS: SystemSettings = {
       maxPerRun: 5,
       schedule: "03:00",
       pauseWhenDraftCountExceeds: 50,
+    },
+    newsGeneration: {
+      enabled: false,
+      morningSchedule: "07:00",
+      afternoonSchedule: "18:00",
     },
   },
   topics: {

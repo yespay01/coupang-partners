@@ -95,6 +95,11 @@ const DEFAULT_SETTINGS = {
       schedule: "03:00",
       pauseWhenDraftCountExceeds: 50,
     },
+    newsGeneration: {
+      enabled: false,
+      morningSchedule: "07:00",
+      afternoonSchedule: "18:00",
+    },
   },
 };
 
@@ -149,6 +154,10 @@ export async function getSystemSettings() {
         reviewGeneration: {
           ...DEFAULT_SETTINGS.automation.reviewGeneration,
           ...(systemData.automation?.reviewGeneration || {}),
+        },
+        newsGeneration: {
+          ...DEFAULT_SETTINGS.automation.newsGeneration,
+          ...(systemData.automation?.newsGeneration || {}),
         },
       },
     };

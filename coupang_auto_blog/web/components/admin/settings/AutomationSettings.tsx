@@ -12,10 +12,14 @@ export function AutomationSettings() {
     setReviewGenerationSchedule,
     setReviewGenerationMaxPerRun,
     setPauseWhenDraftCountExceeds,
+    setNewsGenerationEnabled,
+    setNewsMorningSchedule,
+    setNewsAfternoonSchedule,
   } = useSettingsStore();
 
   const { automation } = settings;
   const reviewGeneration = automation.reviewGeneration;
+  const newsGeneration = automation.newsGeneration;
 
   return (
     <div className="space-y-6">
@@ -232,6 +236,92 @@ export function AutomationSettings() {
           <li>실행 시간(관리값): 매일 {reviewGeneration.schedule}</li>
           <li>1회 최대 생성: {reviewGeneration.maxPerRun}개</li>
           <li>검수 대기 상한: {reviewGeneration.pauseWhenDraftCountExceeds}개</li>
+        </ul>
+      </div>
+
+      {/* ============ 자동 뉴스 생성 ============ */}
+      <div className="border-t border-slate-200 pt-6">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">자동 뉴스 생성 설정</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            네이버 트렌드 헤드라인을 토픽으로 매일 오전·오후 각 1건씩 AI 뉴스 기사를 자동
+            생성합니다. (생성 즉시 게시됨)
+          </p>
+        </div>
+      </div>
+
+      {/* 자동 뉴스 활성화 */}
+      <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
+        <div>
+          <h3 className="font-medium text-slate-900">자동 뉴스 생성 활성화</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            오전·오후 스케줄에 따라 트렌드 기반 뉴스 1건씩 자동 게시합니다.
+          </p>
+        </div>
+        <button
+          onClick={() => setNewsGenerationEnabled(!newsGeneration.enabled)}
+          className={`relative h-6 w-11 rounded-full transition-colors ${
+            newsGeneration.enabled ? "bg-blue-600" : "bg-slate-300"
+          }`}
+          role="switch"
+          aria-checked={newsGeneration.enabled}
+        >
+          <span
+            className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+              newsGeneration.enabled ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* 오전 스케줄 */}
+      <div className="space-y-2">
+        <label htmlFor="newsMorningSchedule" className="block text-sm font-medium text-slate-700">
+          오전 실행 시간
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            id="newsMorningSchedule"
+            type="time"
+            value={newsGeneration.morningSchedule}
+            onChange={(e) => setNewsMorningSchedule(e.target.value)}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <span className="text-sm text-slate-500">매일 이 시간에 오전 뉴스가 게시됩니다.</span>
+        </div>
+      </div>
+
+      {/* 오후 스케줄 */}
+      <div className="space-y-2">
+        <label htmlFor="newsAfternoonSchedule" className="block text-sm font-medium text-slate-700">
+          오후 실행 시간
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            id="newsAfternoonSchedule"
+            type="time"
+            value={newsGeneration.afternoonSchedule}
+            onChange={(e) => setNewsAfternoonSchedule(e.target.value)}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <span className="text-sm text-slate-500">매일 이 시간에 오후 뉴스가 게시됩니다.</span>
+        </div>
+        <p className="text-xs text-slate-400">서버 시간 기준 (Asia/Seoul)</p>
+      </div>
+
+      {/* 자동 뉴스 상태 요약 */}
+      <div className="rounded-lg bg-slate-50 p-4">
+        <h4 className="text-sm font-medium text-slate-700">자동 뉴스 생성 요약</h4>
+        <ul className="mt-2 space-y-1 text-sm text-slate-600">
+          <li>
+            상태:{" "}
+            <span className={newsGeneration.enabled ? "text-green-600" : "text-slate-500"}>
+              {newsGeneration.enabled ? "활성화됨" : "비활성화됨"}
+            </span>
+          </li>
+          <li>오전: 매일 {newsGeneration.morningSchedule}</li>
+          <li>오후: 매일 {newsGeneration.afternoonSchedule}</li>
+          <li>주제 선정: 네이버 뉴스 검색 기반 (8개 카테고리 풀에서 직전 카테고리 제외 후 랜덤)</li>
         </ul>
       </div>
     </div>

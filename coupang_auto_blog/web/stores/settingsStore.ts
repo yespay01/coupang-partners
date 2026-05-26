@@ -35,6 +35,9 @@ type SettingsStore = {
   setReviewGenerationSchedule: (schedule: string) => void;
   setReviewGenerationMaxPerRun: (max: number) => void;
   setPauseWhenDraftCountExceeds: (count: number) => void;
+  setNewsGenerationEnabled: (enabled: boolean) => void;
+  setNewsMorningSchedule: (schedule: string) => void;
+  setNewsAfternoonSchedule: (schedule: string) => void;
 
   // 주제 설정
   setCategories: (categories: CoupangCategory[]) => void;
@@ -169,6 +172,48 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
           reviewGeneration: {
             ...state.settings.automation.reviewGeneration,
             pauseWhenDraftCountExceeds,
+          },
+        },
+      },
+      hasUnsavedChanges: true,
+    })),
+  setNewsGenerationEnabled: (enabled) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        automation: {
+          ...state.settings.automation,
+          newsGeneration: {
+            ...state.settings.automation.newsGeneration,
+            enabled,
+          },
+        },
+      },
+      hasUnsavedChanges: true,
+    })),
+  setNewsMorningSchedule: (morningSchedule) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        automation: {
+          ...state.settings.automation,
+          newsGeneration: {
+            ...state.settings.automation.newsGeneration,
+            morningSchedule,
+          },
+        },
+      },
+      hasUnsavedChanges: true,
+    })),
+  setNewsAfternoonSchedule: (afternoonSchedule) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        automation: {
+          ...state.settings.automation,
+          newsGeneration: {
+            ...state.settings.automation.newsGeneration,
+            afternoonSchedule,
           },
         },
       },

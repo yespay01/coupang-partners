@@ -972,7 +972,7 @@ router.get('/news/:id', async (req, res) => {
  */
 router.post('/news/generate', async (req, res) => {
   try {
-    const { topic, category } = req.body;
+    const { topic, category, autoPublish } = req.body;
     if (!topic || !topic.trim()) {
       return res.status(400).json({ success: false, message: '뉴스 주제를 입력해주세요.' });
     }
@@ -1051,25 +1051,28 @@ router.post('/news/generate', async (req, res) => {
 
     const db = getDb();
     const slug = await generateUniqueSlug(db, 'news', parsed.title || topic.trim());
+    const targetStatus = autoPublish ? 'published' : 'draft';
     const insertResult = await db.query(
-      `INSERT INTO news (title, summary, content, category, slug, status)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      `INSERT INTO news (title, summary, content, category, slug, status, published_at)
+       VALUES ($1, $2, $3, $4, $5, $6, ${autoPublish ? 'NOW()' : 'NULL'}) RETURNING id`,
       [
         parsed.title || topic.trim(),
         parsed.summary || '',
         parsed.content || '',
         parsed.category || category || '트렌드',
         slug,
-        'draft',
+        targetStatus,
       ]
     );
 
     res.json({
       success: true,
-      message: '뉴스가 생성되었습니다.',
+      message: autoPublish ? '뉴스가 게시되었습니다.' : '뉴스 초안이 생성되었습니다.',
       data: {
         newsId: insertResult.rows[0].id,
         title: parsed.title,
+        slug,
+        status: targetStatus,
       },
     });
   } catch (error) {
