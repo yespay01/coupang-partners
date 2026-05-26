@@ -138,16 +138,11 @@ export default function SearchPage() {
                   <h3 className="text-sm font-medium text-slate-900 line-clamp-2 group-hover:text-blue-600 transition">
                     {product.productName}
                   </h3>
-                  {product.productPrice > 0 && (
-                    <div className="mt-2 text-lg font-bold text-red-600">
-                      {product.productPrice.toLocaleString()}원
-                    </div>
-                  )}
                   {product.categoryName && (
-                    <div className="mt-1 text-xs text-slate-500">{product.categoryName}</div>
+                    <div className="mt-2 text-xs text-slate-500">{product.categoryName}</div>
                   )}
-                  <div className="mt-2 text-xs text-blue-500 font-medium">
-                    쿠팡에서 보기 &rarr;
+                  <div className="mt-3 text-xs font-semibold text-orange-600">
+                    쿠팡에서 최저가 확인 &rarr;
                   </div>
                 </a>
               ))}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { label: "리뷰", href: "/", key: "review" },
+  { label: "추천템", href: "/", key: "review" },
   { label: "요리", href: "/recipes", key: "recipes" },
   { label: "뉴스", href: "/news", key: "news" },
   { label: "검색", href: "/search", key: "search" },

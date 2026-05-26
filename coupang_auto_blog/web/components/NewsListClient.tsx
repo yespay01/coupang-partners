@@ -94,7 +94,7 @@ export function NewsListClient({
                   ).toLocaleDateString("ko-KR")}
                 </span>
                 <span className="inline-flex items-center gap-1 font-medium text-blue-600 group-hover:text-blue-700 transition">
-                  자세히 보기
+                  전체 내용 보기
                   <svg
                     className="w-4 h-4"
                     fill="none"

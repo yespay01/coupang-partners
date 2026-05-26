@@ -73,34 +73,43 @@ export default function ReviewPost({ review }: ReviewPostProps) {
       </div>
 
       {/* 상품 정보 카드 */}
-      <div className="border border-gray-200 rounded-lg p-6 bg-gray-50 mb-8">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900">
-          상품 정보
+      <div className="border border-gray-200 rounded-lg p-6 bg-gradient-to-br from-orange-50 to-amber-50 mb-8">
+        <h2 className="text-xl font-semibold mb-2 text-gray-900">
+          오늘의 쿠팡 가격 확인
         </h2>
+        <p className="text-sm text-gray-700 mb-5">{review.productName}</p>
 
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-2xl font-bold text-gray-900 mb-2">
-              {review.productPrice
-                ? `₩${review.productPrice.toLocaleString()}`
-                : "가격 정보 없음"}
-            </p>
-            <p className="text-sm text-gray-600">{review.productName}</p>
-          </div>
-
-          {review.affiliateUrl && (
+        {review.affiliateUrl && (
+          <>
             <Link
               href={review.affiliateUrl}
               target="_blank"
               rel="noopener noreferrer nofollow"
-              className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+              className="group flex items-center justify-center gap-2 w-full px-6 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
             >
-              자세히 보기
+              <span className="text-base sm:text-lg">쿠팡에서 최저가 확인하기</span>
+              <svg
+                className="w-5 h-5 transition-transform group-hover:translate-x-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M13 7l5 5m0 0l-5 5m5-5H6"
+                />
+              </svg>
             </Link>
-          )}
-        </div>
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-sm font-medium text-orange-700">
+              <span>💰</span>
+              <span>회원 전용 추가 할인가 보기 · 로켓배송 가능</span>
+            </p>
+          </>
+        )}
 
-        <p className="text-xs text-gray-500 mt-4">
+        <p className="text-xs text-gray-500 mt-5 text-center">
           이 포스트는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를
           제공받습니다.
         </p>

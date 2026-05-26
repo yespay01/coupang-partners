@@ -4,6 +4,7 @@ import ReviewPost from "@/components/ReviewPost";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Review } from "@/types";
+import { generateSEOMeta } from "@/lib/seo";
 
 // ISR: 1시간마다 재생성
 export const revalidate = 3600;
@@ -63,12 +64,8 @@ export async function generateMetadata({
   const firstMediaImage = review.media?.[0]?.url || "";
   const ogImage = firstMediaImage || review.productImage || "";
 
-  const seoMeta = review.seoMeta || {
-    title: `${review.productName} 쿠팡 최저가 리뷰`,
-    description: review.content?.slice(0, 150) || "",
-    keywords: [review.productName, review.category || "쿠팡", "리뷰", "최저가"],
-    ogImage,
-  };
+  // 핵심 키워드 추출 기반 SEO 메타 (DB에 저장된 seoMeta가 있으면 우선)
+  const seoMeta = review.seoMeta || generateSEOMeta(review);
 
   // seoMeta에 저장된 ogImage보다 로컬 이미지를 우선 사용
   const finalOgImage = ogImage || seoMeta.ogImage || "";

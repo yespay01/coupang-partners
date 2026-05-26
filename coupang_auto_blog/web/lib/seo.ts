@@ -35,33 +35,74 @@ function extractDescription(content: string, maxLength: number = 160): string {
   return truncated + "...";
 }
 
+// 검색량은 낮고 키워드 노이즈만 늘리는 단어
+const STOP_WORDS = new Set([
+  "신제품", "정품", "단품", "세트", "벌크", "본품", "사은품",
+  "무료배송", "당일배송", "로켓배송", "특가", "할인", "쿠폰",
+  "공식", "공식판매", "정식수입", "정식수입품", "병행수입",
+  "선물", "선물용", "기프트", "박스", "패키지",
+  "구매", "판매", "추천", "리뷰", "후기",
+  "ml", "kg", "g", "mm", "cm", "inch", "color", "size",
+]);
+
 /**
- * 상품명에서 키워드 추출
+ * 상품명에서 모델 코드/노이즈를 제거하고 검색 친화적 키워드 추출
+ *
+ * 예) "삼성전자 갤럭시 버즈3 프로 SM-R630NLAAKOO 블루투스 이어폰 신제품"
+ *  → ["갤럭시 버즈3 프로", "삼성전자", "블루투스", "이어폰", ...]
  */
 function extractKeywords(productName: string, category?: string): string[] {
+  const cleaned = (productName || "")
+    // 괄호 안 부가설명 제거 ((정품), [공식] 등)
+    .replace(/[\[(（【].*?[\])）】]/g, " ")
+    // 모델 코드 제거: 영문 대문자/숫자/하이픈 4자 이상 연속
+    .replace(/\b[A-Z0-9][A-Z0-9-]{3,}\b/g, " ")
+    // 색상 표기 제거 (예: "블랙/화이트")
+    .replace(/[^\w\sㄱ-ㅎㅏ-ㅣ가-힣]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const tokens = cleaned
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => {
+      if (t.length < 2) return false;
+      if (STOP_WORDS.has(t.toLowerCase())) return false;
+      // 숫자만 있는 토큰 제거
+      if (/^\d+$/.test(t)) return false;
+      return true;
+    });
+
+  // 중복 제거하며 순서 유지 (앞 토큰일수록 상품의 핵심 키워드)
+  const seen = new Set<string>();
+  const coreTokens: string[] = [];
+  for (const t of tokens) {
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    coreTokens.push(t);
+    if (coreTokens.length >= 6) break;
+  }
+
   const keywords: string[] = [];
 
-  // 기본 키워드
-  keywords.push("쿠팡");
-  keywords.push("리뷰");
-  keywords.push("추천");
+  // 핵심 구문 (앞 2-3 토큰 결합) - 검색엔진 롱테일 매칭
+  if (coreTokens.length >= 2) {
+    keywords.push(coreTokens.slice(0, Math.min(3, coreTokens.length)).join(" "));
+  }
 
-  // 카테고리 추가
-  if (category) {
+  // 개별 핵심 키워드
+  keywords.push(...coreTokens);
+
+  // 카테고리
+  if (category && !seen.has(category.toLowerCase())) {
     keywords.push(category);
   }
 
-  // 상품명에서 주요 단어 추출 (간단한 방식)
-  const words = productName
-    .replace(/[^\w\sㄱ-ㅎㅏ-ㅣ가-힣]/g, " ")
-    .split(/\s+/)
-    .filter((word) => word.length > 1);
+  // 검색 의도 키워드
+  keywords.push("최저가", "쿠팡", "후기");
 
-  // 상위 3-5개 단어 추가
-  keywords.push(...words.slice(0, 5));
-
-  // 중복 제거 및 정리
-  return Array.from(new Set(keywords));
+  return Array.from(new Set(keywords)).filter(Boolean);
 }
 
 /**
@@ -77,11 +118,16 @@ export function generateSEOMeta(
     titleSuffix?: string;
   }
 ): SEOMeta {
-  const siteName = options?.siteName || "쿠팡 리뷰";
+  const siteName = options?.siteName || "세모링크";
   const titleSuffix = options?.titleSuffix || ` | ${siteName}`;
 
-  // 제목 생성 (50-60자)
-  const baseTitle = `${review.productName} 리뷰`;
+  // 키워드 먼저 추출 (제목에도 활용)
+  const keywords = extractKeywords(review.productName || "", review.category);
+  // 첫 항목이 핵심 구문이면 그것을, 아니면 첫 키워드 사용
+  const headKeyword = keywords[0] || review.productName || "";
+
+  // 제목: "핵심키워드 쿠팡 최저가 후기" — 검색 매칭 강화
+  const baseTitle = `${headKeyword} 쿠팡 최저가 후기`;
   const title =
     baseTitle.length + titleSuffix.length > 60
       ? baseTitle.slice(0, 60 - titleSuffix.length) + titleSuffix
@@ -89,12 +135,6 @@ export function generateSEOMeta(
 
   // 설명 생성 (150-160자)
   const description = extractDescription(review.content || "", 150);
-
-  // 키워드 생성
-  const keywords = extractKeywords(
-    review.productName || "",
-    review.category
-  );
 
   // Open Graph 이미지
   const ogImage = review.productImage || "";

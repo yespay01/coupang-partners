@@ -4,9 +4,9 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  title: "세모링크 - 세상의 모든 링크",
+  title: "세모링크 - 쿠팡 최저가 비교·추천템 모음",
   description:
-    "세상의 모든 링크가 모이는 허브, 세모링크에서 다양한 상품 리뷰와 레시피를 확인하세요.",
+    "직접 써보고 골라낸 쿠팡 추천템과 최저가 비교. 솔직 후기, 카테고리별 베스트, 레시피 재료까지 한 번에 확인하세요.",
   alternates: {
     canonical: "https://semolink.store",
   },
@@ -103,7 +103,7 @@ function ReviewCard({ review }: { review: PublishedReview }) {
       <div className="flex flex-col flex-grow">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-xs font-bold tracking-widest text-amber-700/80 uppercase">
-            {review.category || "큐레이션"}
+            {review.category || "추천템"}
           </span>
           <span className="w-4 h-[1px] bg-slate-200" />
           <span className="text-xs font-medium tracking-tight text-slate-400">
@@ -126,7 +126,7 @@ function ReviewCard({ review }: { review: PublishedReview }) {
             href={href}
             className="text-xs font-bold tracking-widest uppercase border-b border-amber-200 pb-1 hover:border-slate-900 transition-all"
           >
-            Read More
+            최저가·후기 보기 →
           </Link>
         </div>
       </div>
@@ -154,19 +154,18 @@ export default async function HomePage() {
         <div className="mx-auto max-w-5xl px-8 relative z-10">
           <div className="flex flex-col items-center">
             <div className="w-16 h-[1px] bg-amber-300 mb-10" />
-            <span className="text-[11px] font-black tracking-[0.6em] text-amber-800/60 mb-10 block uppercase">
-              Archiviste de la Qualité
+            <span className="text-[11px] font-black tracking-[0.4em] text-amber-800/70 mb-10 block uppercase">
+              COUPANG BEST PICK · DAILY UPDATE
             </span>
             <h1 className="text-4xl md:text-6xl font-serif font-bold text-slate-900 leading-[1.2] mb-12 tracking-tight">
-              세상의 모든 링크, <br />
+              세상의 모든 최저가, <br />
               <span className="italic font-normal serif opacity-90">
-                더 나은 일상을 기록하다.
+                한 눈에 비교하고 담아가세요.
               </span>
             </h1>
             <p className="max-w-xl text-slate-500 font-serif italic text-lg md:text-xl leading-relaxed mb-16 opacity-80">
-              &ldquo;우리는 단지 제품을 소개하지 않습니다. <br />
-              품격 있는 삶을 위한 안목을 공유하고, <br />
-              당신의 매일이 하나의 예술이 되기를 바랍니다.&rdquo;
+              &ldquo;직접 써보고 골라낸 필수 아이템만. <br />
+              진짜만 추천하고, 수익은 솔직히 밝힙니다.&rdquo;
             </p>
             <div className="w-[1px] h-24 bg-gradient-to-b from-amber-200 to-transparent" />
           </div>
@@ -177,10 +176,10 @@ export default async function HomePage() {
       <main className="mx-auto max-w-7xl px-8 lg:px-16 py-24">
         <div className="mb-16">
           <h2 className="text-3xl md:text-5xl font-serif font-bold text-slate-900 mb-4">
-            취향의 발견
+            이번 주 추천템
           </h2>
-          <p className="text-slate-400 font-serif italic text-lg opacity-70">
-            당신의 일상에 영감을 줄 선별된 아이템입니다.
+          <p className="text-slate-500 font-serif italic text-lg opacity-80">
+            가격·후기·배송까지 비교해서 골라낸 쿠팡 베스트 아이템.
           </p>
         </div>
 
@@ -193,7 +192,7 @@ export default async function HomePage() {
         ) : (
           <div className="text-center py-40 border-y border-slate-50">
             <p className="text-slate-300 font-serif italic text-2xl">
-              아직 게시된 리뷰가 없습니다.
+              곧 새로운 추천템이 올라옵니다.
             </p>
           </div>
         )}
