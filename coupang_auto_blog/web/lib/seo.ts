@@ -57,6 +57,10 @@ function extractKeywords(productName: string, category?: string): string[] {
     .replace(/[\[(（【].*?[\])）】]/g, " ")
     // 모델 코드 제거: 영문 대문자/숫자/하이픈 4자 이상 연속
     .replace(/\b[A-Z0-9][A-Z0-9-]{3,}\b/g, " ")
+    // 수량 토큰 제거: "5개", "2박스", "10팩" 등
+    .replace(/\b\d+\s*(개입|개|박스|팩|세트|입|매|장|회|병|캔|봉|봉지|포|구|줄|롤|단)\b/g, " ")
+    // 용량/무게/크기 단위 제거: "500g", "1kg", "200ml", "20인치" 등
+    .replace(/\b\d+(\.\d+)?\s*(g|kg|mg|ml|l|cc|cm|mm|m|인치|inch|w)\b/gi, " ")
     // 색상 표기 제거 (예: "블랙/화이트")
     .replace(/[^\w\sㄱ-ㅎㅏ-ㅣ가-힣]/g, " ")
     .replace(/\s+/g, " ")
