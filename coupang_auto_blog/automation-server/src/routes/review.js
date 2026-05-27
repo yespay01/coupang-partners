@@ -4,7 +4,7 @@ import { authenticateToken } from '../config/auth.js';
 import { notifySlack } from '../services/slack.js';
 import { getSystemSettings } from '../services/settingsService.js';
 import { generateText } from '../services/aiProviders.js';
-import { buildPromptFromSettings, validateReviewContentWithSettings, analyzeToneScore } from '../services/reviewUtils.js';
+import { buildPromptFromSettings, validateReviewContentWithSettings, analyzeToneScore, sanitizeReviewText } from '../services/reviewUtils.js';
 import { collectAllImages } from '../services/imageUtils.js';
 import { logger, dbLog } from '../utils/logger.js';
 import { cleanProductName } from '../utils/productName.js';
@@ -405,7 +405,11 @@ router.post('/generate', authenticateToken, async (req, res) => {
 
     // 5. AI 리뷰 생성
     const aiResult = await generateText(settings.ai, userPrompt, promptSettings.systemPrompt);
-    const reviewText = aiResult.text;
+    const rawReviewText = aiResult.text;
+    const reviewText = sanitizeReviewText(rawReviewText);
+    if (reviewText !== rawReviewText) {
+      logger.info(`리뷰 본문 후처리: ${rawReviewText.length}자 → ${reviewText.length}자 (마크다운/단계 라벨 정리)`);
+    }
     logger.info('AI 리뷰 생성 완료', {
       provider: aiResult.provider,
       model: aiResult.model,

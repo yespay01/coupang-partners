@@ -38,6 +38,67 @@ const negativeWords = [
   "형편",
 ];
 
+/**
+ * AI가 생성한 리뷰 본문에서 마크다운 잔재와 단계 라벨을 정리.
+ * 시스템 프롬프트에 "마크다운 금지"가 있어도 AI가 어기는 경우가 잦아
+ * 화면에 별표·해시·[단계] 같은 노이즈가 그대로 노출되는 것을 방지한다.
+ */
+export function sanitizeReviewText(text) {
+  if (!text) return '';
+
+  let s = String(text);
+
+  // 코드블록(```...```) 제거
+  s = s.replace(/```[\s\S]*?```/g, '');
+
+  // 굵은체/이탤릭/취소선/언더스코어 마크다운: 기호만 제거하고 텍스트는 유지
+  // **굵게**, __굵게__, *기울임*, _기울임_, ~~취소~~
+  s = s.replace(/\*\*([^*\n]+?)\*\*/g, '$1');
+  s = s.replace(/__([^_\n]+?)__/g, '$1');
+  s = s.replace(/(?<!\w)\*([^*\n]+?)\*(?!\w)/g, '$1');
+  s = s.replace(/(?<!\w)_([^_\n]+?)_(?!\w)/g, '$1');
+  s = s.replace(/~~([^~\n]+?)~~/g, '$1');
+
+  // 줄 시작의 헤더(##, ### …)와 인용/리스트 기호 제거
+  s = s.replace(/^[ \t]*#{1,6}[ \t]+/gm, '');
+  s = s.replace(/^[ \t]*>[ \t]+/gm, '');
+  s = s.replace(/^[ \t]*[-*+][ \t]+/gm, '');
+
+  // 단계 라벨: [1단계: ...], 【2단계】, (3단계 - ...) 등
+  s = s.replace(/^[ \t]*[\[(（【]?\s*\d+\s*단계[^\]\n)）】]*[\])）】]?\s*[:：]?[ \t]*\n?/gm, '');
+  // 단계 라벨: 줄 시작의 "1.", "1)", "①" 같은 순서 번호 + 공백
+  s = s.replace(/^[ \t]*([0-9]+[.)）]|[①②③④⑤⑥⑦⑧⑨⑩])[ \t]+/gm, '');
+
+  // 줄 시작의 "구매 계기:", "사용 느낌:" 같이 단계 명칭이 콜론으로 끝나는 라벨 제거
+  s = s.replace(/^[ \t]*(구매\s*계기|구매계기|실제\s*사용\s*느낌|사용\s*느낌|솔직한?\s*평가|평가|마무리|총평|결론|장점|단점|아쉬운\s*점|좋은\s*점|추천|요약)[ \t]*[:：][ \t]*\n?/gm, '');
+
+  // 본문 첫 줄이 "상품명 후기/리뷰" 같은 제목 형태이면 통째로 제거
+  const lines = s.split(/\r?\n/);
+  while (lines.length > 0) {
+    const first = lines[0].trim();
+    if (!first) {
+      lines.shift();
+      continue;
+    }
+    const looksLikeTitle =
+      /(후기|리뷰|솔직\s*후기|사용기|체험기|내돈내산)\s*$/i.test(first) &&
+      first.length <= 60 &&
+      !/[.!?。…]$/.test(first);
+    if (looksLikeTitle) {
+      lines.shift();
+      continue;
+    }
+    break;
+  }
+  s = lines.join('\n');
+
+  // 연속 빈 줄 정리 (2줄 초과 → 1줄)
+  s = s.replace(/\n{3,}/g, '\n\n');
+  s = s.replace(/[ \t]+\n/g, '\n');
+
+  return s.trim();
+}
+
 export function computeNextRunAt(attempt) {
   const baseMinutes = Number(process.env.REVIEW_RETRY_BASE_MINUTES ?? 5);
   const minutes = Math.pow(2, Math.max(0, attempt - 1)) * baseMinutes;
