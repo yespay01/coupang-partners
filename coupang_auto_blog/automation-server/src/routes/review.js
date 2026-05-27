@@ -8,6 +8,7 @@ import { buildPromptFromSettings, validateReviewContentWithSettings, analyzeTone
 import { collectAllImages } from '../services/imageUtils.js';
 import { logger, dbLog } from '../utils/logger.js';
 import { cleanProductName } from '../utils/productName.js';
+import { extractSeoKeywords } from '../services/keywordExtractor.js';
 
 const router = express.Router();
 
@@ -444,13 +445,42 @@ router.post('/generate', authenticateToken, async (req, res) => {
     const media = await collectAllImages(productForImages, settings);
     logger.info('이미지 수집 완료', { imageCount: media.length });
 
-    // 7. DB에 리뷰 저장
+    // 7. AI 기반 SEO 키워드 추출 (실패해도 리뷰 저장은 계속)
+    const aiKeywords = await extractSeoKeywords(
+      settings.ai,
+      cleanedName,
+      product.category_name
+    );
+
+    // 검색 의도 키워드를 자동으로 합쳐 메타용 풀 키워드 구성
+    const mergedKeywords = Array.from(
+      new Set([
+        ...aiKeywords,
+        product.category_name,
+        '쿠팡',
+        '최저가',
+        '후기',
+      ].filter(Boolean))
+    );
+
+    const firstMediaImage = Array.isArray(media)
+      ? media.find((m) => m?.type === 'image')?.url
+      : null;
+
+    const seoMeta = {
+      title: `${aiKeywords[0] || cleanedName} 쿠팡 최저가 후기 | 세모링크`,
+      description: reviewText.slice(0, 150),
+      keywords: mergedKeywords,
+      ogImage: firstMediaImage || product.product_image || '',
+    };
+
+    // 8. DB에 리뷰 저장
     const reviewResult = await db.query(
       `INSERT INTO reviews (
         product_id, product_name, content, status, category,
         affiliate_url, media, tone_score, char_count,
-        product_price, product_image
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        product_price, product_image, seo_meta
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
       [
         product.product_id,
         product.product_name,
@@ -463,18 +493,19 @@ router.post('/generate', authenticateToken, async (req, res) => {
         charCount,
         product.product_price,
         product.product_image,
+        JSON.stringify(seoMeta),
       ]
     );
 
     const reviewId = reviewResult.rows[0].id;
 
-    // 8. 상품 상태를 completed로 업데이트
+    // 9. 상품 상태를 completed로 업데이트
     await db.query(
       "UPDATE products SET status = 'completed', updated_at = NOW() WHERE product_id = $1",
       [productId]
     );
 
-    // 9. 성공 로그
+    // 10. 성공 로그
     await dbLog('review-generate', 'info', `리뷰 생성 완료: ${product.product_name}`, {
       productId,
       reviewId,
