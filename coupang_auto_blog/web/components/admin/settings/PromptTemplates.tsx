@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { PromptTemplate } from "@/types/promptTemplate";
 import { TemplateEditor } from "./TemplateEditor";
+import { DEFAULT_SYSTEM_PROMPT, DEFAULT_REVIEW_TEMPLATE } from "@/types/settings";
 
 export function PromptTemplates() {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
@@ -10,6 +11,7 @@ export function PromptTemplates() {
   const [error, setError] = useState<string | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isApplyingRecommended, setIsApplyingRecommended] = useState(false);
 
   const loadTemplates = async () => {
     try {
@@ -107,6 +109,60 @@ export function PromptTemplates() {
     }
   };
 
+  const handleApplyRecommendedToDefault = async () => {
+    const defaultTpl = templates.find((t) => t.isDefault);
+    if (!defaultTpl) {
+      alert(
+        "기본값으로 지정된 템플릿이 없습니다.\n먼저 템플릿 하나를 '기본값 설정'으로 지정해주세요."
+      );
+      return;
+    }
+
+    const confirmed = confirm(
+      `기본 템플릿 "${defaultTpl.name}"의 시스템 프롬프트와 리뷰 템플릿을\n권장 버전(단계 라벨 금지·마크다운 금지 규칙 강화)으로 교체합니다.\n\n그 외 설정(글자수, 톤 점수, 가이드라인, 카테고리)은 그대로 유지됩니다.\n\n계속하시겠습니까?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsApplyingRecommended(true);
+
+      // 1. 템플릿 업데이트
+      const updateRes = await fetch(
+        `/api/settings/prompt-templates?id=${defaultTpl.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemPrompt: DEFAULT_SYSTEM_PROMPT,
+            reviewTemplate: DEFAULT_REVIEW_TEMPLATE,
+          }),
+        }
+      );
+      if (!updateRes.ok) {
+        const data = await updateRes.json().catch(() => ({}));
+        throw new Error(data.error || "템플릿 업데이트 실패");
+      }
+
+      // 2. settings.prompt 동기화 (자동 리뷰 생성이 즉시 새 프롬프트 사용)
+      const syncRes = await fetch("/api/settings/sync-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: defaultTpl.id }),
+      });
+      if (!syncRes.ok) {
+        const data = await syncRes.json().catch(() => ({}));
+        throw new Error(data.error || "설정 동기화 실패");
+      }
+
+      alert("기본 템플릿이 권장 버전으로 업데이트되었습니다.\n다음 자동 리뷰 생성부터 새 프롬프트가 적용됩니다.");
+      await loadTemplates();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "권장 프롬프트 적용 중 오류 발생");
+    } finally {
+      setIsApplyingRecommended(false);
+    }
+  };
+
   const handleSave = async () => {
     setEditingTemplate(null);
     setIsCreating(false);
@@ -130,19 +186,29 @@ export function PromptTemplates() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">프롬프트 템플릿 관리</h2>
           <p className="mt-1 text-sm text-slate-500">
             여러 프롬프트 템플릿을 생성하고 상황에 맞게 사용하세요.
           </p>
         </div>
-        <button
-          onClick={() => setIsCreating(true)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          + 새 템플릿
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleApplyRecommendedToDefault}
+            disabled={isApplyingRecommended || templates.length === 0}
+            className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+            title="기본 템플릿의 시스템 프롬프트·리뷰 템플릿을 최신 권장 버전으로 교체"
+          >
+            {isApplyingRecommended ? "적용 중..." : "권장 프롬프트로 기본 템플릿 업데이트"}
+          </button>
+          <button
+            onClick={() => setIsCreating(true)}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            + 새 템플릿
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
