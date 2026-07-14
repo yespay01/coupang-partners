@@ -72,7 +72,7 @@ export default function RootLayout({
             {`
               (function () {
                 var s = document.createElement('script');
-                s.src = 'https://wcs.naver.net/wcslog.js';
+                s.src = 'https://wcs.pstatic.net/wcslog.js';
                 s.onload = function () {
                   if (!window.wcs_add) window.wcs_add = {};
                   window.wcs_add['wa'] = '${naverAnalyticsId}';
