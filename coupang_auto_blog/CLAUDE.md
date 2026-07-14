@@ -1,7 +1,7 @@
 # 쿠팡 자동 블로그 프로젝트 - Claude 작업 지침
 
-> **최종 업데이트**: 2026-02-24
-> **핵심 원칙**: Git 기반 워크플로우
+> **최종 업데이트**: 2026-07-14
+> **핵심 원칙**: Git 기반 워크플로우 (개발 컴퓨터에서 SSH 원격 배포 가능)
 
 ---
 
@@ -138,8 +138,16 @@ docker image prune -f       # <none> 태그 이미지만 정리
 3. **작업 완료 후 반드시 git push**
    - 서버에서 pull 받을 수 있도록
 
-4. **서버 배포는 직접 하지 않음**
-   - 사용자가 서버 컴퓨터에서 pull 받도록 안내
+4. **서버 배포: SSH 원격 배포 가능** (2026-07-14 사용자 승인)
+   - 개발 컴퓨터에서 SSH로 서버에 배포 명령을 실행할 수 있음:
+   ```bash
+   ssh insuk@192.168.0.5 "cd /home/insuk/blog/coupang_auto_blog && git -C /home/insuk/blog pull && docker compose down && docker compose build && docker compose up -d"
+   ```
+   - SSH 키 인증 설정됨 (비밀번호 불필요). 대체 주소: `insuk@100.107.201.37` (Tailscale)
+   - 빌드 중 사이트가 잠시 502가 되는 것은 정상 (약 5~8분)
+   - 배포 후 `curl -s -o /dev/null -w '%{http_code}' https://semolink.store`로 200 확인할 것
+   - DB 직접 접근: `docker exec coupang-postgres psql -U coupang_user -d coupang_blog`
+   - 환경변수는 서버의 `web/.env.production` / `.env.production` 수정 (런타임 주입 변수는 재빌드 불필요, 컨테이너 재생성만)
 
 ---
 
@@ -324,11 +332,11 @@ docker compose up -d
 
 | 컴퓨터 | 코드 수정 | Git 커밋 | Git 푸시 | Git Pull | 도커 빌드 | 배포 |
 |--------|----------|---------|---------|---------|----------|-----|
-| 개발   | ✅       | ✅      | ✅      | ✅      | ✅       | ❌  |
+| 개발   | ✅       | ✅      | ✅      | ✅      | ✅       | ✅ (SSH 원격) |
 | 서버   | ❌       | ❌      | ❌      | ✅      | ✅       | ✅  |
 
 **기억하세요:**
-- 개발 = 코드 작업 + 푸시
+- 개발 = 코드 작업 + 푸시 + (필요 시 SSH 원격 배포)
 - 서버 = 풀 + 빌드 + 실행 (코드 수정 절대 금지!)
 
 ---
