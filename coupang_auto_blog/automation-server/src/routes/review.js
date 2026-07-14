@@ -13,6 +13,55 @@ import { extractSeoKeywords } from '../services/keywordExtractor.js';
 const router = express.Router();
 
 /**
+ * 검색결과용 메타 설명 생성: 최대 길이 안에서 문장 경계로 자름
+ * (중간에 뚝 잘린 설명은 검색결과 클릭률을 떨어뜨림)
+ */
+function buildMetaDescription(text, maxLen = 155) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (clean.length <= maxLen) return clean;
+
+  const slice = clean.slice(0, maxLen);
+  const lastSentenceEnd = Math.max(
+    slice.lastIndexOf('.'),
+    slice.lastIndexOf('!'),
+    slice.lastIndexOf('?')
+  );
+
+  // 문장 끝이 너무 앞이면 (설명이 반토막) 마지막 단어 경계에서 자르고 말줄임
+  if (lastSentenceEnd >= 60) {
+    return slice.slice(0, lastSentenceEnd + 1);
+  }
+  const lastSpace = slice.lastIndexOf(' ');
+  return (lastSpace > 0 ? slice.slice(0, lastSpace) : slice) + '…';
+}
+
+/**
+ * 상품명 기반 고유 slug 생성 (한글 유지, 중복 시 -2, -3 부여)
+ */
+async function generateUniqueReviewSlug(db, title, fallback) {
+  const base = String(title || '')
+    .replace(/[^\w가-힣぀-ゟ゠-ヿ]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80)
+    .toLowerCase();
+
+  if (!base) return fallback;
+
+  const existing = await db.query(
+    `SELECT slug FROM reviews WHERE slug = $1 OR slug ~ $2`,
+    [base, `^${base}-[0-9]+$`]
+  );
+
+  if (existing.rows.length === 0) return base;
+
+  const usedSlugs = new Set(existing.rows.map((r) => r.slug));
+  let counter = 2;
+  while (usedSlugs.has(`${base}-${counter}`)) counter++;
+  return `${base}-${counter}`;
+}
+
+/**
  * GET /api/reviews
  * 공개 리뷰 목록 조회 (published만)
  */
@@ -471,9 +520,10 @@ router.post('/generate', authenticateToken, async (req, res) => {
       ? media.find((m) => m?.type === 'image')?.url
       : null;
 
+    // 제목에 상품명을 넣어 롱테일 검색(구체적인 상품명 검색)에 잡히게 함
     const seoMeta = {
-      title: `${aiKeywords[0] || cleanedName} 쿠팡 최저가 후기 | 세모링크`,
-      description: reviewText.slice(0, 150),
+      title: `${cleanedName} 솔직 후기 · 쿠팡 최저가 | 세모링크`,
+      description: buildMetaDescription(reviewText),
       keywords: mergedKeywords,
       ogImage: firstMediaImage || product.product_image || '',
     };
@@ -587,8 +637,29 @@ router.post('/publish', authenticateToken, async (req, res) => {
 
     const db = getDb();
 
-    // slug 생성
-    const slug = `review-${reviewId}-${Date.now()}`;
+    // 기존 slug가 있으면 유지 (재발행 시 URL이 바뀌면 기존 검색 유입이 끊김)
+    const existing = await db.query(
+      'SELECT slug, product_name FROM reviews WHERE id = $1',
+      [reviewId]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '리뷰를 찾을 수 없습니다.',
+      });
+    }
+
+    let slug = existing.rows[0].slug;
+    if (!slug) {
+      // 상품명 기반 slug (검색엔진이 URL에서 키워드를 읽음)
+      const cleanedName = cleanProductName(existing.rows[0].product_name || '');
+      slug = await generateUniqueReviewSlug(
+        db,
+        cleanedName,
+        `review-${reviewId}-${Date.now()}`
+      );
+    }
 
     // 상태 업데이트
     await db.query(

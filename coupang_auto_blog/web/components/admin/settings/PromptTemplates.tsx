@@ -3,7 +3,11 @@
 import { useState, useEffect } from "react";
 import type { PromptTemplate } from "@/types/promptTemplate";
 import { TemplateEditor } from "./TemplateEditor";
-import { DEFAULT_SYSTEM_PROMPT, DEFAULT_REVIEW_TEMPLATE } from "@/types/settings";
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  DEFAULT_REVIEW_TEMPLATE,
+  RECOMMENDED_REVIEW_LENGTH,
+} from "@/types/settings";
 
 export function PromptTemplates() {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
@@ -119,7 +123,7 @@ export function PromptTemplates() {
     }
 
     const confirmed = confirm(
-      `기본 템플릿 "${defaultTpl.name}"의 시스템 프롬프트와 리뷰 템플릿을\n권장 버전(단계 라벨 금지·마크다운 금지 규칙 강화)으로 교체합니다.\n\n그 외 설정(글자수, 톤 점수, 가이드라인, 카테고리)은 그대로 유지됩니다.\n\n계속하시겠습니까?`
+      `기본 템플릿 "${defaultTpl.name}"을 권장 버전으로 교체합니다.\n\n- 시스템 프롬프트·리뷰 템플릿: SEO 강화 버전 (장단점·꿀팁·추천대상 포함)\n- 글자수: ${RECOMMENDED_REVIEW_LENGTH.minLength}~${RECOMMENDED_REVIEW_LENGTH.maxLength}자 (검색 노출에 유리한 분량)\n\n그 외 설정(톤 점수, 가이드라인, 카테고리)은 그대로 유지됩니다.\n\n계속하시겠습니까?`
     );
     if (!confirmed) return;
 
@@ -135,6 +139,8 @@ export function PromptTemplates() {
           body: JSON.stringify({
             systemPrompt: DEFAULT_SYSTEM_PROMPT,
             reviewTemplate: DEFAULT_REVIEW_TEMPLATE,
+            minLength: RECOMMENDED_REVIEW_LENGTH.minLength,
+            maxLength: RECOMMENDED_REVIEW_LENGTH.maxLength,
           }),
         }
       );
