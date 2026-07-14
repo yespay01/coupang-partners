@@ -102,6 +102,23 @@ export default async function ReviewDetailPage({ params }: PageProps) {
             </h1>
           </header>
 
+          {review.affiliateUrl && (
+            <div className="mb-16 text-center">
+              <a
+                href={review.affiliateUrl}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="inline-flex items-center gap-2 px-10 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+              >
+                👉 쿠팡 최저가 바로 확인하기
+              </a>
+              <p className="mt-4 text-[11px] text-slate-400">
+                이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
+                수수료를 제공받습니다.
+              </p>
+            </div>
+          )}
+
           {review.media && review.media.length > 0 && (
             <div className="mb-20 space-y-8">
               {review.media.map((item, index) => (
