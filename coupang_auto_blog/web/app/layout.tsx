@@ -48,6 +48,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // 네이버 애널리틱스: 서버 환경변수에 ID가 있을 때만 스크립트 삽입
+  // (네이버는 referrer로 검색어를 안 넘겨주므로, 유입 검색어는 네이버 애널리틱스에서만 확인 가능)
+  const naverAnalyticsId = process.env.NAVER_ANALYTICS_ID;
+
   return (
     <html lang="ko">
       <head>
@@ -63,6 +67,22 @@ export default function RootLayout({
             gtag('config', 'GT-K52R4F3K');
           `}
         </Script>
+        {naverAnalyticsId && (
+          <Script id="naver-analytics" strategy="afterInteractive">
+            {`
+              (function () {
+                var s = document.createElement('script');
+                s.src = 'https://wcs.naver.net/wcslog.js';
+                s.onload = function () {
+                  if (!window.wcs_add) window.wcs_add = {};
+                  window.wcs_add['wa'] = '${naverAnalyticsId}';
+                  if (window.wcs) window.wcs_do();
+                };
+                document.head.appendChild(s);
+              })();
+            `}
+          </Script>
+        )}
       </head>
       <body
         className={`${notoSerif.variable} ${notoSans.variable} font-sans antialiased`}
