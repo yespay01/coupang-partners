@@ -26,16 +26,19 @@ function CoupangCTAButton({
   href,
   label,
   compact = false,
+  onClick,
 }: {
   href: string;
   label: string;
   compact?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer nofollow"
+      onClick={onClick}
       className={`group flex items-center justify-center gap-2 w-full ${
         compact ? "px-4 py-3" : "px-6 py-4"
       } bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all`}
@@ -67,6 +70,27 @@ export default function ReviewPost({ review }: ReviewPostProps) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // 쿠팡 클릭 추적 (fire-and-forget, 실패해도 이동에 영향 없음)
+  const trackClick = (position: string) => {
+    try {
+      fetch("/api/track/click", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({
+          review_id: review.id,
+          review_slug: review.slug || null,
+          product_name: review.productName || null,
+          position,
+          page_url: window.location.pathname,
+          referrer: document.referrer || null,
+        }),
+      }).catch(() => {});
+    } catch {
+      // 추적 실패 무시
+    }
+  };
+
   const affiliateUrl = review.affiliateUrl;
   const priceText =
     review.productPrice && review.productPrice > 0
@@ -91,6 +115,7 @@ export default function ReviewPost({ review }: ReviewPostProps) {
               rel="noopener noreferrer nofollow"
               aria-label={`${review.productName} 쿠팡 상품 페이지 열기`}
               className="group block absolute inset-0"
+              onClick={() => trackClick("image")}
             >
               <Image
                 src={review.productImage}
@@ -149,6 +174,7 @@ export default function ReviewPost({ review }: ReviewPostProps) {
           <CoupangCTAButton
             href={affiliateUrl}
             label="👉 쿠팡 최저가 바로 확인하기"
+            onClick={() => trackClick("top")}
           />
           <p className="mt-3 text-xs text-gray-500 text-center">
             이 포스트는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
@@ -168,6 +194,7 @@ export default function ReviewPost({ review }: ReviewPostProps) {
                   href={affiliateUrl}
                   label={`${review.productName ? `${review.productName} ` : ""}최저가 보러가기`}
                   compact
+                  onClick={() => trackClick("mid")}
                 />
               </div>
             )}
@@ -193,6 +220,7 @@ export default function ReviewPost({ review }: ReviewPostProps) {
             <CoupangCTAButton
               href={affiliateUrl}
               label="쿠팡에서 최저가 확인하기"
+              onClick={() => trackClick("bottom")}
             />
             <p className="mt-3 flex items-center justify-center gap-1.5 text-sm font-medium text-orange-700">
               <span>💰</span>
@@ -281,6 +309,7 @@ export default function ReviewPost({ review }: ReviewPostProps) {
               href={affiliateUrl}
               target="_blank"
               rel="noopener noreferrer nofollow"
+              onClick={() => trackClick("sticky")}
               className="group flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 px-5 py-3.5 text-white shadow-2xl shadow-orange-500/30 hover:shadow-orange-500/50 transition-shadow"
             >
               <span className="min-w-0">

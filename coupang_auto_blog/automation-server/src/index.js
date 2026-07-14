@@ -106,6 +106,53 @@ app.post('/api/track', async (req, res) => {
   }
 });
 
+// Public coupang click tracking endpoint (인증 불필요)
+app.post('/api/track/click', async (req, res) => {
+  try {
+    const {
+      review_id, review_slug, product_name, position,
+      page_url, referrer_domain, device_type, ip_address,
+    } = req.body;
+
+    // Bot 필터링
+    const userAgent = req.headers['user-agent'] || '';
+    if (/bot|crawler|spider|crawling/i.test(userAgent)) {
+      return res.json({ success: true, tracked: false });
+    }
+
+    const ip = ip_address || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
+    if (ip === '127.0.0.1' || ip === '::1' || ip === 'localhost') {
+      return res.json({ success: true, tracked: false });
+    }
+
+    const reviewIdNum = Number.parseInt(review_id, 10);
+
+    const { getDb } = await import('./config/database.js');
+    const db = getDb();
+    await db.query(
+      `INSERT INTO coupang_clicks
+         (review_id, review_slug, product_name, position,
+          page_url, referrer_domain, device_type, ip_address)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [
+        Number.isNaN(reviewIdNum) ? null : reviewIdNum,
+        review_slug || null,
+        product_name || null,
+        String(position || 'unknown').slice(0, 30),
+        page_url || null,
+        referrer_domain || null,
+        device_type || null,
+        ip || null,
+      ]
+    );
+
+    res.json({ success: true, tracked: true });
+  } catch (error) {
+    console.error('Click tracking error:', error);
+    res.json({ success: false });
+  }
+});
+
 // Dynamic import routes AFTER services initialization
 const routes = await Promise.all([
   import('./routes/auth.js'),

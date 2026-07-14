@@ -1455,4 +1455,87 @@ router.get('/analytics/stats', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/analytics/clicks
+ * 쿠팡 링크 클릭 통계 (글별·버튼 위치별)
+ */
+router.get('/analytics/clicks', async (req, res) => {
+  try {
+    const db = getDb();
+    const { dateRange = '30d' } = req.query;
+
+    const hours = dateRange === '24h' ? 24 : dateRange === '7d' ? 168 : dateRange === '30d' ? 720 : null;
+    const whereClause = hours ? `WHERE created_at >= NOW() - INTERVAL '${hours} hours'` : '';
+
+    const [
+      totalResult,
+      byPositionResult,
+      byDateResult,
+      byReviewResult,
+      reviewViewsResult,
+      recentResult,
+    ] = await Promise.all([
+      db.query(`SELECT COUNT(*) as count FROM coupang_clicks ${whereClause}`),
+      db.query(`
+        SELECT COALESCE(position, 'unknown') as position, COUNT(*) as count
+        FROM coupang_clicks ${whereClause}
+        GROUP BY position ORDER BY count DESC
+      `),
+      db.query(`
+        SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date, COUNT(*) as count
+        FROM coupang_clicks ${whereClause}
+        GROUP BY date ORDER BY date DESC LIMIT 30
+      `),
+      db.query(`
+        SELECT review_id, review_slug,
+               MAX(product_name) as product_name,
+               COUNT(*) as clicks
+        FROM coupang_clicks ${whereClause}
+        GROUP BY review_id, review_slug
+        ORDER BY clicks DESC LIMIT 20
+      `),
+      db.query(`
+        SELECT page_slug, COUNT(*) as views
+        FROM visitor_logs
+        ${whereClause ? whereClause + " AND" : 'WHERE'} page_type = 'review'
+        GROUP BY page_slug
+      `),
+      db.query(`
+        SELECT * FROM coupang_clicks ORDER BY created_at DESC LIMIT 20
+      `),
+    ]);
+
+    // 글별 클릭에 조회수를 붙여 CTR 계산
+    const viewsBySlug = new Map(
+      reviewViewsResult.rows.map((r) => [r.page_slug, parseInt(r.views)])
+    );
+    const byReview = byReviewResult.rows.map((r) => {
+      const views = viewsBySlug.get(r.review_slug) || 0;
+      const clicks = parseInt(r.clicks);
+      return {
+        reviewId: r.review_id,
+        slug: r.review_slug,
+        productName: r.product_name,
+        clicks,
+        views,
+        ctr: views > 0 ? Number(((clicks / views) * 100).toFixed(1)) : null,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        total: parseInt(totalResult.rows[0].count),
+        byPosition: byPositionResult.rows,
+        byDate: byDateResult.rows,
+        byReview,
+        recentClicks: recentResult.rows,
+      },
+    });
+  } catch (error) {
+    console.error('쿠팡 클릭 통계 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 export default router;

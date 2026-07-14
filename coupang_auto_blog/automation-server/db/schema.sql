@@ -152,6 +152,24 @@ CREATE INDEX IF NOT EXISTS idx_visitor_logs_created_at ON visitor_logs(created_a
 CREATE INDEX IF NOT EXISTS idx_visitor_logs_page_type ON visitor_logs(page_type);
 CREATE INDEX IF NOT EXISTS idx_visitor_logs_referrer_domain ON visitor_logs(referrer_domain);
 
+-- Coupang Click Logs Table (쿠팡 링크 클릭 추적: 글별·버튼 위치별 클릭 집계용)
+CREATE TABLE IF NOT EXISTS coupang_clicks (
+  id SERIAL PRIMARY KEY,
+  review_id INTEGER,
+  review_slug VARCHAR(255),
+  product_name VARCHAR(500),
+  position VARCHAR(30),
+  page_url TEXT,
+  referrer_domain VARCHAR(255),
+  device_type VARCHAR(20),
+  ip_address VARCHAR(45),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_coupang_clicks_created_at ON coupang_clicks(created_at);
+CREATE INDEX IF NOT EXISTS idx_coupang_clicks_review_id ON coupang_clicks(review_id);
+CREATE INDEX IF NOT EXISTS idx_coupang_clicks_position ON coupang_clicks(position);
+
 -- Insert default settings
 INSERT INTO settings (key, value, description) VALUES
 ('system', '{

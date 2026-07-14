@@ -2,6 +2,37 @@
 
 import { useEffect, useState } from "react";
 
+type ClickStats = {
+  total: number;
+  byPosition: { position: string; count: number }[];
+  byDate: { date: string; count: number }[];
+  byReview: {
+    reviewId: number | null;
+    slug: string | null;
+    productName: string | null;
+    clicks: number;
+    views: number;
+    ctr: number | null;
+  }[];
+  recentClicks: {
+    id: number;
+    review_slug: string | null;
+    product_name: string | null;
+    position: string;
+    device_type: string | null;
+    created_at: string;
+  }[];
+};
+
+const POSITION_LABELS: Record<string, string> = {
+  top: "상단 버튼",
+  image: "상품 이미지",
+  mid: "본문 중간",
+  bottom: "하단 카드",
+  sticky: "하단 고정바",
+  unknown: "기타",
+};
+
 type AnalyticsStats = {
   total: number;
   byDate: { date: string; count: number }[];
@@ -56,6 +87,7 @@ const PAGE_TYPE_LABELS: Record<string, string> = {
 
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
+  const [clickStats, setClickStats] = useState<ClickStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState("30d");
@@ -68,15 +100,19 @@ export default function AnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(
-        `/api/admin/analytics/stats?dateRange=${dateRange}`
-      );
-      const data = await response.json();
+      const [visitorRes, clickRes] = await Promise.all([
+        fetch(`/api/admin/analytics/stats?dateRange=${dateRange}`),
+        fetch(`/api/admin/analytics/clicks?dateRange=${dateRange}`),
+      ]);
+      const data = await visitorRes.json();
       if (data.success) {
         setStats(data.data);
       } else {
         setError(data.error || data.message || "통계 조회 실패");
       }
+      // 클릭 통계는 실패해도 방문자 통계는 표시
+      const clickData = await clickRes.json().catch(() => null);
+      setClickStats(clickData?.success ? clickData.data : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "통계 조회 실패");
     } finally {
@@ -163,16 +199,137 @@ export default function AnalyticsPage() {
           ))}
         </div>
 
-        {/* 총 방문자 수 */}
-        <div className="rounded-lg border-2 border-blue-500 bg-blue-50 p-6">
-          <h2 className="text-lg font-bold text-blue-900">총 방문자 수</h2>
-          <p className="mt-2 text-4xl font-bold text-blue-600">
-            {stats.total.toLocaleString()}
-          </p>
-          <p className="mt-1 text-sm text-blue-700">
-            {DATE_RANGES.find((r) => r.value === dateRange)?.label} 기준
-          </p>
+        {/* 핵심 지표: 방문자 · 쿠팡 클릭 · 클릭률 */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-lg border-2 border-blue-500 bg-blue-50 p-6">
+            <h2 className="text-lg font-bold text-blue-900">총 방문자 수</h2>
+            <p className="mt-2 text-4xl font-bold text-blue-600">
+              {stats.total.toLocaleString()}
+            </p>
+            <p className="mt-1 text-sm text-blue-700">
+              {DATE_RANGES.find((r) => r.value === dateRange)?.label} 기준
+            </p>
+          </div>
+          <div className="rounded-lg border-2 border-orange-500 bg-orange-50 p-6">
+            <h2 className="text-lg font-bold text-orange-900">쿠팡 링크 클릭</h2>
+            <p className="mt-2 text-4xl font-bold text-orange-600">
+              {(clickStats?.total ?? 0).toLocaleString()}
+            </p>
+            <p className="mt-1 text-sm text-orange-700">
+              수익으로 이어지는 클릭 수
+            </p>
+          </div>
+          <div className="rounded-lg border-2 border-emerald-500 bg-emerald-50 p-6">
+            <h2 className="text-lg font-bold text-emerald-900">리뷰 → 쿠팡 클릭률</h2>
+            <p className="mt-2 text-4xl font-bold text-emerald-600">
+              {(() => {
+                const reviewVisits = Number(
+                  stats.byPageType.find((p) => p.page_type === "review")
+                    ?.count || 0
+                );
+                const clicks = clickStats?.total ?? 0;
+                return reviewVisits > 0
+                  ? `${((clicks / reviewVisits) * 100).toFixed(1)}%`
+                  : "-";
+              })()}
+            </p>
+            <p className="mt-1 text-sm text-emerald-700">
+              리뷰 방문 대비 쿠팡 클릭
+            </p>
+          </div>
         </div>
+
+        {/* 쿠팡 클릭 분석 */}
+        {clickStats && (
+          <div className="rounded-lg border border-orange-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900">쿠팡 클릭 분석</h2>
+
+            {/* 버튼 위치별 클릭 */}
+            <h3 className="mt-4 text-sm font-semibold text-slate-600">
+              버튼 위치별 클릭
+            </h3>
+            {clickStats.byPosition.length > 0 ? (
+              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                {clickStats.byPosition.map((p) => (
+                  <div
+                    key={p.position}
+                    className="rounded-lg border border-orange-100 bg-orange-50/50 p-3 text-center"
+                  >
+                    <div className="text-xs font-semibold text-slate-500">
+                      {POSITION_LABELS[p.position] || p.position}
+                    </div>
+                    <div className="mt-1 text-xl font-bold text-orange-600">
+                      {Number(p.count).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-400">
+                아직 수집된 클릭이 없습니다. 방문자가 쿠팡 버튼을 누르면 여기에
+                집계됩니다.
+              </p>
+            )}
+
+            {/* 글별 클릭 Top 20 */}
+            {clickStats.byReview.length > 0 && (
+              <>
+                <h3 className="mt-6 text-sm font-semibold text-slate-600">
+                  글별 쿠팡 클릭 Top 20
+                </h3>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase text-slate-500">
+                        <th className="pb-2 pr-4">상품</th>
+                        <th className="pb-2 pr-4 text-right">클릭</th>
+                        <th className="pb-2 pr-4 text-right">조회</th>
+                        <th className="pb-2 text-right">클릭률</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {clickStats.byReview.map((r, i) => (
+                        <tr key={`${r.reviewId}-${i}`} className="hover:bg-slate-50">
+                          <td className="py-2 pr-4">
+                            {r.slug ? (
+                              <a
+                                href={`/reviews/${r.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                {r.productName || r.slug}
+                              </a>
+                            ) : (
+                              <span className="text-slate-700">
+                                {r.productName || `리뷰 #${r.reviewId}`}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-4 text-right font-semibold text-orange-600">
+                            {r.clicks.toLocaleString()}
+                          </td>
+                          <td className="py-2 pr-4 text-right text-slate-600">
+                            {r.views.toLocaleString()}
+                          </td>
+                          <td className="py-2 text-right">
+                            {r.ctr !== null ? (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                                {r.ctr}%
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* 기기 유형 */}
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
