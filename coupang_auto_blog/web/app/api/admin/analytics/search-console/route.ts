@@ -1,0 +1,49 @@
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+
+const AUTOMATION_SERVER_URL =
+  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
+
+/**
+ * GET /api/admin/analytics/search-console
+ * Google Search Console 데이터 프록시
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("admin_session");
+
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const dateRange = searchParams.get("dateRange") || "30d";
+
+    const response = await fetch(
+      `${AUTOMATION_SERVER_URL}/api/admin/analytics/search-console?dateRange=${dateRange}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `admin_session=${sessionCookie.value}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
+    }
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Search Console fetch error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

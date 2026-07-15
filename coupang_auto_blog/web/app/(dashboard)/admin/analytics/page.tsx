@@ -24,6 +24,28 @@ type ClickStats = {
   }[];
 };
 
+type GscData = {
+  configured: boolean;
+  keywords: {
+    keyword: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }[];
+  pages: {
+    page: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }[];
+  totalClicks: number;
+  totalImpressions: number;
+  averageCtr: number;
+  averagePosition: number;
+};
+
 const POSITION_LABELS: Record<string, string> = {
   top: "상단 버튼",
   image: "상품 이미지",
@@ -88,6 +110,7 @@ const PAGE_TYPE_LABELS: Record<string, string> = {
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
   const [clickStats, setClickStats] = useState<ClickStats | null>(null);
+  const [gscData, setGscData] = useState<GscData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState("30d");
@@ -100,9 +123,10 @@ export default function AnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [visitorRes, clickRes] = await Promise.all([
+      const [visitorRes, clickRes, gscRes] = await Promise.all([
         fetch(`/api/admin/analytics/stats?dateRange=${dateRange}`),
         fetch(`/api/admin/analytics/clicks?dateRange=${dateRange}`),
+        fetch(`/api/admin/analytics/search-console?dateRange=${dateRange}`),
       ]);
       const data = await visitorRes.json();
       if (data.success) {
@@ -113,6 +137,9 @@ export default function AnalyticsPage() {
       // 클릭 통계는 실패해도 방문자 통계는 표시
       const clickData = await clickRes.json().catch(() => null);
       setClickStats(clickData?.success ? clickData.data : null);
+      // GSC 데이터도 실패해도 기존 통계는 표시
+      const gscResult = await gscRes.json().catch(() => null);
+      setGscData(gscResult?.success ? gscResult.data : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "통계 조회 실패");
     } finally {
@@ -433,13 +460,112 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {/* 구글 검색 키워드 (Search Console) */}
+        <div className="rounded-lg border border-indigo-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-900">
+              구글 검색 키워드
+            </h2>
+            <span className="text-xs text-slate-400">Google Search Console API (2~3일 지연)</span>
+          </div>
+          {gscData && gscData.configured ? (
+            <>
+              {/* GSC 요약 지표 */}
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 text-center">
+                  <div className="text-xs font-semibold text-slate-500">총 클릭</div>
+                  <div className="mt-1 text-xl font-bold text-indigo-600">
+                    {gscData.totalClicks.toLocaleString()}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 text-center">
+                  <div className="text-xs font-semibold text-slate-500">총 노출</div>
+                  <div className="mt-1 text-xl font-bold text-indigo-600">
+                    {gscData.totalImpressions.toLocaleString()}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 text-center">
+                  <div className="text-xs font-semibold text-slate-500">평균 CTR</div>
+                  <div className="mt-1 text-xl font-bold text-indigo-600">
+                    {gscData.averageCtr}%
+                  </div>
+                </div>
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 text-center">
+                  <div className="text-xs font-semibold text-slate-500">평균 순위</div>
+                  <div className="mt-1 text-xl font-bold text-indigo-600">
+                    {gscData.averagePosition}
+                  </div>
+                </div>
+              </div>
+
+              {/* GSC 키워드 테이블 */}
+              {gscData.keywords.length > 0 ? (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase text-slate-500">
+                        <th className="pb-2 pr-4">#</th>
+                        <th className="pb-2 pr-4">키워드</th>
+                        <th className="pb-2 pr-4 text-right">클릭</th>
+                        <th className="pb-2 pr-4 text-right">노출</th>
+                        <th className="pb-2 pr-4 text-right">CTR</th>
+                        <th className="pb-2 text-right">순위</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {gscData.keywords.map((k, i) => (
+                        <tr key={k.keyword} className="hover:bg-slate-50">
+                          <td className="py-2 pr-4 text-xs font-bold text-slate-400">
+                            {i + 1}
+                          </td>
+                          <td className="py-2 pr-4 text-sm text-slate-700">
+                            {k.keyword}
+                          </td>
+                          <td className="py-2 pr-4 text-right font-semibold text-indigo-600">
+                            {k.clicks.toLocaleString()}
+                          </td>
+                          <td className="py-2 pr-4 text-right text-slate-600">
+                            {k.impressions.toLocaleString()}
+                          </td>
+                          <td className="py-2 pr-4 text-right">
+                            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">
+                              {k.ctr}%
+                            </span>
+                          </td>
+                          <td className="py-2 text-right text-slate-600">
+                            {k.position}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-slate-400">
+                  해당 기간에 수집된 구글 검색 데이터가 없습니다.
+                </p>
+              )}
+            </>
+          ) : (
+            <div className="mt-4 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/30 p-6 text-center">
+              <p className="text-sm font-medium text-indigo-700">
+                Google Search Console 연동이 필요합니다
+              </p>
+              <p className="mt-2 text-xs text-indigo-500">
+                서버 환경변수에 GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+                GOOGLE_SEARCH_CONSOLE_SITE_URL을 설정하세요.
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* 검색 키워드 Top 20 */}
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-900">
-              검색 키워드 Top 20
+              검색 키워드 Top 20 (네이버)
             </h2>
-            <span className="text-xs text-slate-400">네이버 검색만 수집 가능 (구글은 보안 정책상 미지원)</span>
+            <span className="text-xs text-slate-400">네이버 검색만 수집 가능 (referrer 기반)</span>
           </div>
           {stats.byKeyword.length > 0 ? (
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">

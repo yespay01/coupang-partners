@@ -8,6 +8,7 @@ import { generateText } from '../services/aiProviders.js';
 import { searchProducts } from '../services/coupang/products.js';
 import { naverSearch, formatNaverResults, getLatestLottoNumbers, formatLottoData, isLottoTopic } from '../services/webSearch.js';
 import { createDeeplinks } from '../services/coupang/deeplink.js';
+import { getSearchConsoleData } from '../services/googleSearchConsole.js';
 import fetch from 'node-fetch';
 
 const router = express.Router();
@@ -1534,6 +1535,22 @@ router.get('/analytics/clicks', async (req, res) => {
     });
   } catch (error) {
     console.error('쿠팡 클릭 통계 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/analytics/search-console
+ * Google Search Console 키워드 및 페이지 성과 데이터
+ */
+router.get('/analytics/search-console', async (req, res) => {
+  try {
+    const { dateRange = '30d' } = req.query;
+    const data = await getSearchConsoleData(dateRange);
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Google Search Console 조회 오류:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
