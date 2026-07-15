@@ -9,6 +9,7 @@ import { searchProducts } from '../services/coupang/products.js';
 import { naverSearch, formatNaverResults, getLatestLottoNumbers, formatLottoData, isLottoTopic } from '../services/webSearch.js';
 import { createDeeplinks } from '../services/coupang/deeplink.js';
 import { getSearchConsoleData } from '../services/googleSearchConsole.js';
+import { getNaverSearchData } from '../services/naverSearchAdvisor.js';
 import fetch from 'node-fetch';
 
 const router = express.Router();
@@ -1551,6 +1552,22 @@ router.get('/analytics/search-console', async (req, res) => {
     res.json({ success: true, data });
   } catch (error) {
     console.error('Google Search Console 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/analytics/naver-sa
+ * 네이버 서치어드바이저 검색 키워드 및 웹문서 데이터
+ */
+router.get('/analytics/naver-sa', async (req, res) => {
+  try {
+    const { dateRange = '30d' } = req.query;
+    const data = await getNaverSearchData(dateRange);
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('네이버 서치어드바이저 조회 오류:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

@@ -24,6 +24,28 @@ type ClickStats = {
   }[];
 };
 
+type NaverSaData = {
+  configured: boolean;
+  message?: string;
+  keywords: {
+    keyword: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }[];
+  pages: {
+    page: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }[];
+  totalClicks: number;
+  totalImpressions: number;
+  averageCtr: number;
+};
+
 type GscData = {
   configured: boolean;
   keywords: {
@@ -111,6 +133,7 @@ export default function AnalyticsPage() {
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
   const [clickStats, setClickStats] = useState<ClickStats | null>(null);
   const [gscData, setGscData] = useState<GscData | null>(null);
+  const [naverSaData, setNaverSaData] = useState<NaverSaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState("30d");
@@ -123,10 +146,11 @@ export default function AnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [visitorRes, clickRes, gscRes] = await Promise.all([
+      const [visitorRes, clickRes, gscRes, naverSaRes] = await Promise.all([
         fetch(`/api/admin/analytics/stats?dateRange=${dateRange}`),
         fetch(`/api/admin/analytics/clicks?dateRange=${dateRange}`),
         fetch(`/api/admin/analytics/search-console?dateRange=${dateRange}`),
+        fetch(`/api/admin/analytics/naver-sa?dateRange=${dateRange}`),
       ]);
       const data = await visitorRes.json();
       if (data.success) {
@@ -140,6 +164,9 @@ export default function AnalyticsPage() {
       // GSC 데이터도 실패해도 기존 통계는 표시
       const gscResult = await gscRes.json().catch(() => null);
       setGscData(gscResult?.success ? gscResult.data : null);
+      // 네이버 서치어드바이저 데이터
+      const naverSaResult = await naverSaRes.json().catch(() => null);
+      setNaverSaData(naverSaResult?.success ? naverSaResult.data : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "통계 조회 실패");
     } finally {
@@ -559,37 +586,148 @@ export default function AnalyticsPage() {
           )}
         </div>
 
-        {/* 검색 키워드 Top 20 */}
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        {/* 네이버 검색 키워드 (서치어드바이저) */}
+        <div className="rounded-lg border border-green-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-900">
-              검색 키워드 Top 20 (네이버)
+              네이버 검색 키워드
             </h2>
-            <span className="text-xs text-slate-400">네이버 검색만 수집 가능 (referrer 기반)</span>
+            <span className="text-xs text-slate-400">네이버 서치어드바이저 (세션 쿠키 기반)</span>
           </div>
-          {stats.byKeyword.length > 0 ? (
-            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {stats.byKeyword.map((k, i) => (
-                <div
-                  key={k.keyword}
-                  className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-400">
-                      #{i + 1}
-                    </span>
-                    <span className="text-sm text-slate-700">{k.keyword}</span>
+          {naverSaData && naverSaData.configured ? (
+            <>
+              {/* 네이버 요약 지표 */}
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-green-100 bg-green-50/50 p-3 text-center">
+                  <div className="text-xs font-semibold text-slate-500">총 클릭</div>
+                  <div className="mt-1 text-xl font-bold text-green-600">
+                    {naverSaData.totalClicks.toLocaleString()}
                   </div>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                    {Number(k.count)}회
-                  </span>
                 </div>
-              ))}
-            </div>
+                <div className="rounded-lg border border-green-100 bg-green-50/50 p-3 text-center">
+                  <div className="text-xs font-semibold text-slate-500">총 노출</div>
+                  <div className="mt-1 text-xl font-bold text-green-600">
+                    {naverSaData.totalImpressions.toLocaleString()}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-green-100 bg-green-50/50 p-3 text-center">
+                  <div className="text-xs font-semibold text-slate-500">평균 CTR</div>
+                  <div className="mt-1 text-xl font-bold text-green-600">
+                    {naverSaData.averageCtr}%
+                  </div>
+                </div>
+              </div>
+
+              {/* 네이버 키워드 테이블 */}
+              {naverSaData.keywords.length > 0 ? (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase text-slate-500">
+                        <th className="pb-2 pr-4">#</th>
+                        <th className="pb-2 pr-4">키워드</th>
+                        <th className="pb-2 pr-4 text-right">클릭</th>
+                        <th className="pb-2 pr-4 text-right">노출</th>
+                        <th className="pb-2 pr-4 text-right">CTR</th>
+                        <th className="pb-2 text-right">순위</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {naverSaData.keywords.map((k, i) => (
+                        <tr key={k.keyword} className="hover:bg-slate-50">
+                          <td className="py-2 pr-4 text-xs font-bold text-slate-400">
+                            {i + 1}
+                          </td>
+                          <td className="py-2 pr-4 text-sm text-slate-700">
+                            {k.keyword}
+                          </td>
+                          <td className="py-2 pr-4 text-right font-semibold text-green-600">
+                            {k.clicks.toLocaleString()}
+                          </td>
+                          <td className="py-2 pr-4 text-right text-slate-600">
+                            {k.impressions.toLocaleString()}
+                          </td>
+                          <td className="py-2 pr-4 text-right">
+                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+                              {k.ctr}%
+                            </span>
+                          </td>
+                          <td className="py-2 text-right text-slate-600">
+                            {k.position}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-slate-400">
+                  해당 기간에 수집된 네이버 검색 데이터가 없습니다.
+                </p>
+              )}
+
+              {/* 네이버 웹문서 Top 10 */}
+              {naverSaData.pages.length > 0 && (
+                <>
+                  <h3 className="mt-6 text-sm font-semibold text-slate-600">
+                    네이버 웹문서 Top 10
+                  </h3>
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase text-slate-500">
+                          <th className="pb-2 pr-4">#</th>
+                          <th className="pb-2 pr-4">페이지</th>
+                          <th className="pb-2 pr-4 text-right">클릭</th>
+                          <th className="pb-2 pr-4 text-right">노출</th>
+                          <th className="pb-2 text-right">CTR</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {naverSaData.pages.slice(0, 10).map((p, i) => (
+                          <tr key={p.page} className="hover:bg-slate-50">
+                            <td className="py-2 pr-4 text-xs font-bold text-slate-400">
+                              {i + 1}
+                            </td>
+                            <td className="py-2 pr-4 text-sm text-slate-700 max-w-[300px] truncate">
+                              <a
+                                href={p.page}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                                title={p.page}
+                              >
+                                {p.page.replace('https://semolink.store', '')}
+                              </a>
+                            </td>
+                            <td className="py-2 pr-4 text-right font-semibold text-green-600">
+                              {p.clicks.toLocaleString()}
+                            </td>
+                            <td className="py-2 pr-4 text-right text-slate-600">
+                              {p.impressions.toLocaleString()}
+                            </td>
+                            <td className="py-2 text-right">
+                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+                                {p.ctr}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </>
           ) : (
-            <p className="mt-4 text-sm text-slate-400">
-              아직 수집된 키워드가 없습니다. 네이버 검색을 통해 방문한 경우에만 표시됩니다.
-            </p>
+            <div className="mt-4 rounded-lg border border-dashed border-green-300 bg-green-50/30 p-6 text-center">
+              <p className="text-sm font-medium text-green-700">
+                {naverSaData?.message || '네이버 서치어드바이저 연동이 필요합니다'}
+              </p>
+              <p className="mt-2 text-xs text-green-500">
+                서버 환경변수에 NAVER_SA_COOKIES, NAVER_SA_SITE_HASH를 설정하세요.
+              </p>
+            </div>
           )}
         </div>
 
