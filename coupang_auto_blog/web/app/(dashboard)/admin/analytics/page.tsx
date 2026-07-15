@@ -27,6 +27,8 @@ type ClickStats = {
 type NaverSaData = {
   configured: boolean;
   message?: string;
+  cookieStatus?: "active" | "expired" | "error";
+  cookieUpdatedAt?: string;
   keywords: {
     keyword: string;
     clicks: number;
@@ -592,7 +594,23 @@ export default function AnalyticsPage() {
             <h2 className="text-lg font-bold text-slate-900">
               네이버 검색 키워드
             </h2>
-            <span className="text-xs text-slate-400">네이버 서치어드바이저 (세션 쿠키 기반)</span>
+            <div className="flex items-center gap-2">
+              {naverSaData?.cookieStatus === "active" && (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                  쿠키 정상
+                </span>
+              )}
+              {naverSaData?.cookieStatus === "expired" && (
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                  쿠키 만료
+                </span>
+              )}
+              {naverSaData?.cookieUpdatedAt && (
+                <span className="text-xs text-slate-400">
+                  갱신: {new Date(naverSaData.cookieUpdatedAt).toLocaleDateString("ko-KR")}
+                </span>
+              )}
+            </div>
           </div>
           {naverSaData && naverSaData.configured ? (
             <>

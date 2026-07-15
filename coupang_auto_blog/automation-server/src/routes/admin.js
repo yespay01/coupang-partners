@@ -9,7 +9,7 @@ import { searchProducts } from '../services/coupang/products.js';
 import { naverSearch, formatNaverResults, getLatestLottoNumbers, formatLottoData, isLottoTopic } from '../services/webSearch.js';
 import { createDeeplinks } from '../services/coupang/deeplink.js';
 import { getSearchConsoleData } from '../services/googleSearchConsole.js';
-import { getNaverSearchData } from '../services/naverSearchAdvisor.js';
+import { getNaverSearchData, saveNaverSaCookies, getNaverSaStatus } from '../services/naverSearchAdvisor.js';
 import fetch from 'node-fetch';
 
 const router = express.Router();
@@ -1552,6 +1552,41 @@ router.get('/analytics/search-console', async (req, res) => {
     res.json({ success: true, data });
   } catch (error) {
     console.error('Google Search Console 조회 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/credentials/naver-sa
+ * 네이버 서치어드바이저 세션 쿠키 업데이트
+ */
+router.put('/credentials/naver-sa', requireAdmin, async (req, res) => {
+  try {
+    const { cookies, siteHash } = req.body;
+
+    if (!cookies || typeof cookies !== 'string') {
+      return res.status(400).json({ success: false, message: 'cookies 문자열이 필요합니다' });
+    }
+
+    await saveNaverSaCookies(cookies, siteHash);
+
+    res.json({ success: true, message: '네이버 SA 쿠키가 업데이트되었습니다.' });
+  } catch (error) {
+    console.error('네이버 SA 쿠키 업데이트 오류:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/credentials/naver-sa/status
+ * 네이버 서치어드바이저 쿠키 상태 확인
+ */
+router.get('/credentials/naver-sa/status', async (req, res) => {
+  try {
+    const status = await getNaverSaStatus();
+    res.json({ success: true, data: status });
+  } catch (error) {
+    console.error('네이버 SA 상태 확인 오류:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import axios from 'axios';
 import { generateToken } from '../config/auth.js';
 import { pickTrendingTopic } from '../services/trendingTopics.js';
+import { refreshNaverSession } from '../services/naverSearchAdvisor.js';
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:4000';
 const CRON_REVIEW_LIMIT = parseInt(process.env.CRON_REVIEW_GENERATION_LIMIT || '5', 10);
@@ -12,6 +13,7 @@ let reviewGenerationTask = null;
 let newsMorningTask = null;
 let newsAfternoonTask = null;
 let logCleanupTask = null;
+let naverSessionTask = null;
 let currentScheduleSnapshot = null;
 let scheduleSyncTimer = null;
 let isSyncingSchedules = false;
@@ -345,6 +347,18 @@ export async function initCronJobs() {
     timezone: 'Asia/Seoul'
   });
 
+  // 6시간마다 - 네이버 SA 세션 유지 (고정)
+  stopTask(naverSessionTask);
+  naverSessionTask = cron.schedule('0 */6 * * *', async () => {
+    console.log('⏰ Running Naver SA session keep-alive...');
+    try {
+      const result = await refreshNaverSession();
+      console.log('✅ Naver SA session keep-alive:', result);
+    } catch (error) {
+      console.error('❌ Naver SA session keep-alive failed:', error.message);
+    }
+  }, { timezone: 'Asia/Seoul' });
+
   if (scheduleSyncTimer) {
     clearInterval(scheduleSyncTimer);
   }
@@ -360,5 +374,6 @@ export async function initCronJobs() {
     console.log(`   - News (afternoon): Every day at ${currentScheduleSnapshot.newsAfternoon.label} KST`);
   }
   console.log('   - Log cleanup: Every Sunday at 12:00 AM KST');
+  console.log('   - Naver SA keep-alive: Every 6 hours');
   console.log(`   - Schedule sync: Every ${Math.floor(CRON_SCHEDULE_SYNC_MS / 1000)}s`);
 }
