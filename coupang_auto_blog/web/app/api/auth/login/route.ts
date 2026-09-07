@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60, // 24시간
+        maxAge: 30 * 24 * 60 * 60, // 개인용 관리자: 30일 유지
         path: '/',
       });
     }

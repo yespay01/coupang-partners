@@ -423,9 +423,10 @@ export async function initCronJobs() {
     timezone: 'Asia/Seoul'
   });
 
-  // 6시간마다 - 네이버 SA 세션 유지 (고정)
+  // 30분마다 - 네이버 SA 세션 유지 (고정)
+  // 네이버 로그인 세션은 6시간 안에 만료될 수 있어 짧게 유지한다.
   stopTask(naverSessionTask);
-  naverSessionTask = cron.schedule('0 */6 * * *', async () => {
+  const keepNaverSessionAlive = async () => {
     console.log('⏰ Running Naver SA session keep-alive...');
     try {
       const result = await refreshNaverSession();
@@ -433,7 +434,13 @@ export async function initCronJobs() {
     } catch (error) {
       console.error('❌ Naver SA session keep-alive failed:', error.message);
     }
-  }, { timezone: 'Asia/Seoul' });
+  };
+  naverSessionTask = cron.schedule('*/30 * * * *', keepNaverSessionAlive, {
+    timezone: 'Asia/Seoul'
+  });
+
+  // 재배포/재시작 직후에도 즉시 세션 상태를 갱신한다.
+  keepNaverSessionAlive().catch(() => {});
 
   stopTask(dailyDiagnosticsTask);
   dailyDiagnosticsTask = null;
@@ -468,7 +475,7 @@ export async function initCronJobs() {
     console.log(`   - News (afternoon): ${newsAfternoonTask ? `Every day at ${currentScheduleSnapshot.newsAfternoon.label} KST` : 'disabled'}`);
   }
   console.log('   - Log cleanup: Every Sunday at 12:00 AM KST');
-  console.log('   - Naver SA keep-alive: Every 6 hours');
+  console.log('   - Naver SA keep-alive: Every 30 minutes + startup');
   console.log(`   - Daily CTR diagnostics: ${dailyDiagnosticsTask ? '04:20 KST' : 'disabled'}`);
   console.log(`   - Real-price Search fallback: ${dailyPriceObservationTask ? 'hourly at :10 KST' : 'disabled'}`);
   console.log(`   - Schedule sync: Every ${Math.floor(CRON_SCHEDULE_SYNC_MS / 1000)}s`);

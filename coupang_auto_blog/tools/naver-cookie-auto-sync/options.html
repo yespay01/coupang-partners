@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>네이버 통계 자동 동기화</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>네이버 통계 자동 동기화</h1>
+      <p>
+        크롬에서 네이버 서치어드바이저와 세모링크 관리자에 한 번씩 로그인하면,
+        15분마다 쿠키를 자동 동기화합니다.
+      </p>
+      <ol>
+        <li><a href="https://searchadvisor.naver.com/console/board" target="_blank">네이버 서치어드바이저</a> 로그인</li>
+        <li><a href="https://semolink.store/admin" target="_blank">세모링크 관리자</a> 로그인</li>
+        <li>아래 버튼으로 즉시 동기화</li>
+      </ol>
+      <button id="sync">지금 동기화</button>
+      <div id="status" role="status">상태 확인 중...</div>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

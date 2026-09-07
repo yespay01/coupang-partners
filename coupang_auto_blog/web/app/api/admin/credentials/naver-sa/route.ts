@@ -4,6 +4,16 @@ import { cookies } from "next/headers";
 const AUTOMATION_SERVER_URL =
   process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "PUT, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 /**
  * PUT /api/admin/credentials/naver-sa
  * 네이버 서치어드바이저 쿠키 업데이트 프록시
@@ -12,11 +22,12 @@ export async function PUT(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("admin_session");
+    const authorization = request.headers.get("authorization");
 
-    if (!sessionCookie) {
+    if (!sessionCookie && !authorization) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401, headers: CORS_HEADERS }
       );
     }
 
@@ -28,7 +39,9 @@ export async function PUT(request: NextRequest) {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Cookie: `admin_session=${sessionCookie.value}`,
+          ...(authorization
+            ? { Authorization: authorization }
+            : { Cookie: `admin_session=${sessionCookie!.value}` }),
         },
         body: JSON.stringify(body),
       }
@@ -36,14 +49,14 @@ export async function PUT(request: NextRequest) {
 
     const data = await response.json();
     if (!response.ok) {
-      return NextResponse.json(data, { status: response.status });
+      return NextResponse.json(data, { status: response.status, headers: CORS_HEADERS });
     }
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: CORS_HEADERS });
   } catch (error) {
     console.error("Naver SA credentials update error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 }
