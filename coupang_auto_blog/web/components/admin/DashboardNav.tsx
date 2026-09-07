@@ -27,9 +27,6 @@ export function DashboardNav() {
         대시보드
       </Link>
       <span className="text-slate-500/60">|</span>
-      <Link href="/admin/reviews" className="hover:text-white">
-        후기 승인
-      </Link>
       <Link href="/admin/products" className="hover:text-white">
         수집 상품
       </Link>

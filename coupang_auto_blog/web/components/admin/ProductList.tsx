@@ -53,7 +53,6 @@ export function ProductList({
   onFirstPage,
 }: ProductListProps) {
   const [search, setSearch] = useState(filters.search || "");
-  const [generatingReviews, setGeneratingReviews] = useState<Set<string>>(new Set());
   const [deletingProducts, setDeletingProducts] = useState<Set<string>>(new Set());
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -79,40 +78,6 @@ export function ProductList({
         [status]: !currentStatuses[status],
       },
     });
-  };
-
-  const handleGenerateReview = async (product: Product) => {
-    if (generatingReviews.has(product.id)) {
-      return; // 이미 생성 중
-    }
-
-    setGeneratingReviews((prev) => new Set(prev).add(product.id));
-
-    try {
-      // automation-server는 product_id (쿠팡 상품 ID)로 검색하므로 productId 전송
-      const response = await fetch("/api/admin/generate-review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: product.productId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "리뷰 생성 실패");
-      }
-
-      alert("리뷰가 생성되었습니다. 잠시 후 후기 목록에서 확인하세요.");
-    } catch (error) {
-      console.error("리뷰 생성 오류:", error);
-      alert(error instanceof Error ? error.message : "리뷰 생성 중 오류가 발생했습니다.");
-    } finally {
-      setGeneratingReviews((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(product.id);
-        return newSet;
-      });
-    }
   };
 
   const handleDeleteProduct = async (product: Product) => {
@@ -351,20 +316,6 @@ export function ProductList({
                     >
                       제휴 링크
                     </a>
-                    {/* 대기중 또는 실패 상태일 때 리뷰 생성/재시도 버튼 */}
-                    {(product.status === "pending" || product.status === "failed") && (
-                      <button
-                        onClick={() => handleGenerateReview(product)}
-                        disabled={generatingReviews.has(product.id)}
-                        className="rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {generatingReviews.has(product.id)
-                          ? "생성 중..."
-                          : product.status === "failed"
-                            ? "재시도"
-                            : "리뷰 생성"}
-                      </button>
-                    )}
                     {/* 삭제 버튼 */}
                     <button
                       onClick={() => handleDeleteProduct(product)}
