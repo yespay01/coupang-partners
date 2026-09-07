@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "세모링크 네이버 통계 자동 연동",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "네이버 서치어드바이저 로그인 세션을 세모링크와 자동으로 동기화합니다.",
   "permissions": ["alarms", "cookies", "storage"],
   "host_permissions": [

@@ -2,15 +2,12 @@ const SYNC_ALARM = "naver-sa-cookie-sync";
 const SYNC_URL = "https://semolink.store/api/admin/credentials/naver-sa";
 
 function cookieHeader(cookies) {
-  const selected = new Map();
-  for (const cookie of cookies) {
-    // 같은 이름이면 호스트 전용 쿠키를 우선한다.
-    const current = selected.get(cookie.name);
-    if (!current || (!cookie.domain.startsWith(".") && current.domain.startsWith("."))) {
-      selected.set(cookie.name, cookie);
-    }
-  }
-  return [...selected.values()].map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
+  // 브라우저처럼 경로가 긴 쿠키를 먼저 보낸다. 같은 이름의 쿠키도
+  // 경로가 다르면 제거하지 않는다. 네이버가 이 순서로 세션을 판별한다.
+  return [...cookies]
+    .sort((a, b) => (b.path?.length || 0) - (a.path?.length || 0))
+    .map((cookie) => `${cookie.name}=${cookie.value}`)
+    .join("; ");
 }
 
 async function saveStatus(status) {
@@ -22,14 +19,15 @@ async function saveStatus(status) {
 
 async function syncCookies() {
   try {
-    const [naverCookies, searchAdvisorCookies, adminSession] = await Promise.all([
-      chrome.cookies.getAll({ domain: ".naver.com" }),
-      chrome.cookies.getAll({ domain: "searchadvisor.naver.com" }),
-      chrome.cookies.get({ url: "https://semolink.store", name: "admin_session" }),
+    const [searchAdvisorCookies, adminSession] = await Promise.all([
+      // 해당 페이지에 실제로 첨부되는 도메인/경로 쿠키만 읽는다.
+      chrome.cookies.getAll({
+        url: "https://searchadvisor.naver.com/console/site/report/expose?site=https%3A%2F%2Fsemolink.store",
+      }),
+      chrome.cookies.get({ url: "https://semolink.store/", name: "admin_session" }),
     ]);
 
-    const merged = [...naverCookies, ...searchAdvisorCookies];
-    const header = cookieHeader(merged);
+    const header = cookieHeader(searchAdvisorCookies);
     if (!header.includes("NID_AUT=") || !header.includes("NID_SES=")) {
       throw new Error("네이버 로그인이 필요합니다.");
     }
