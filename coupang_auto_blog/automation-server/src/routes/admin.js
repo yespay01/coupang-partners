@@ -22,7 +22,7 @@ import {
   registerAffiliateLink,
 } from '../services/coupang/affiliateLinkRegistry.js';
 import { getSearchConsoleData } from '../services/googleSearchConsole.js';
-import { getNaverSearchData, saveNaverSaCookies, getNaverSaStatus } from '../services/naverSearchAdvisor.js';
+import { getNaverSearchData, saveNaverSaCookies, getNaverSaStatus, saveNaverSearchSnapshot } from '../services/naverSearchAdvisor.js';
 import fetch from 'node-fetch';
 
 const router = express.Router();
@@ -1862,6 +1862,21 @@ router.put('/credentials/naver-sa', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('네이버 SA 쿠키 업데이트 오류:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/credentials/naver-sa/snapshot
+ * 로그인된 Chrome에서 조회한 네이버 서치어드바이저 결과 저장
+ */
+router.post('/credentials/naver-sa/snapshot', requireAdmin, async (req, res) => {
+  try {
+    const { dateRange, report } = req.body || {};
+    const data = await saveNaverSearchSnapshot(dateRange, report);
+    res.json({ success: true, message: '네이버 통계가 동기화되었습니다.', data });
+  } catch (error) {
+    console.error('네이버 SA 브라우저 스냅샷 저장 오류:', error);
+    res.status(400).json({ success: false, message: error.message });
   }
 });
 

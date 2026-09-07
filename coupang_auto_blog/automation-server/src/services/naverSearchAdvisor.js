@@ -9,6 +9,103 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 const REFERER = 'https://searchadvisor.naver.com/console/site/report/expose?site=https%3A%2F%2Fsemolink.store';
 
 const DB_KEY = 'naver_sa';
+const SNAPSHOT_DB_KEY = 'naver_sa_snapshots';
+const ALLOWED_DATE_RANGES = new Set(['7d', '30d', 'all']);
+
+function normalizeNaverReport(data, capturedAt = null) {
+  const items = data?.items?.[0];
+
+  if (!items) {
+    return {
+      configured: true,
+      cookieStatus: 'active',
+      cookieUpdatedAt: capturedAt,
+      keywords: [],
+      pages: [],
+      totalClicks: 0,
+      totalImpressions: 0,
+      averageCtr: 0,
+    };
+  }
+
+  const keywords = (items.querys || []).slice(0, 100).map(q => ({
+    keyword: String(q.key || '').slice(0, 500),
+    clicks: Number(q.clickCount) || 0,
+    impressions: Number(q.exposeCount) || 0,
+    ctr: q.ctr != null ? parseFloat(Number(q.ctr).toFixed(2)) : 0,
+    position: q.exposedRank != null ? parseFloat(Number(q.exposedRank).toFixed(1)) : 0,
+  }));
+
+  const pages = (items.urls || []).slice(0, 100).map(u => {
+    let pageUrl = String(u.key || '').slice(0, 2000);
+    try { pageUrl = decodeURIComponent(pageUrl); } catch {}
+    return {
+      page: pageUrl,
+      clicks: Number(u.clickCount) || 0,
+      impressions: Number(u.exposeCount) || 0,
+      ctr: u.ctr != null ? parseFloat(Number(u.ctr).toFixed(2)) : 0,
+      position: u.exposedRank != null ? parseFloat(Number(u.exposedRank).toFixed(1)) : 0,
+    };
+  });
+
+  const periodData = items.period || {};
+  const totalClicks = Number(periodData.clickCount) || keywords.reduce((s, k) => s + k.clicks, 0);
+  const totalImpressions = Number(periodData.exposeCount) || keywords.reduce((s, k) => s + k.impressions, 0);
+  const averageCtr = periodData.ctr != null
+    ? parseFloat(Number(periodData.ctr).toFixed(2))
+    : (totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(2)) : 0);
+
+  return {
+    configured: true,
+    cookieStatus: 'active',
+    cookieUpdatedAt: capturedAt,
+    keywords,
+    pages,
+    totalClicks,
+    totalImpressions,
+    averageCtr,
+  };
+}
+
+export async function saveNaverSearchSnapshot(dateRange, report) {
+  if (!ALLOWED_DATE_RANGES.has(dateRange)) {
+    throw new Error('지원하지 않는 기간입니다.');
+  }
+  const serialized = JSON.stringify(report);
+  if (!report || typeof report !== 'object' || serialized.length > 1_000_000) {
+    throw new Error('네이버 통계 데이터 형식이 올바르지 않습니다.');
+  }
+
+  const db = getDb();
+  const currentResult = await db.query('SELECT value FROM settings WHERE key = $1', [SNAPSHOT_DB_KEY]);
+  const current = currentResult.rows[0]?.value || {};
+  const capturedAt = new Date().toISOString();
+  const next = {
+    ...current,
+    [dateRange]: { capturedAt, report },
+  };
+
+  await db.query(
+    `INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
+     ON CONFLICT (key) DO UPDATE SET value = $2::jsonb, updated_at = NOW()`,
+    [SNAPSHOT_DB_KEY, JSON.stringify(next)]
+  );
+
+  return normalizeNaverReport(report, capturedAt);
+}
+
+async function getNaverSearchSnapshot(dateRange) {
+  try {
+    const db = getDb();
+    const result = await db.query('SELECT value FROM settings WHERE key = $1', [SNAPSHOT_DB_KEY]);
+    const snapshot = result.rows[0]?.value?.[dateRange];
+    if (!snapshot?.report) return null;
+    return normalizeNaverReport(snapshot.report, snapshot.capturedAt || null);
+  } catch (error) {
+    logger.error('네이버 SA 브라우저 스냅샷 조회 실패:', error.message);
+    return null;
+  }
+}
 
 /**
  * DB에서 네이버 SA 쿠키/설정 조회 (DB 우선, 환경변수 fallback)
@@ -211,6 +308,10 @@ export async function refreshNaverSession() {
  * 세션 쿠키 기반 인증 (공식 API 없음)
  */
 export async function getNaverSearchData(dateRange = '30d') {
+  // 로그인된 Chrome이 보낸 최신 결과를 최우선으로 사용한다.
+  const snapshot = await getNaverSearchSnapshot(dateRange);
+  if (snapshot) return snapshot;
+
   const creds = await getNaverSaCredentials();
 
   if (!creds) {
@@ -253,61 +354,7 @@ export async function getNaverSearchData(dateRange = '30d') {
     }
 
     const data = await response.json();
-    const items = data?.items?.[0];
-
-    if (!items) {
-      return {
-        configured: true,
-        cookieStatus: 'active',
-        cookieUpdatedAt: creds.updatedAt,
-        keywords: [],
-        pages: [],
-        totalClicks: 0,
-        totalImpressions: 0,
-        averageCtr: 0,
-      };
-    }
-
-    // querys 배열: 검색 키워드 데이터
-    const keywords = (items.querys || []).map(q => ({
-      keyword: q.key || '',
-      clicks: q.clickCount || 0,
-      impressions: q.exposeCount || 0,
-      ctr: q.ctr != null ? parseFloat(q.ctr.toFixed(2)) : 0,
-      position: q.exposedRank != null ? parseFloat(q.exposedRank.toFixed(1)) : 0,
-    }));
-
-    // urls 배열: 웹문서 데이터
-    const pages = (items.urls || []).map(u => {
-      let pageUrl = u.key || '';
-      try { pageUrl = decodeURIComponent(pageUrl); } catch {}
-      return {
-        page: pageUrl,
-        clicks: u.clickCount || 0,
-        impressions: u.exposeCount || 0,
-        ctr: u.ctr != null ? parseFloat(u.ctr.toFixed(2)) : 0,
-        position: u.exposedRank != null ? parseFloat(u.exposedRank.toFixed(1)) : 0,
-      };
-    });
-
-    // period: 기간 합계
-    const periodData = items.period || {};
-    const totalClicks = periodData.clickCount || keywords.reduce((s, k) => s + k.clicks, 0);
-    const totalImpressions = periodData.exposeCount || keywords.reduce((s, k) => s + k.impressions, 0);
-    const averageCtr = periodData.ctr != null
-      ? parseFloat(periodData.ctr.toFixed(2))
-      : (totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(2)) : 0);
-
-    return {
-      configured: true,
-      cookieStatus: 'active',
-      cookieUpdatedAt: creds.updatedAt,
-      keywords,
-      pages,
-      totalClicks,
-      totalImpressions,
-      averageCtr,
-    };
+    return normalizeNaverReport(data, creds.updatedAt);
   } catch (error) {
     logger.error('네이버 서치어드바이저 API 호출 오류:', error);
 
