@@ -1,164 +1,34 @@
-import { notFound } from "next/navigation";
-import { Metadata } from "next";
-import ReviewPost from "@/components/ReviewPost";
-import { SiteHeader } from "@/components/SiteHeader";
-import { SiteFooter } from "@/components/SiteFooter";
-import { Review } from "@/types";
-import { generateSEOMeta } from "@/lib/seo";
+import type { Metadata } from "next";
+import { notFound, permanentRedirect } from "next/navigation";
 
-// ISR: 1시간마다 재생성
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
-// 동적 경로 허용 (빌드 시 정적 생성 안 함)
-export const dynamicParams = true;
+const AUTOMATION_SERVER_URL = process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
 
-const AUTOMATION_SERVER_URL =
-  process.env.AUTOMATION_SERVER_URL || "http://automation-server:4000";
+type PageProps = { params: Promise<{ slug: string }> };
 
-interface PageProps {
-  params: Promise<{ slug: string }>;
-}
-
-/**
- * slug로 리뷰 조회 (automation-server API)
- */
-async function getReviewBySlug(slug: string): Promise<Review | null> {
+async function getProductId(slug: string): Promise<string | null> {
   try {
-    const url = new URL(`${AUTOMATION_SERVER_URL}/api/reviews/by-slug`);
-    url.searchParams.set('slug', slug);
-    const response = await fetch(url.toString(), { next: { revalidate: 3600 } });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const result = await response.json();
-
-    if (!result.success || !result.data) {
-      return null;
-    }
-
-    return result.data as Review;
-  } catch (error) {
-    console.error("리뷰 조회 실패:", error);
+    let decodedSlug = slug;
+    try { decodedSlug = decodeURIComponent(slug); } catch {}
+    const url = new URL(`${AUTOMATION_SERVER_URL}/api/legacy/reviews/by-slug`);
+    url.searchParams.set("slug", decodedSlug);
+    const response = await fetch(url.toString(), { cache: "no-store" });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return payload.success && payload.data?.productId ? String(payload.data.productId) : null;
+  } catch {
     return null;
   }
 }
 
-/**
- * SEO 메타데이터 생성
- */
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const review = await getReviewBySlug(slug);
-
-  if (!review) {
-    return {
-      title: "리뷰를 찾을 수 없습니다",
-    };
-  }
-
-  // media 배열에서 첫 번째 이미지 URL 추출 (MinIO 로컬 이미지 우선)
-  const firstMediaImage = review.media?.[0]?.url || "";
-  const ogImage = firstMediaImage || review.productImage || "";
-
-  // 핵심 키워드 추출 기반 SEO 메타 (DB에 저장된 seoMeta가 있으면 우선)
-  const seoMeta = review.seoMeta || generateSEOMeta(review);
-
-  // seoMeta에 저장된 ogImage보다 로컬 이미지를 우선 사용
-  const finalOgImage = ogImage || seoMeta.ogImage || "";
-
-  return {
-    title: seoMeta.title,
-    description: seoMeta.description,
-    keywords: seoMeta.keywords,
-    alternates: {
-      canonical: `https://semolink.store/reviews/${slug}`,
-    },
-    openGraph: {
-      title: seoMeta.title,
-      description: seoMeta.description,
-      images: finalOgImage ? [{ url: finalOgImage, width: 800, height: 600 }] : [],
-      type: "article",
-      publishedTime: review.publishedAt,
-      modifiedTime: review.updatedAt,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: seoMeta.title,
-      description: seoMeta.description,
-      images: finalOgImage ? [finalOgImage] : [],
-    },
-  };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: "상품 정보로 이동 중", robots: { index: false, follow: false, nocache: true } };
 }
 
-/**
- * 리뷰 상세 페이지
- */
-export default async function ReviewPage({ params }: PageProps) {
+export default async function LegacyReviewSlugPage({ params }: PageProps) {
   const { slug } = await params;
-  const review = await getReviewBySlug(slug);
-
-  // 404 처리
-  if (!review) {
-    notFound();
-  }
-
-  // 구조화된 데이터 (Schema.org)
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: review.productName,
-    image: review.productImage,
-    review: {
-      "@type": "Review",
-      reviewRating: {
-        "@type": "Rating",
-        ratingValue: "4.5",
-        bestRating: "5",
-      },
-      author: {
-        "@type": "Organization",
-        name: "세모링크",
-      },
-      reviewBody: review.content,
-      datePublished: review.publishedAt,
-    },
-    offers: {
-      "@type": "Offer",
-      price: review.productPrice,
-      priceCurrency: "KRW",
-      availability: "https://schema.org/InStock",
-      url: review.affiliateUrl,
-    },
-  };
-
-  return (
-    <div className="min-h-screen bg-white">
-      <SiteHeader />
-
-      {/* 구조화된 데이터 */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-      />
-
-      {/* 리뷰 포스트 */}
-      <main className="pt-36 pb-32">
-        <ReviewPost review={review} />
-      </main>
-
-      <SiteFooter />
-    </div>
-  );
-}
-
-/**
- * 정적 경로 생성 - 빈 배열 반환 (dynamicParams=true로 런타임에 동적 처리)
- * 빌드 중 automation-server가 없으므로 API 호출 안 함
- */
-export async function generateStaticParams() {
-  return [];
+  const productId = await getProductId(slug);
+  if (!productId) notFound();
+  permanentRedirect(`/products/${encodeURIComponent(productId)}`);
 }

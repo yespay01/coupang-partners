@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import OptimizationOverview from "@/components/admin/OptimizationOverview";
+import {
+  normalizeOptimizationSnapshot,
+  type AnalyticsOptimizationSnapshot,
+} from "@/types/analyticsOptimization";
 
 type ClickStats = {
   total: number;
@@ -136,26 +141,33 @@ export default function AnalyticsPage() {
   const [clickStats, setClickStats] = useState<ClickStats | null>(null);
   const [gscData, setGscData] = useState<GscData | null>(null);
   const [naverSaData, setNaverSaData] = useState<NaverSaData | null>(null);
+  const [optimizationData, setOptimizationData] =
+    useState<AnalyticsOptimizationSnapshot | null>(null);
+  const [optimizationError, setOptimizationError] = useState<string | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState("30d");
   const [keywordTab, setKeywordTab] = useState<"google" | "naver">("google");
   const [showLogs, setShowLogs] = useState(false);
 
-  useEffect(() => {
-    fetchStats();
-  }, [dateRange]);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setOptimizationError(null);
     try {
-      const [visitorRes, clickRes, gscRes, naverSaRes] = await Promise.all([
-        fetch(`/api/admin/analytics/stats?dateRange=${dateRange}`),
-        fetch(`/api/admin/analytics/clicks?dateRange=${dateRange}`),
-        fetch(`/api/admin/analytics/search-console?dateRange=${dateRange}`),
-        fetch(`/api/admin/analytics/naver-sa?dateRange=${dateRange}`),
-      ]);
+      const optimizationRequest = fetch(
+        `/api/admin/analytics/optimization?dateRange=${dateRange}`
+      ).catch(() => null);
+      const [visitorRes, clickRes, gscRes, naverSaRes, optimizationRes] =
+        await Promise.all([
+          fetch(`/api/admin/analytics/stats?dateRange=${dateRange}`),
+          fetch(`/api/admin/analytics/clicks?dateRange=${dateRange}`),
+          fetch(`/api/admin/analytics/search-console?dateRange=${dateRange}`),
+          fetch(`/api/admin/analytics/naver-sa?dateRange=${dateRange}`),
+          optimizationRequest,
+        ]);
       const data = await visitorRes.json();
       if (data.success) {
         setStats(data.data);
@@ -168,12 +180,32 @@ export default function AnalyticsPage() {
       setGscData(gscResult?.success ? gscResult.data : null);
       const naverSaResult = await naverSaRes.json().catch(() => null);
       setNaverSaData(naverSaResult?.success ? naverSaResult.data : null);
+      const optimizationResult = await optimizationRes
+        ?.json()
+        .catch(() => null);
+      if (optimizationResult?.success) {
+        setOptimizationData(
+          normalizeOptimizationSnapshot(optimizationResult.data)
+        );
+        setOptimizationError(null);
+      } else {
+        setOptimizationData(null);
+        setOptimizationError(
+          optimizationResult?.error ||
+            optimizationResult?.message ||
+            "최적화 분석 API에 연결할 수 없습니다."
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "통계 조회 실패");
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   if (loading) {
     return (
@@ -282,12 +314,12 @@ export default function AnalyticsPage() {
             <p className="mt-0.5 text-xs text-slate-400">수익 전환 클릭</p>
           </div>
           <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
-            <p className="text-xs font-medium text-slate-500">클릭률</p>
+            <p className="text-xs font-medium text-slate-500">기존 참고 CTR</p>
             <p className="mt-1 text-2xl font-bold text-emerald-600">
               {coupangCtr}
               {coupangCtr !== "-" && <span className="text-lg">%</span>}
             </p>
-            <p className="mt-0.5 text-xs text-slate-400">리뷰 방문 대비</p>
+            <p className="mt-0.5 text-xs text-slate-400">페이지 방문 대비 단순 클릭</p>
           </div>
           <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
             <p className="text-xs font-medium text-slate-500">구글 노출</p>
@@ -312,6 +344,11 @@ export default function AnalyticsPage() {
             </p>
           </div>
         </div>
+
+        <OptimizationOverview
+          data={optimizationData}
+          error={optimizationError}
+        />
 
         {/* 쿠팡 클릭 분석 */}
         {clickStats && (

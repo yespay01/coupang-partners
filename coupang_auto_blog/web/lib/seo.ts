@@ -103,8 +103,8 @@ function extractKeywords(productName: string, category?: string): string[] {
     keywords.push(category);
   }
 
-  // 검색 의도 키워드
-  keywords.push("최저가", "쿠팡", "후기");
+  // 검색 의도 키워드 (검증할 수 없는 가격 우위나 체험 표현은 사용하지 않음)
+  keywords.push("쿠팡", "상품 선택 가이드", "상품 비교");
 
   return Array.from(new Set(keywords)).filter(Boolean);
 }
@@ -130,8 +130,8 @@ export function generateSEOMeta(
   // 첫 항목이 핵심 구문이면 그것을, 아니면 첫 키워드 사용
   const headKeyword = keywords[0] || review.productName || "";
 
-  // 제목: "핵심키워드 쿠팡 최저가 후기" — 검색 매칭 강화
-  const baseTitle = `${headKeyword} 쿠팡 최저가 후기`;
+  // 제목은 페이지에서 실제 제공하는 정보의 성격만 설명한다.
+  const baseTitle = `${headKeyword} 상품 선택 가이드`;
   const title =
     baseTitle.length + titleSuffix.length > 60
       ? baseTitle.slice(0, 60 - titleSuffix.length) + titleSuffix
@@ -165,7 +165,7 @@ export function generateOpenGraphMeta(
     images: seoMeta.ogImage ? [{ url: seoMeta.ogImage }] : [],
     type: "article" as const,
     url,
-    siteName: "쿠팡 리뷰 블로그",
+    siteName: "세모링크",
     publishedTime: review.publishedAt,
     modifiedTime: review.updatedAt,
   };
@@ -189,33 +189,16 @@ export function generateTwitterMeta(seoMeta: SEOMeta) {
 export function generateStructuredData(review: Review) {
   return {
     "@context": "https://schema.org",
-    "@type": "Product",
-    name: review.productName,
-    image: review.productImage,
+    "@type": "Article",
+    headline: `${review.productName} 상품 선택 가이드`,
+    image: review.productImage ? [review.productImage] : undefined,
     description: extractDescription(review.content || "", 200),
-    review: {
-      "@type": "Review",
-      reviewRating: {
-        "@type": "Rating",
-        ratingValue: "4.5",
-        bestRating: "5",
-      },
-      author: {
-        "@type": "Organization",
-        name: "쿠팡 리뷰 블로그",
-      },
-      reviewBody: review.content,
-      datePublished: review.publishedAt,
+    author: {
+      "@type": "Organization",
+      name: "세모링크",
     },
-    offers: review.productPrice
-      ? {
-          "@type": "Offer",
-          price: review.productPrice,
-          priceCurrency: "KRW",
-          availability: "https://schema.org/InStock",
-          url: review.affiliateUrl,
-        }
-      : undefined,
+    datePublished: review.publishedAt,
+    dateModified: review.updatedAt,
   };
 }
 
@@ -223,7 +206,8 @@ export function generateStructuredData(review: Review) {
  * 페이지 메타데이터 생성 (Next.js Metadata 형식)
  */
 export function generatePageMetadata(review: Review, pageUrl: string) {
-  const seoMeta = review.seoMeta || generateSEOMeta(review);
+  // 과거 저장 메타에는 근거 없는 최저가·후기 문구가 포함될 수 있어 현재 데이터로 재생성한다.
+  const seoMeta = generateSEOMeta(review);
 
   return {
     title: seoMeta.title,

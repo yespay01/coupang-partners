@@ -10,6 +10,32 @@ const bannedPatterns = [
   /최저가\s*보장?/i,
 ];
 
+// 입력 데이터로 입증할 수 없는 1인칭 구매·사용·배송 체험을 차단한다.
+// 프롬프트가 DB에 저장되어 있어 기본 프롬프트보다 오래된 경우에도 이 검증은 항상 적용된다.
+const unverifiedExperiencePatterns = [
+  { code: "PERSONAL_PURCHASE_CLAIM", pattern: /내\s*돈\s*내\s*산/i },
+  {
+    code: "FIRST_PERSON_EXPERIENCE_CLAIM",
+    pattern: /(?:제가|저는|나는|우리는|우리\s*집(?:에서|에는|은)?)\s*.{0,24}(?:구매했|주문했|사용했|사용해\s*봤|써\s*봤|먹어\s*봤|입어\s*봤|착용했|설치했|배송\s*받|받아\s*봤)/i,
+  },
+  {
+    code: "DIRECT_EXPERIENCE_CLAIM",
+    pattern: /(?:직접|실제로)\s*(?:구매(?:했|해서|해\s*봤)|주문(?:했|해서|해\s*봤)|사용(?:했|해서|해\s*봤)|써\s*봤|먹어\s*봤|입어\s*봤|착용했|설치했|배송\s*받|받아\s*봤)/i,
+  },
+  {
+    code: "OBSERVED_USE_CLAIM",
+    pattern: /(?:사용해|써|먹어|입어|착용해|설치해)\s*보니/i,
+  },
+  {
+    code: "DELIVERY_EXPERIENCE_CLAIM",
+    pattern: /(?:배송(?:이|은|도)?\s*(?:빨랐|늦었|도착했|걸렸)|주문(?:한|하고)\s*(?:날|다음\s*날|뒤).{0,12}도착했)/i,
+  },
+  {
+    code: "PACKAGING_EXPERIENCE_CLAIM",
+    pattern: /(?:포장(?:이|은|도)?\s*(?:꼼꼼했|깔끔했|안전했|튼튼했|허술했)|(?:택배\s*)?(?:상자|박스|포장)\s*(?:를|을)\s*(?:열어|뜯어)\s*보니)/i,
+  },
+];
+
 const positiveWords = [
   "만족",
   "좋",
@@ -107,10 +133,19 @@ export function computeNextRunAt(attempt) {
 
 export function buildPrompt(product) {
   return `
-  ${product.name} (${product.category}) 상품에 대한 후기를 생생하게 작성해주세요.
-  100~150자 분량으로, 실제 사용 경험처럼 묘사하고 광고성 문구는 삼가주세요.
-  예: "배송이 빨라서 원하는 날에 도착했고, 품질도 만족스러워 인테리어에도 잘 어울려요."
+  ${product.name} (${product.category}) 상품을 검토하는 사람을 위한 선택 가이드를 작성해주세요.
+  100~150자 분량으로, 상품명에서 확인되는 정보와 구매 전에 비교할 기준만 설명해주세요.
+  직접 구매하거나 사용한 것처럼 쓰지 말고, 가격·배송·옵션은 쿠팡 상품 페이지에서 확인하도록 안내해주세요.
   `;
+}
+
+/**
+ * 생성문에서 입증되지 않은 체험 주장 코드를 반환한다.
+ * @returns {string|null}
+ */
+export function findUnverifiedExperienceClaim(reviewText) {
+  const match = unverifiedExperiencePatterns.find(({ pattern }) => pattern.test(reviewText ?? ""));
+  return match?.code ?? null;
 }
 
 /**
@@ -184,6 +219,11 @@ export function validateReviewContent(reviewText) {
     throw new Error("REVIEW_CONTAINS_BANNED_PHRASE");
   }
 
+  const experienceClaim = findUnverifiedExperienceClaim(reviewText);
+  if (experienceClaim) {
+    throw new Error(`REVIEW_CONTAINS_UNVERIFIED_EXPERIENCE:${experienceClaim}`);
+  }
+
   const toneScore = analyzeToneScore(reviewText);
   if (toneScore <= 0.4) {
     throw new Error(`REVIEW_TONE_SCORE_TOO_LOW:${toneScore}`);
@@ -212,6 +252,11 @@ export function validateReviewContentWithSettings(reviewText, promptSettings) {
     throw new Error("REVIEW_CONTAINS_BANNED_PHRASE");
   }
 
+  const experienceClaim = findUnverifiedExperienceClaim(reviewText);
+  if (experienceClaim) {
+    throw new Error(`REVIEW_CONTAINS_UNVERIFIED_EXPERIENCE:${experienceClaim}`);
+  }
+
   // 톤 점수 검증
   const toneScore = analyzeToneScore(reviewText);
   if (toneScore <= toneScoreThreshold) {
@@ -225,4 +270,5 @@ export const __constants = {
   REVIEW_MIN_LENGTH,
   REVIEW_MAX_LENGTH,
   bannedPatterns,
+  unverifiedExperiencePatterns,
 };

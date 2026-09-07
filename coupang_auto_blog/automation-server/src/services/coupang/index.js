@@ -19,6 +19,14 @@ import {
 } from "./products.js";
 import { createDeeplinks } from "./deeplink.js";
 import {
+  affiliateUrlReasonMessage,
+  isValidPartnerId,
+  normalizeSubId,
+  validateProductApiProducts,
+  validateShortAffiliateUrl,
+} from "./affiliateUrl.js";
+import { logger } from "../../utils/logger.js";
+import {
   getClicksReport,
   getOrdersReport,
   getCancelsReport,
@@ -30,27 +38,118 @@ import {
  */
 export function createCoupangClient(accessKey, secretKey, partnerId, subId = "") {
   const credentials = { accessKey, secretKey };
+  const configuredSubId = normalizeSubId(subId);
+
+  const runProductRequest = async (request, source) => {
+    if (!isValidPartnerId(partnerId)) {
+      return {
+        success: false,
+        message: affiliateUrlReasonMessage('invalid_partner_id'),
+        products: [],
+      };
+    }
+
+    const response = await request();
+    if (!response.success) return response;
+
+    const products = response.products || [];
+    const { validProducts, invalidProducts } = validateProductApiProducts(products, partnerId);
+    const invalidProductCount = invalidProducts.length;
+
+    if (invalidProductCount > 0) {
+      logger.warn('쿠팡 Product API 제휴 URL 검증 실패', {
+        source,
+        invalidProductCount,
+        totalProductCount: products.length,
+      });
+    }
+
+    if (products.length > 0 && validProducts.length === 0) {
+      return {
+        ...response,
+        success: false,
+        message: '쿠팡 Product API 제휴 URL의 Partner ID를 검증할 수 없습니다.',
+        products: [],
+        invalidProductCount,
+      };
+    }
+
+    return { ...response, products: validProducts, invalidProductCount };
+  };
+
+  const runDeeplinkRequest = async (urls) => {
+    if (!isValidPartnerId(partnerId)) {
+      return {
+        success: false,
+        message: affiliateUrlReasonMessage('invalid_partner_id'),
+        deeplinks: [],
+      };
+    }
+
+    const response = await createDeeplinks(
+      { urls, subId: configuredSubId },
+      credentials
+    );
+    if (!response.success) return response;
+
+    const verifiedDeeplinks = [];
+    for (const deeplink of response.deeplinks || []) {
+      const validation = validateShortAffiliateUrl(
+        deeplink?.shortenUrl,
+        deeplink?.landingUrl,
+        partnerId
+      );
+      if (!validation.valid) {
+        return {
+          success: false,
+          message: affiliateUrlReasonMessage(validation.reason),
+          deeplinks: [],
+        };
+      }
+      verifiedDeeplinks.push(deeplink);
+    }
+
+    return { ...response, deeplinks: verifiedDeeplinks };
+  };
 
   return {
+    partnerId,
+    subId: configuredSubId,
+
     // 상품 조회 API
     searchProducts: (keyword, limit) =>
-      searchProducts({ keyword, limit, subId: subId }, credentials),
+      runProductRequest(
+        () => searchProducts({ keyword, limit, subId: configuredSubId }, credentials),
+        'search'
+      ),
 
     getBestProducts: (categoryId, limit) =>
-      getBestProducts({ categoryId, limit, subId: subId }, credentials),
+      runProductRequest(
+        () => getBestProducts({ categoryId, limit, subId: configuredSubId }, credentials),
+        'best-category'
+      ),
 
     getGoldboxProducts: (imageSize) =>
-      getGoldboxProducts({ subId: subId, imageSize }, credentials),
+      runProductRequest(
+        () => getGoldboxProducts({ subId: configuredSubId, imageSize }, credentials),
+        'goldbox'
+      ),
 
     getCoupangPLProducts: (limit, imageSize) =>
-      getCoupangPLProducts({ limit, subId: subId, imageSize }, credentials),
+      runProductRequest(
+        () => getCoupangPLProducts({ limit, subId: configuredSubId, imageSize }, credentials),
+        'coupang-pl'
+      ),
 
     getCoupangPLBrandProducts: (brandId, limit, imageSize) =>
-      getCoupangPLBrandProducts({ brandId, limit, subId: subId, imageSize }, credentials),
+      runProductRequest(
+        () => getCoupangPLBrandProducts({ brandId, limit, subId: configuredSubId, imageSize }, credentials),
+        `coupang-pl-brand:${brandId}`
+      ),
 
     // 딥링크 API
     createDeeplinks: (urls) =>
-      createDeeplinks({ urls, subId: subId }, credentials),
+      runDeeplinkRequest(urls),
 
     // 카테고리 추천 API
     recommendCategory: (productName) =>
@@ -72,10 +171,7 @@ export function createCoupangClient(accessKey, secretKey, partnerId, subId = "")
     // 연결 테스트
     testConnection: async () => {
       try {
-        const result = await createDeeplinks(
-          { urls: ["https://www.coupang.com"], subId: subId },
-          credentials
-        );
+        const result = await runDeeplinkRequest(["https://www.coupang.com"]);
         return { success: result.success, message: result.message };
       } catch (error) {
         return {

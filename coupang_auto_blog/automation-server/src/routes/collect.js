@@ -3,6 +3,9 @@ import { getDb } from '../config/database.js';
 import { authenticateToken } from '../config/auth.js';
 import { createCoupangClient } from '../services/coupang/index.js';
 import { notifySlack } from '../services/slack.js';
+import { registerAffiliateLink } from '../services/coupang/affiliateLinkRegistry.js';
+import { normalizeObservedPrice, recordPriceObservation } from '../services/priceObservations.js';
+import { getPopularSearchDemandKeywords } from '../services/searchDemand.js';
 
 const router = express.Router();
 
@@ -24,54 +27,166 @@ async function getSystemSettings() {
 /**
  * 상품 저장
  */
-async function saveProduct(product, source) {
-  const db = getDb();
+export async function saveProduct(product, source, client, db = getDb()) {
+  const connection = typeof db.connect === 'function' ? await db.connect() : db;
 
   try {
+    await connection.query('BEGIN');
     // 중복 확인
-    const existing = await db.query(
+    const existing = await connection.query(
       'SELECT id FROM products WHERE product_id = $1',
       [product.productId]
     );
+    const affiliateLink = await registerAffiliateLink(connection, {
+      productId: product.productId,
+      destinationUrl: product.productUrl,
+      partnerId: client.partnerId,
+      subId: client.subId,
+      linkSource: 'product_api',
+    });
+    const observedPrice = normalizeObservedPrice(product.productPrice);
 
     if (existing.rows.length > 0) {
-      console.debug(`상품 이미 존재: ${product.productId}`);
+      await connection.query(
+        `UPDATE products SET
+           product_name = COALESCE($2, product_name),
+           product_price = COALESCE($3, product_price),
+           product_image = COALESCE($4, product_image),
+           product_url = $5,
+           affiliate_url = $5,
+           affiliate_link_id = $6,
+           updated_at = NOW()
+         WHERE product_id = $1`,
+        [product.productId, product.productName || null, observedPrice,
+          product.productImage || null, product.productUrl, affiliateLink.link_id]
+      );
+      if (observedPrice != null) {
+        await connection.query(
+          'UPDATE reviews SET product_price = $2, updated_at = NOW() WHERE product_id = $1',
+          [product.productId, observedPrice]
+        );
+        await recordPriceObservation(connection, {
+          productId: String(product.productId), priceKrw: observedPrice,
+          observedAt: new Date(), source: 'collection', context: source,
+        });
+      }
+      await connection.query('COMMIT');
+      console.debug(`기존 상품 실제 가격 관측 갱신: ${product.productId}`);
       return false;
     }
 
     // 상품 저장
-    await db.query(
+    await connection.query(
       `INSERT INTO products (
         product_id, product_name, product_price, product_image,
         product_url, category_id, category_name, affiliate_url,
-        source, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        source, status, affiliate_link_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         product.productId,
         product.productName,
-        product.productPrice,
+        observedPrice,
         product.productImage,
         product.productUrl,
         product.categoryId,
         product.categoryName,
         product.affiliateUrl,
         source,
-        'pending'
+        'pending',
+        affiliateLink.link_id,
       ]
     );
+
+    if (observedPrice != null) {
+      await recordPriceObservation(connection, {
+        productId: String(product.productId), priceKrw: observedPrice,
+        observedAt: new Date(), source: 'collection', context: source,
+      });
+    }
+
+    await connection.query('COMMIT');
 
     console.info(`상품 저장: ${product.productName}`);
     return true;
   } catch (error) {
+    try { await connection.query('ROLLBACK'); } catch {}
     console.error('상품 저장 오류:', error);
     return false;
+  } finally {
+    if (connection !== db && typeof connection.release === 'function') connection.release();
+  }
+}
+
+/**
+ * 목록형 API 한 번의 응답으로 이미 보유한 상품 여러 개의 실제 가격을 갱신한다.
+ * 새 상품 추가 한도와 무관하며, 응답에 없는 상품 가격을 추정하지 않는다.
+ */
+export async function refreshExistingProductPrices(products, source, db = getDb()) {
+  const candidates = [...new Map((Array.isArray(products) ? products : [])
+    .map((product) => [String(product?.productId || ''), product])
+    .filter(([productId, product]) => productId && normalizeObservedPrice(product?.productPrice) != null))
+    .values()];
+  if (candidates.length === 0) return 0;
+
+  const connection = typeof db.connect === 'function' ? await db.connect() : db;
+  try {
+    await connection.query('BEGIN');
+    const existing = await connection.query(
+      'SELECT product_id FROM products WHERE product_id = ANY($1::varchar[])',
+      [candidates.map((product) => String(product.productId))]
+    );
+    const existingIds = new Set(existing.rows.map((row) => String(row.product_id)));
+    let refreshed = 0;
+    for (const product of candidates) {
+      const productId = String(product.productId);
+      if (!existingIds.has(productId)) continue;
+      const price = normalizeObservedPrice(product.productPrice);
+      await connection.query(
+        `UPDATE products SET product_price = $2, updated_at = NOW()
+          WHERE product_id = $1`,
+        [productId, price]
+      );
+      await connection.query(
+        'UPDATE reviews SET product_price = $2, updated_at = NOW() WHERE product_id = $1',
+        [productId, price]
+      );
+      await recordPriceObservation(connection, {
+        productId, priceKrw: price, observedAt: new Date(), source: 'collection', context: source,
+      });
+      refreshed += 1;
+    }
+    await connection.query('COMMIT');
+    if (refreshed > 0) console.info(`목록 응답 기존 상품 가격 갱신 (${source}): ${refreshed}개`);
+    return refreshed;
+  } catch (error) {
+    try { await connection.query('ROLLBACK'); } catch {}
+    throw error;
+  } finally {
+    if (connection !== db && typeof connection.release === 'function') connection.release();
   }
 }
 
 /**
  * 키워드로 상품 수집
  */
-async function collectByKeywords(client, keywords, maxProducts) {
+function rotateDaily(items) {
+  if (!Array.isArray(items) || items.length < 2) return items || [];
+  const kstDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+  const offset = Math.abs([...kstDate].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % items.length;
+  return [...items.slice(offset), ...items.slice(0, offset)];
+}
+
+function throwIfCoupangRateLimited(result) {
+  if (result?.success !== false) return;
+  if (!result.rateLimited && !/사용 횟수|횟수.*초과|rate.?limit|쿨다운/i.test(String(result.message || ''))) return;
+  const error = new Error('쿠팡 API 사용 한도가 확인되어 남은 상품 수집을 중단합니다.');
+  error.code = 'COUPANG_RATE_LIMITED';
+  throw error;
+}
+
+async function collectByKeywords(client, keywords, maxProducts, {
+  rotate = true, maxSourceCalls = 2,
+} = {}) {
   let collected = 0;
 
   if (keywords.length === 0) {
@@ -84,34 +199,50 @@ async function collectByKeywords(client, keywords, maxProducts) {
     return 0;
   }
 
-  const productsPerKeyword = Math.ceil(maxProducts / keywords.length);
+  const uniqueKeywords = [...new Set(keywords
+    .map((keyword) => String(keyword || '').normalize('NFKC').replace(/\s+/g, ' ').trim().slice(0, 50))
+    .filter((keyword) => keyword.length >= 2))];
+  const selectedKeywords = (rotate ? rotateDaily(uniqueKeywords) : uniqueKeywords)
+    .slice(0, Math.min(uniqueKeywords.length, maxProducts, maxSourceCalls));
+  if (selectedKeywords.length === 0) return 0;
+  const productsPerKeyword = Math.max(1, Math.ceil(maxProducts / selectedKeywords.length));
+  const candidateLimit = Math.min(10, Math.max(5, productsPerKeyword * 5));
 
-  for (const keyword of keywords) {
+  for (const keyword of selectedKeywords) {
     if (collected >= maxProducts) break;
 
     try {
-      const result = await client.searchProducts(keyword, productsPerKeyword);
+      const result = await client.searchProducts(keyword, candidateLimit);
 
       if (!result.success) {
+        throwIfCoupangRateLimited(result);
         console.warn(`키워드 검색 실패 (${keyword}): ${result.message}`);
         continue;
       }
 
-      const products = result.products.slice(0, maxProducts - collected);
+      await refreshExistingProductPrices(result.products, `keyword:${keyword}`);
+
+      const products = result.products.slice(0, candidateLimit);
       if (products.length === 0) continue;
 
+      let keywordCollected = 0;
       for (const product of products) {
-        if (collected >= maxProducts) break;
+        if (collected >= maxProducts || keywordCollected >= productsPerKeyword) break;
 
         // productUrl은 이미 제휴 링크이므로 그대로 사용
         const saved = await saveProduct(
           { ...product, affiliateUrl: product.productUrl },
-          `keyword:${keyword}`
+          `keyword:${keyword}`,
+          client
         );
 
-        if (saved) collected++;
+        if (saved) {
+          collected++;
+          keywordCollected++;
+        }
       }
     } catch (error) {
+      if (error.code === 'COUPANG_RATE_LIMITED') throw error;
       console.error(`키워드 수집 오류 (${keyword}):`, error);
     }
   }
@@ -127,23 +258,32 @@ async function collectGoldbox(client, maxProducts) {
     const result = await client.getGoldboxProducts();
 
     if (!result.success) {
+      throwIfCoupangRateLimited(result);
       console.warn(`골드박스 조회 실패: ${result.message}`);
       return 0;
     }
 
-    const products = result.products.slice(0, maxProducts);
+    await refreshExistingProductPrices(result.products, 'goldbox');
+
+    const products = result.products.slice(0, 50);
     if (products.length === 0) return 0;
 
     let collected = 0;
     for (const product of products) {
+      if (collected >= maxProducts) break;
       // productUrl은 이미 제휴 링크이므로 그대로 사용
-      const saved = await saveProduct({ ...product, affiliateUrl: product.productUrl }, 'goldbox');
+      const saved = await saveProduct(
+        { ...product, affiliateUrl: product.productUrl },
+        'goldbox',
+        client
+      );
       if (saved) collected++;
     }
 
     console.info(`골드박스 수집 완료: ${collected}개`);
     return collected;
   } catch (error) {
+    if (error.code === 'COUPANG_RATE_LIMITED') throw error;
     console.error('골드박스 수집 오류:', error);
     return 0;
   }
@@ -159,34 +299,44 @@ async function collectCoupangPL(client, brands, maxProducts) {
   }
 
   let collected = 0;
-  const productsPerBrand = Math.ceil(maxProducts / brands.length);
+  const selectedBrands = rotateDaily([...new Set(brands)]).slice(0, Math.min(brands.length, maxProducts, 2));
+  const productsPerBrand = Math.ceil(maxProducts / selectedBrands.length);
 
-  for (const brandId of brands) {
+  for (const brandId of selectedBrands) {
     if (collected >= maxProducts) break;
 
     try {
-      const result = await client.getCoupangPLBrandProducts(brandId, productsPerBrand);
+      const result = await client.getCoupangPLBrandProducts(brandId, 100);
 
       if (!result.success) {
+        throwIfCoupangRateLimited(result);
         console.warn(`쿠팡 PL 브랜드 ${brandId} 조회 실패: ${result.message}`);
         continue;
       }
 
-      const products = result.products.slice(0, maxProducts - collected);
+      await refreshExistingProductPrices(result.products, `coupangPL:${brandId}`);
+
+      const products = result.products.slice(0, 20);
       if (products.length === 0) continue;
 
+      let brandCollected = 0;
       for (const product of products) {
-        if (collected >= maxProducts) break;
+        if (collected >= maxProducts || brandCollected >= productsPerBrand) break;
 
         // productUrl은 이미 제휴 링크이므로 그대로 사용
         const saved = await saveProduct(
           { ...product, affiliateUrl: product.productUrl },
-          `coupangPL:${brandId}`
+          `coupangPL:${brandId}`,
+          client
         );
 
-        if (saved) collected++;
+        if (saved) {
+          collected++;
+          brandCollected++;
+        }
       }
     } catch (error) {
+      if (error.code === 'COUPANG_RATE_LIMITED') throw error;
       console.error(`쿠팡 PL 브랜드 ${brandId} 수집 오류:`, error);
     }
   }
@@ -198,7 +348,7 @@ async function collectCoupangPL(client, brands, maxProducts) {
 /**
  * 카테고리별 베스트 상품 수집
  */
-async function collectByCategories(client, categories, maxProducts) {
+async function collectByCategories(client, categories, maxProducts, { maxSourceCalls = 6 } = {}) {
   let collected = 0;
   const enabledCategories = categories.filter((cat) => cat.enabled);
 
@@ -212,24 +362,31 @@ async function collectByCategories(client, categories, maxProducts) {
     return 0;
   }
 
-  const productsPerCategory = Math.ceil(maxProducts / enabledCategories.length);
+  const selectedCategories = rotateDaily(enabledCategories)
+    .slice(0, Math.min(enabledCategories.length, maxProducts, maxSourceCalls));
+  const productsPerCategory = Math.max(1, Math.ceil(maxProducts / selectedCategories.length));
+  const candidateLimit = 100;
 
-  for (const category of enabledCategories) {
+  for (const category of selectedCategories) {
     if (collected >= maxProducts) break;
 
     try {
-      const result = await client.getBestProducts(category.id, productsPerCategory);
+      const result = await client.getBestProducts(category.id, candidateLimit);
 
       if (!result.success) {
+        throwIfCoupangRateLimited(result);
         console.warn(`카테고리 조회 실패 (${category.name}): ${result.message}`);
         continue;
       }
 
-      const products = result.products.slice(0, maxProducts - collected);
+      await refreshExistingProductPrices(result.products, `category:${category.id}`);
+
+      const products = result.products.slice(0, candidateLimit);
       if (products.length === 0) continue;
 
+      let categoryCollected = 0;
       for (const product of products) {
-        if (collected >= maxProducts) break;
+        if (collected >= maxProducts || categoryCollected >= productsPerCategory) break;
 
         // productUrl은 이미 제휴 링크이므로 그대로 사용
         const saved = await saveProduct(
@@ -239,12 +396,17 @@ async function collectByCategories(client, categories, maxProducts) {
             categoryName: category.name,
             affiliateUrl: product.productUrl,
           },
-          `category:${category.id}`
+          `category:${category.id}`,
+          client
         );
 
-        if (saved) collected++;
+        if (saved) {
+          collected++;
+          categoryCollected++;
+        }
       }
     } catch (error) {
+      if (error.code === 'COUPANG_RATE_LIMITED') throw error;
       console.error(`카테고리 수집 오류 (${category.name}):`, error);
     }
   }
@@ -261,6 +423,61 @@ async function saveLog(type, level, message, payload = {}) {
     'INSERT INTO logs (type, level, message, payload) VALUES ($1, $2, $3, $4)',
     [type, level, message, JSON.stringify(payload)]
   );
+}
+
+export async function runDiscoveryCollection(client, settings, requestedMaxProducts, db = getDb()) {
+  const maxProducts = Math.min(Math.max(Number.parseInt(requestedMaxProducts, 10) || 100, 1), 200);
+  const quotas = {
+    goldbox: Math.max(1, Math.floor(maxProducts * 0.2)),
+    categories: Math.max(1, Math.floor(maxProducts * 0.5)),
+    searchDemand: Math.max(1, Math.floor(maxProducts * 0.2)),
+  };
+  quotas.curated = Math.max(0, maxProducts - quotas.goldbox - quotas.categories - quotas.searchDemand);
+
+  let totalCollected = 0;
+  const stats = { goldbox: 0, categories: 0, searchDemand: 0, keywords: 0, coupangPL: 0 };
+
+  if (settings.topics?.goldboxEnabled ?? true) {
+    stats.goldbox = await collectGoldbox(client, quotas.goldbox);
+    totalCollected += stats.goldbox;
+  }
+
+  const categories = settings.topics?.categories || [];
+  if (categories.length > 0) {
+    stats.categories = await collectByCategories(client, categories, quotas.categories);
+    totalCollected += stats.categories;
+  }
+
+  const demandKeywords = await getPopularSearchDemandKeywords(db, {
+    days: 14, limit: quotas.searchDemand, minimumSearches: 2,
+  });
+  if (demandKeywords.length > 0) {
+    stats.searchDemand = await collectByKeywords(
+      client, demandKeywords, quotas.searchDemand, { rotate: false, maxSourceCalls: 2 }
+    );
+    totalCollected += stats.searchDemand;
+  }
+
+  const curatedKeywords = settings.topics?.keywords || [];
+  const keywordCapacity = Math.min(
+    maxProducts - totalCollected,
+    quotas.curated + Math.max(0, quotas.searchDemand - stats.searchDemand)
+  );
+  if (curatedKeywords.length > 0 && keywordCapacity > 0) {
+    stats.keywords = await collectByKeywords(
+      client, curatedKeywords, keywordCapacity, { maxSourceCalls: 1 }
+    );
+    totalCollected += stats.keywords;
+  }
+
+  const coupangPLBrands = settings.topics?.coupangPLBrands || [];
+  const remaining = maxProducts - totalCollected;
+  if (remaining > 0 && coupangPLBrands.length > 0) {
+    stats.coupangPL = await collectCoupangPL(client, coupangPLBrands, remaining);
+    totalCollected += stats.coupangPL;
+  }
+
+  return { totalCollected, stats, quotas, demandKeywords };
 }
 
 /**
@@ -295,55 +512,11 @@ router.post('/auto', async (req, res) => {
       settings.coupang.subId
     );
 
-    const maxProducts = settings.automation.maxProductsPerRun || 10;
-    let totalCollected = 0;
-    const collectionStats = {
-      goldbox: 0,
-      categories: 0,
-      keywords: 0,
-      coupangPL: 0,
-    };
-
-    // 골드박스
-    const goldboxEnabled = settings.topics?.goldboxEnabled ?? true;
-    if (goldboxEnabled) {
-      const goldboxCount = await collectGoldbox(client, Math.floor(maxProducts * 0.2));
-      totalCollected += goldboxCount;
-      collectionStats.goldbox = goldboxCount;
-    }
-
-    // 카테고리
-    const categories = settings.topics?.categories || [];
-    if (categories.length > 0) {
-      const categoryCollected = await collectByCategories(
-        client,
-        categories,
-        Math.floor(maxProducts * 0.4)
-      );
-      totalCollected += categoryCollected;
-      collectionStats.categories = categoryCollected;
-    }
-
-    // 키워드
-    const keywords = settings.topics?.keywords || [];
-    if (keywords.length > 0) {
-      const keywordCollected = await collectByKeywords(
-        client,
-        keywords,
-        Math.floor(maxProducts * 0.3)
-      );
-      totalCollected += keywordCollected;
-      collectionStats.keywords = keywordCollected;
-    }
-
-    // 쿠팡 PL
-    const coupangPLBrands = settings.topics?.coupangPLBrands || [];
-    const remaining = maxProducts - totalCollected;
-    if (remaining > 0 && coupangPLBrands.length > 0) {
-      const plCollected = await collectCoupangPL(client, coupangPLBrands, remaining);
-      totalCollected += plCollected;
-      collectionStats.coupangPL = plCollected;
-    }
+    const collection = await runDiscoveryCollection(
+      client, settings, settings.automation.maxProductsPerRun || 100
+    );
+    const totalCollected = collection.totalCollected;
+    const collectionStats = collection.stats;
 
     // 로그 저장
     await saveLog('collection', 'info', `상품 자동 수집 완료: ${totalCollected}개`, {
@@ -363,6 +536,7 @@ router.post('/auto', async (req, res) => {
           { label: '골드박스', value: String(collectionStats.goldbox) },
           { label: '카테고리 베스트', value: String(collectionStats.categories) },
           { label: '키워드 검색', value: String(collectionStats.keywords) },
+          { label: '실제 검색 수요', value: String(collectionStats.searchDemand) },
           { label: '쿠팡 PL', value: String(collectionStats.coupangPL) },
         ],
       });
@@ -420,51 +594,9 @@ router.post('/manual', async (req, res) => {
       settings.coupang.subId
     );
 
-    let totalCollected = 0;
-    const collectionStats = {
-      goldbox: 0,
-      categories: 0,
-      keywords: 0,
-      coupangPL: 0,
-    };
-
-    // 동일한 수집 로직
-    const goldboxEnabled = settings.topics?.goldboxEnabled ?? true;
-    if (goldboxEnabled) {
-      const goldboxCount = await collectGoldbox(client, Math.floor(maxProducts * 0.2));
-      totalCollected += goldboxCount;
-      collectionStats.goldbox = goldboxCount;
-    }
-
-    const categories = settings.topics?.categories || [];
-    if (categories.length > 0) {
-      const categoryCollected = await collectByCategories(
-        client,
-        categories,
-        Math.floor(maxProducts * 0.4)
-      );
-      totalCollected += categoryCollected;
-      collectionStats.categories = categoryCollected;
-    }
-
-    const keywords = settings.topics?.keywords || [];
-    if (keywords.length > 0) {
-      const keywordCollected = await collectByKeywords(
-        client,
-        keywords,
-        Math.floor(maxProducts * 0.3)
-      );
-      totalCollected += keywordCollected;
-      collectionStats.keywords = keywordCollected;
-    }
-
-    const coupangPLBrands = settings.topics?.coupangPLBrands || [];
-    const remaining = maxProducts - totalCollected;
-    if (remaining > 0 && coupangPLBrands.length > 0) {
-      const plCollected = await collectCoupangPL(client, coupangPLBrands, remaining);
-      totalCollected += plCollected;
-      collectionStats.coupangPL = plCollected;
-    }
+    const collection = await runDiscoveryCollection(client, settings, maxProducts);
+    const totalCollected = collection.totalCollected;
+    const collectionStats = collection.stats;
 
     await saveLog('collection', 'info', `수동 상품 수집 완료: ${totalCollected}개`, {
       totalCollected,
@@ -482,6 +614,7 @@ router.post('/manual', async (req, res) => {
           { label: '골드박스', value: String(collectionStats.goldbox) },
           { label: '카테고리 베스트', value: String(collectionStats.categories) },
           { label: '키워드 검색', value: String(collectionStats.keywords) },
+          { label: '실제 검색 수요', value: String(collectionStats.searchDemand) },
           { label: '쿠팡 PL', value: String(collectionStats.coupangPL) },
         ],
       });

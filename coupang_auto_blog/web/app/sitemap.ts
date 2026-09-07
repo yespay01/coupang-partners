@@ -11,7 +11,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 정적 페이지
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL, lastModified: new Date(), changeFrequency: "daily", priority: 1.0 },
-    { url: `${SITE_URL}/reviews`, lastModified: new Date(), changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_URL}/recipes`, lastModified: new Date(), changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_URL}/news`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
     { url: `${SITE_URL}/search`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.5 },
@@ -20,23 +19,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const shouldSkipDynamicFetch = process.env.NEXT_PHASE === "phase-production-build";
   if (shouldSkipDynamicFetch) return staticPages;
 
-  // 리뷰 목록 (published)
-  let reviewPages: MetadataRoute.Sitemap = [];
+  // 리뷰 본문은 색인에서 제거하고, 공식 상품 정보 면만 노출한다.
+  let productPages: MetadataRoute.Sitemap = [];
   try {
-    const res = await fetch(`${AUTOMATION_SERVER_URL}/api/reviews/sitemap?limit=1000`, {
+    const res = await fetch(`${AUTOMATION_SERVER_URL}/api/products/sitemap?limit=45000`, {
       cache: "no-store",
     });
     if (res.ok) {
       const data = await res.json();
-      const reviews: { slug: string; updatedAt?: string; productImage?: string }[] = data.data?.reviews || [];
-      reviewPages = reviews
-        .filter((r) => r.slug)
-        .map((r) => ({
-          url: `${SITE_URL}/reviews/${r.slug}`,
-          lastModified: r.updatedAt ? new Date(r.updatedAt) : new Date(),
+      const products: { productId: string; updatedAt?: string; productImage?: string }[] = data.data?.products || [];
+      productPages = products
+        .filter((product) => product.productId)
+        .map((product) => ({
+          url: `${SITE_URL}/products/${encodeURIComponent(product.productId)}`,
+          lastModified: product.updatedAt ? new Date(product.updatedAt) : new Date(),
           changeFrequency: "weekly" as const,
           priority: 0.8,
-          ...(r.productImage ? { images: [r.productImage] } : {}),
+          ...(product.productImage ? { images: [product.productImage] } : {}),
         }));
     }
   } catch {
@@ -83,5 +82,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // automation-server 미응답 시 빈 배열
   }
 
-  return [...staticPages, ...reviewPages, ...recipePages, ...newsPages];
+  return [...staticPages, ...productPages, ...recipePages, ...newsPages];
 }

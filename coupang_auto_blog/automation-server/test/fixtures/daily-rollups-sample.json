@@ -1,0 +1,52 @@
+{
+  "rollups": [
+    {
+      "business_date_kst": "2026-08-22",
+      "eligible_impression_sessions": 140,
+      "qualified_outbound_sessions": 7,
+      "raw_outbound_sessions": 7,
+      "orphan_outbound_sessions": 0,
+      "qualified_outbound_ctr_pct": 5,
+      "impression_events": 180,
+      "outbound_events": 7,
+      "total_events": 220,
+      "bot_events": 3,
+      "duplicate_events": 2,
+      "source_max_received_at": "2026-08-22T14:00:00.000Z",
+      "data_status": "complete",
+      "calculation_version": 1
+    },
+    {
+      "business_date_kst": "2026-08-23",
+      "eligible_impression_sessions": 155,
+      "qualified_outbound_sessions": 8,
+      "raw_outbound_sessions": 8,
+      "orphan_outbound_sessions": 0,
+      "qualified_outbound_ctr_pct": 5.16,
+      "impression_events": 195,
+      "outbound_events": 8,
+      "total_events": 240,
+      "bot_events": 4,
+      "duplicate_events": 2,
+      "source_max_received_at": "2026-08-23T14:00:00.000Z",
+      "data_status": "complete",
+      "calculation_version": 1
+    },
+    {
+      "business_date_kst": "2026-08-24",
+      "eligible_impression_sessions": 160,
+      "qualified_outbound_sessions": 8,
+      "raw_outbound_sessions": 8,
+      "orphan_outbound_sessions": 0,
+      "qualified_outbound_ctr_pct": 5,
+      "impression_events": 200,
+      "outbound_events": 8,
+      "total_events": 250,
+      "bot_events": 4,
+      "duplicate_events": 2,
+      "source_max_received_at": "2026-08-24T14:00:00.000Z",
+      "data_status": "complete",
+      "calculation_version": 1
+    }
+  ]
+}

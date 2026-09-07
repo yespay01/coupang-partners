@@ -20,11 +20,11 @@ const notoSans = Noto_Sans_KR({
 export const metadata: Metadata = {
   metadataBase: new URL("https://semolink.store"),
   title: {
-    default: "세모링크 - 쿠팡 최저가 비교·추천템 모음",
+    default: "세모링크 - 쿠팡 상품 큐레이션",
     template: "%s | 세모링크",
   },
   description:
-    "직접 써보고 골라낸 쿠팡 추천템과 최저가 비교. 솔직 후기, 카테고리별 베스트, 레시피 재료까지 한 번에 확인하세요.",
+    "쿠팡 상품을 카테고리별로 살펴보고 현재 가격과 구성을 확인하세요.",
   openGraph: {
     siteName: "세모링크",
     locale: "ko_KR",

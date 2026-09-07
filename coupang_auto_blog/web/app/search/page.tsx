@@ -5,14 +5,25 @@ import { apiClient } from "@/lib/apiClient";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { CoupangDynamicBanner } from "@/components/CoupangDynamicBanner";
+import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
+import { AffiliateOutboundLink } from "@/components/AffiliateOutboundLink";
+import { sendAnalyticsEvent } from "@/lib/analytics";
 
 interface Product {
+  productId?: string;
   productName: string;
   productPrice: number;
   productImage: string;
   productUrl: string;
   affiliateUrl?: string;
+  affiliateLink?: { linkId: string; goUrl?: string };
   categoryName?: string;
+}
+
+const suggestedKeywords = ["무선 이어폰", "에어프라이어", "화장지", "고양이 모래"];
+
+function validPrice(value: number) {
+  return Number.isFinite(value) && value > 0;
 }
 
 export default function SearchPage() {
@@ -36,7 +47,14 @@ export default function SearchPage() {
       }>(`/api/search?keyword=${encodeURIComponent(keyword.trim())}&limit=10`);
 
       if (data.success && data.data) {
-        setProducts(data.data.products);
+        setProducts([...data.data.products].sort((a, b) => {
+          if (!validPrice(a.productPrice)) return 1;
+          if (!validPrice(b.productPrice)) return -1;
+          return a.productPrice - b.productPrice;
+        }));
+        if (data.data.products.length > 0) {
+          sendAnalyticsEvent({ eventName: "list_view", surface: "search" });
+        }
       } else {
         setError(data.error || "검색에 실패했습니다.");
         setProducts([]);
@@ -56,9 +74,9 @@ export default function SearchPage() {
 
       <div className="bg-white border-b border-slate-100">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 pt-24">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">쿠팡 상품 검색</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">쿠팡 최저가 검색</h1>
           <p className="mt-2 text-slate-600">
-            원하는 상품을 검색하고 최저가로 구매하세요.
+            상품명을 입력하면 쿠팡 검색 결과를 낮은 가격부터 비교합니다.
           </p>
 
           {/* Search bar */}
@@ -68,7 +86,7 @@ export default function SearchPage() {
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              placeholder="상품명을 입력하세요 (예: 무선 이어폰, 에어프라이어)"
+              placeholder="쿠팡 최저가 검색 · 상품명 입력"
               className="flex-1 rounded-xl border border-slate-300 px-5 py-3 text-base focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               disabled={isSearching}
             />
@@ -83,9 +101,16 @@ export default function SearchPage() {
                   검색 중
                 </span>
               ) : (
-                "검색"
+                "최저가 찾기"
               )}
             </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2" aria-label="추천 검색어">
+            {suggestedKeywords.map((item) => (
+              <button key={item} type="button" onClick={() => setKeyword(item)} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-orange-300 hover:text-orange-700">
+                {item}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -114,16 +139,27 @@ export default function SearchPage() {
           </div>
         ) : products.length > 0 ? (
           <>
-            <div className="mb-4 text-sm text-slate-500">
-              {products.length}개의 상품을 찾았습니다
+            <AffiliateDisclosure className="mb-4 text-center" />
+            <div className="mb-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              검색 결과 {products.length}개를 낮은 가격순으로 보여드립니다. 옵션·배송비를 포함한 최종 가격은 쿠팡에서 확인하세요.
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {products.map((product, i) => (
-                <a
+                <AffiliateOutboundLink
                   key={i}
-                  href={product.affiliateUrl || product.productUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={
+                    product.affiliateLink?.linkId
+                      ? undefined
+                      : product.affiliateUrl || product.productUrl
+                  }
+                  linkId={product.affiliateLink?.linkId}
+                  impressionEventName="product_card_impression"
+                  tracking={{
+                    productName: product.productName,
+                    productId: product.productId,
+                    surface: "search",
+                    position: "search_card",
+                  }}
                   className="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
                 >
                   {product.productImage && (
@@ -141,15 +177,15 @@ export default function SearchPage() {
                   {product.categoryName && (
                     <div className="mt-2 text-xs text-slate-500">{product.categoryName}</div>
                   )}
+                  {validPrice(product.productPrice) && (
+                    <div className="mt-3 text-lg font-extrabold tracking-tight text-slate-950">{Math.round(product.productPrice).toLocaleString("ko-KR")}원</div>
+                  )}
                   <div className="mt-3 text-xs font-semibold text-orange-600">
-                    쿠팡에서 최저가 확인 &rarr;
+                    쿠팡에서 최종가 확인 &rarr;
                   </div>
-                </a>
+                </AffiliateOutboundLink>
               ))}
             </div>
-            <p className="mt-6 text-xs text-slate-400 text-center">
-              이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
-            </p>
           </>
         ) : searched && !error ? (
           <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-12 text-center">
@@ -163,7 +199,7 @@ export default function SearchPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
-            <p className="text-slate-500">검색어를 입력하여 쿠팡 상품을 찾아보세요.</p>
+            <p className="text-slate-500">상품명을 입력해 쿠팡 검색 결과 중 낮은 가격을 찾아보세요.</p>
           </div>
         ) : null}
       </main>

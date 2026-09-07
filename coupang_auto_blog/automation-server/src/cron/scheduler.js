@@ -3,6 +3,15 @@ import axios from 'axios';
 import { generateToken } from '../config/auth.js';
 import { pickTrendingTopic } from '../services/trendingTopics.js';
 import { refreshNaverSession } from '../services/naverSearchAdvisor.js';
+import { getDb } from '../config/database.js';
+import {
+  isDailyDiagnosticsEnabled,
+  runDailyDiagnosticsCoordinator,
+} from '../services/dailyDiagnostics.js';
+import {
+  isPriceObservationEnabled,
+  runDailyPriceObservationJob,
+} from '../services/priceObservationJob.js';
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:4000';
 const CRON_REVIEW_LIMIT = parseInt(process.env.CRON_REVIEW_GENERATION_LIMIT || '5', 10);
@@ -14,9 +23,13 @@ let newsMorningTask = null;
 let newsAfternoonTask = null;
 let logCleanupTask = null;
 let naverSessionTask = null;
+let dailyDiagnosticsTask = null;
+let dailyPriceObservationTask = null;
 let currentScheduleSnapshot = null;
 let scheduleSyncTimer = null;
 let isSyncingSchedules = false;
+let isRunningDailyDiagnostics = false;
+let isRunningDailyPriceObservation = false;
 
 let lastNewsCategory = null;
 
@@ -259,6 +272,51 @@ async function runScheduledLogCleanup() {
   }
 }
 
+export async function runScheduledDailyDiagnostics() {
+  if (isRunningDailyDiagnostics) {
+    console.warn('⚠️ Daily CTR diagnostics already running. Skipping overlap.');
+    return { status: 'skipped_overlap' };
+  }
+  isRunningDailyDiagnostics = true;
+  try {
+    const result = await runDailyDiagnosticsCoordinator(getDb());
+    console.log('✅ Daily CTR diagnostics completed:', {
+      businessDateKst: result.businessDateKst,
+      candidateCount: result.candidateResult?.candidates?.length || 0,
+      stored: result.candidateResult?.stored || 0,
+    });
+    return result;
+  } catch (error) {
+    console.error('❌ Daily CTR diagnostics failed:', getErrorMessage(error));
+    throw error;
+  } finally {
+    isRunningDailyDiagnostics = false;
+  }
+}
+
+export async function runScheduledDailyPriceObservation() {
+  if (isRunningDailyPriceObservation) {
+    console.warn('⚠️ Daily price observation already running. Skipping overlap.');
+    return { status: 'skipped_overlap' };
+  }
+  isRunningDailyPriceObservation = true;
+  try {
+    const result = await runDailyPriceObservationJob(getDb());
+    console.log('✅ Daily real-price observation completed:', {
+      businessDateKst: result.businessDateKst,
+      observed: result.observed,
+      unmatched: result.unmatched,
+      invalidPrice: result.invalidPrice,
+    });
+    return result;
+  } catch (error) {
+    console.error('❌ Daily real-price observation failed:', getErrorMessage(error));
+    throw error;
+  } finally {
+    isRunningDailyPriceObservation = false;
+  }
+}
+
 function stopTask(task) {
   if (!task) return;
   try {
@@ -359,6 +417,24 @@ export async function initCronJobs() {
     }
   }, { timezone: 'Asia/Seoul' });
 
+  stopTask(dailyDiagnosticsTask);
+  dailyDiagnosticsTask = null;
+  if (isDailyDiagnosticsEnabled()) {
+    // 04:20 KST: 전일 이벤트가 늦게 도착할 시간을 두고 최근 7일을 재계산한다.
+    dailyDiagnosticsTask = cron.schedule('20 4 * * *', () => {
+      runScheduledDailyDiagnostics().catch(() => {});
+    }, { timezone: 'Asia/Seoul' });
+  }
+
+  stopTask(dailyPriceObservationTask);
+  dailyPriceObservationTask = null;
+  if (isPriceObservationEnabled()) {
+    // 목록형 API에 잡히지 않은 상품만 Search API 여유 범위에서 소량 보완한다.
+    dailyPriceObservationTask = cron.schedule('10 * * * *', () => {
+      runScheduledDailyPriceObservation().catch(() => {});
+    }, { timezone: 'Asia/Seoul' });
+  }
+
   if (scheduleSyncTimer) {
     clearInterval(scheduleSyncTimer);
   }
@@ -375,5 +451,7 @@ export async function initCronJobs() {
   }
   console.log('   - Log cleanup: Every Sunday at 12:00 AM KST');
   console.log('   - Naver SA keep-alive: Every 6 hours');
+  console.log(`   - Daily CTR diagnostics: ${dailyDiagnosticsTask ? '04:20 KST' : 'disabled'}`);
+  console.log(`   - Real-price Search fallback: ${dailyPriceObservationTask ? 'hourly at :10 KST' : 'disabled'}`);
   console.log(`   - Schedule sync: Every ${Math.floor(CRON_SCHEDULE_SYNC_MS / 1000)}s`);
 }

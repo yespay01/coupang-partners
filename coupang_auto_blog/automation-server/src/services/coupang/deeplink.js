@@ -4,6 +4,11 @@
 
 import { logger } from "../../utils/logger.js";
 import { coupangRequest } from "./client.js";
+import {
+  affiliateUrlReasonMessage,
+  normalizeSubId,
+  validatePlainCoupangUrl,
+} from "./affiliateUrl.js";
 
 /**
  * 딥링크 생성 API
@@ -13,20 +18,36 @@ import { coupangRequest } from "./client.js";
 export async function createDeeplinks(params, credentials) {
   const { urls, subId } = params;
   const { accessKey, secretKey } = credentials;
+  const coupangUrls = Array.isArray(urls) ? urls : [urls];
+
+  const validatedUrls = [];
+  for (const url of coupangUrls) {
+    const validation = validatePlainCoupangUrl(url);
+    if (!validation.valid) {
+      return {
+        success: false,
+        message: affiliateUrlReasonMessage(validation.reason),
+        reason: validation.reason,
+        deeplinks: [],
+      };
+    }
+    validatedUrls.push(validation.normalizedUrl);
+  }
 
   const path = `/v2/providers/affiliate_open_api/apis/openapi/v1/deeplink`;
 
   const body = {
-    coupangUrls: Array.isArray(urls) ? urls : [urls],
+    coupangUrls: validatedUrls,
   };
 
   // subId가 있을 때만 포함 (빈 문자열 전송 시 API 오류 가능)
-  if (subId) {
-    body.subId = subId;
+  const configuredSubId = normalizeSubId(subId);
+  if (configuredSubId) {
+    body.subId = configuredSubId;
   }
 
   try {
-    logger.info(`딥링크 생성 요청: ${urls.length || 1}개 URL`);
+    logger.info(`딥링크 생성 요청: ${validatedUrls.length}개 URL`);
     const result = await coupangRequest("POST", path, accessKey, secretKey, body);
 
     logger.info("딥링크 API 응답:", {
@@ -45,7 +66,6 @@ export async function createDeeplinks(params, credentials) {
       logger.info("딥링크 생성 성공:", {
         totalCount: result.data.length,
         sampleKeys: Object.keys(result.data[0] || {}), // 응답 필드명 확인용
-        sample: result.data[0],
       });
     } else {
       logger.warn("딥링크 응답 data가 비어있습니다:", { rCode: result.rCode, rMessage: result.rMessage });

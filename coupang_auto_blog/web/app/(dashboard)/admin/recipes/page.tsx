@@ -378,7 +378,7 @@ export default function AdminRecipesPage() {
                         <a
                           href={product.affiliateUrl || product.productUrl}
                           target="_blank"
-                          rel="noopener noreferrer"
+                          rel="sponsored nofollow noopener noreferrer"
                           className="text-xs text-blue-500 hover:underline"
                         >
                           링크 확인

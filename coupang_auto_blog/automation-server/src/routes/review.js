@@ -4,13 +4,103 @@ import { authenticateToken } from '../config/auth.js';
 import { notifySlack } from '../services/slack.js';
 import { getSystemSettings } from '../services/settingsService.js';
 import { generateText } from '../services/aiProviders.js';
-import { buildPromptFromSettings, validateReviewContentWithSettings, analyzeToneScore, sanitizeReviewText } from '../services/reviewUtils.js';
+import { buildPromptFromSettings, validateReviewContentWithSettings, sanitizeReviewText } from '../services/reviewUtils.js';
 import { collectAllImages } from '../services/imageUtils.js';
 import { logger, dbLog } from '../utils/logger.js';
 import { cleanProductName } from '../utils/productName.js';
 import { extractSeoKeywords } from '../services/keywordExtractor.js';
+import {
+  affiliateUrlReasonMessage,
+  isShortAffiliateUrl,
+  validateAffiliateUrl,
+  validateLongAffiliateUrl,
+} from '../services/coupang/affiliateUrl.js';
+import {
+  buildPublicGoUrl,
+  registerAffiliateLink,
+  validateRegisteredAffiliateLink,
+} from '../services/coupang/affiliateLinkRegistry.js';
 
 const router = express.Router();
+
+function publicAffiliateLinkFields(row) {
+  const linkId = row.affiliate_link_id ? String(row.affiliate_link_id) : null;
+  return {
+    affiliateLink: linkId
+      ? { linkId, goUrl: buildPublicGoUrl(linkId) }
+      : undefined,
+  };
+}
+
+function registryLinkFromReviewRow(row) {
+  if (!row.registry_link_id) return null;
+  return {
+    link_id: row.registry_link_id,
+    destination_url: row.registry_destination_url,
+    landing_url: row.registry_landing_url,
+    partner_tracking_code: row.registry_partner_tracking_code,
+    sub_id: row.registry_sub_id,
+    link_source: row.registry_link_source,
+    validation_status: row.registry_validation_status,
+    validation_reason: row.registry_validation_reason,
+    validated_at: row.registry_validated_at,
+    is_active: row.registry_is_active,
+  };
+}
+
+/**
+ * 홈/공개 목록에서는 원본 affiliateUrl을 내보내지 않는다.
+ * 현재 Partner ID까지 다시 검증된 registry linkId만 공개해 모든 CTA가 /go를 통과하게 한다.
+ */
+export function mapPublicReviewListRow(row, currentPartnerId) {
+  const registryLink = registryLinkFromReviewRow(row);
+  const validation = validateRegisteredAffiliateLink(registryLink, currentPartnerId);
+  const linkId = registryLink?.link_id ? String(registryLink.link_id) : null;
+  const goUrl = linkId ? buildPublicGoUrl(linkId) : null;
+  const affiliateLink = validation.valid && goUrl
+    ? { linkId, goUrl }
+    : undefined;
+
+  return {
+    id: String(row.id),
+    productId: row.product_id,
+    productName: row.product_name,
+    productPrice: row.product_price,
+    productImage: row.product_image,
+    title: row.title,
+    content: row.content,
+    slug: row.slug,
+    status: row.status,
+    category: row.category,
+    affiliateLink,
+    author: row.author,
+    media: row.media,
+    charCount: row.char_count,
+    viewCount: row.view_count,
+    createdAt: row.created_at?.toISOString(),
+    updatedAt: row.updated_at?.toISOString(),
+    publishedAt: row.published_at?.toISOString(),
+  };
+}
+
+export const PUBLIC_REVIEW_LIST_QUERY = `
+  SELECT r.*,
+         al.link_id AS registry_link_id,
+         al.destination_url AS registry_destination_url,
+         al.landing_url AS registry_landing_url,
+         al.partner_tracking_code AS registry_partner_tracking_code,
+         al.sub_id AS registry_sub_id,
+         al.link_source AS registry_link_source,
+         al.validation_status AS registry_validation_status,
+         al.validation_reason AS registry_validation_reason,
+         al.validated_at AS registry_validated_at,
+         al.is_active AS registry_is_active
+  FROM reviews r
+  LEFT JOIN affiliate_links al ON al.link_id = r.affiliate_link_id
+  WHERE r.status = 'published'
+  ORDER BY r.published_at DESC, r.created_at DESC
+  LIMIT $1 OFFSET $2
+`;
 
 /**
  * 검색결과용 메타 설명 생성: 최대 길이 안에서 문장 경계로 자름
@@ -69,50 +159,36 @@ router.get('/reviews', async (req, res) => {
   try {
     const db = getDb();
     const { limit = 12, offset = 0 } = req.query;
+    const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 12, 1), 100);
+    const safeOffset = Math.max(Number.parseInt(offset, 10) || 0, 0);
+
+    // 설정 조회 장애/잘못된 Partner ID에서는 링크를 숨기고 목록 자체는 유지한다.
+    let currentPartnerId = null;
+    try {
+      currentPartnerId = (await getSystemSettings())?.coupang?.partnerId || null;
+    } catch (error) {
+      logger.warn('공개 리뷰 제휴 링크 설정 조회 실패', { message: error.message });
+    }
 
     // published 상태의 리뷰만 조회
-    const query = `
-      SELECT * FROM reviews
-      WHERE status = 'published'
-      ORDER BY published_at DESC, created_at DESC
-      LIMIT $1 OFFSET $2
-    `;
-
     const countQuery = `
       SELECT COUNT(*) as count FROM reviews
       WHERE status = 'published'
     `;
 
     const [reviewsResult, countResult] = await Promise.all([
-      db.query(query, [parseInt(limit), parseInt(offset)]),
+      db.query(PUBLIC_REVIEW_LIST_QUERY, [safeLimit, safeOffset]),
       db.query(countQuery),
     ]);
 
-    const reviews = reviewsResult.rows.map(row => ({
-      id: String(row.id),
-      productId: row.product_id,
-      productName: row.product_name,
-      title: row.title,
-      content: row.content,
-      slug: row.slug,
-      status: row.status,
-      category: row.category,
-      affiliateUrl: row.affiliate_url,
-      author: row.author,
-      media: row.media,
-      charCount: row.char_count,
-      viewCount: row.view_count,
-      createdAt: row.created_at?.toISOString(),
-      updatedAt: row.updated_at?.toISOString(),
-      publishedAt: row.published_at?.toISOString(),
-    }));
+    const reviews = reviewsResult.rows.map((row) => mapPublicReviewListRow(row, currentPartnerId));
 
     res.json({
       success: true,
       data: {
         reviews,
         totalCount: parseInt(countResult.rows[0].count),
-        hasMore: parseInt(offset) + reviews.length < parseInt(countResult.rows[0].count),
+        hasMore: safeOffset + reviews.length < parseInt(countResult.rows[0].count),
       },
     });
   } catch (error) {
@@ -205,6 +281,7 @@ router.get('/reviews/id/:id', async (req, res) => {
       status: row.status,
       category: row.category,
       affiliateUrl: row.affiliate_url,
+      ...publicAffiliateLinkFields(row),
       author: row.author,
       media: row.media,
       charCount: row.char_count,
@@ -269,6 +346,7 @@ router.get('/reviews/by-slug', async (req, res) => {
       status: row.status,
       category: row.category,
       affiliateUrl: row.affiliate_url,
+      ...publicAffiliateLinkFields(row),
       author: row.author,
       media: row.media,
       charCount: row.char_count,
@@ -327,6 +405,7 @@ router.get('/reviews/:slug', async (req, res) => {
       status: row.status,
       category: row.category,
       affiliateUrl: row.affiliate_url,
+      ...publicAffiliateLinkFields(row),
       author: row.author,
       media: row.media,
       charCount: row.char_count,
@@ -393,6 +472,24 @@ router.post('/generate', authenticateToken, async (req, res) => {
 
     // 2. 시스템 설정 로드
     const settings = await getSystemSettings();
+
+    const affiliateValidation = validateLongAffiliateUrl(
+      product.product_url,
+      settings.coupang?.partnerId
+    );
+    if (!affiliateValidation.valid) {
+      const error = new Error(affiliateUrlReasonMessage(affiliateValidation.reason));
+      error.status = 422;
+      throw error;
+    }
+
+    const affiliateLink = await registerAffiliateLink(db, {
+      productId: product.product_id,
+      destinationUrl: product.product_url,
+      partnerId: settings.coupang.partnerId,
+      subId: settings.coupang.subId,
+      linkSource: 'product_api',
+    });
 
     // 3. 프롬프트 설정 결정: 기본 템플릿이 있으면 템플릿 값 사용
     let promptSettings = settings.prompt;
@@ -466,23 +563,10 @@ router.post('/generate', authenticateToken, async (req, res) => {
       usage: aiResult.usage,
     });
 
-    // 6. 품질 검증 (실패 시 에러 throw)
-    let toneScore, charCount;
-    try {
-      const validation = validateReviewContentWithSettings(reviewText, promptSettings);
-      toneScore = validation.toneScore;
-      charCount = validation.charCount;
-    } catch (validationError) {
-      // 검증 실패해도 리뷰는 저장하되 경고 로그
-      logger.warn('리뷰 품질 검증 경고 (저장은 진행):', validationError.message);
-      toneScore = analyzeToneScore(reviewText);
-      charCount = Array.from(reviewText).length;
-      await dbLog('review-generate', 'warn', `리뷰 품질 검증 경고: ${validationError.message}`, {
-        productId,
-        toneScore,
-        charCount,
-      });
-    }
+    // 6. 품질 검증: 실패한 생성문은 DB에 저장하지 않는다.
+    // 오래된 DB 프롬프트가 기본 프롬프트를 덮더라도 허위 체험 주장은 여기서 차단된다.
+    const validation = validateReviewContentWithSettings(reviewText, promptSettings);
+    const { toneScore, charCount } = validation;
 
     // 6. 이미지 수집
     const productForImages = {
@@ -511,8 +595,8 @@ router.post('/generate', authenticateToken, async (req, res) => {
         ...aiKeywords,
         product.category_name,
         '쿠팡',
-        '최저가',
-        '후기',
+        '상품 비교',
+        '구매 가이드',
       ].filter(Boolean))
     );
 
@@ -522,7 +606,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
 
     // 제목에 상품명을 넣어 롱테일 검색(구체적인 상품명 검색)에 잡히게 함
     const seoMeta = {
-      title: `${cleanedName} 솔직 후기 · 쿠팡 최저가 | 세모링크`,
+      title: `${cleanedName} 선택 가이드 | 세모링크`,
       description: buildMetaDescription(reviewText),
       keywords: mergedKeywords,
       ogImage: firstMediaImage || product.product_image || '',
@@ -533,14 +617,15 @@ router.post('/generate', authenticateToken, async (req, res) => {
       `INSERT INTO reviews (
         product_id, product_name, content, status, category,
         affiliate_url, media, tone_score, char_count,
-        product_price, product_image, seo_meta
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+        product_price, product_image, seo_meta, affiliate_link_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
       [
         product.product_id,
         product.product_name,
         reviewText,
         'draft',
         product.category_name,
+        // Product API의 검증된 원본 URL을 재딥링크 없이 저장한다.
         product.product_url,
         JSON.stringify(media),
         toneScore,
@@ -548,6 +633,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
         product.product_price,
         product.product_image,
         JSON.stringify(seoMeta),
+        affiliateLink.link_id,
       ]
     );
 
@@ -555,8 +641,8 @@ router.post('/generate', authenticateToken, async (req, res) => {
 
     // 9. 상품 상태를 completed로 업데이트
     await db.query(
-      "UPDATE products SET status = 'completed', updated_at = NOW() WHERE product_id = $1",
-      [productId]
+      "UPDATE products SET status = 'completed', affiliate_link_id = $2, updated_at = NOW() WHERE product_id = $1",
+      [productId, affiliateLink.link_id]
     );
 
     // 10. 성공 로그
@@ -613,7 +699,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
       stack: error.stack,
     });
 
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: error.message,
     });
@@ -639,7 +725,7 @@ router.post('/publish', authenticateToken, async (req, res) => {
 
     // 기존 slug가 있으면 유지 (재발행 시 URL이 바뀌면 기존 검색 유입이 끊김)
     const existing = await db.query(
-      'SELECT slug, product_name FROM reviews WHERE id = $1',
+      'SELECT slug, product_name, product_id, affiliate_url, affiliate_link_id FROM reviews WHERE id = $1',
       [reviewId]
     );
 
@@ -648,6 +734,33 @@ router.post('/publish', authenticateToken, async (req, res) => {
         success: false,
         message: '리뷰를 찾을 수 없습니다.',
       });
+    }
+
+    const settings = await getSystemSettings();
+    const affiliateValidation = validateAffiliateUrl(
+      existing.rows[0].affiliate_url,
+      settings.coupang?.partnerId,
+      // 기존 DB의 coupa.ng URL은 생성 당시 landingUrl을 저장하지 않았으므로
+      // 게시 시점에 변경 없이 보존한다.
+      { allowExistingShortUrl: true }
+    );
+    if (!affiliateValidation.valid) {
+      return res.status(422).json({
+        success: false,
+        message: affiliateUrlReasonMessage(affiliateValidation.reason),
+      });
+    }
+
+    let affiliateLinkId = existing.rows[0].affiliate_link_id || null;
+    if (!affiliateLinkId && !isShortAffiliateUrl(existing.rows[0].affiliate_url)) {
+      const affiliateLink = await registerAffiliateLink(db, {
+        productId: existing.rows[0].product_id,
+        destinationUrl: existing.rows[0].affiliate_url,
+        partnerId: settings.coupang.partnerId,
+        subId: settings.coupang.subId,
+        linkSource: 'legacy',
+      });
+      affiliateLinkId = affiliateLink.link_id;
     }
 
     let slug = existing.rows[0].slug;
@@ -663,8 +776,8 @@ router.post('/publish', authenticateToken, async (req, res) => {
 
     // 상태 업데이트
     await db.query(
-      'UPDATE reviews SET status = $1, slug = $2, published_at = NOW() WHERE id = $3',
-      ['published', slug, reviewId]
+      'UPDATE reviews SET status = $1, slug = $2, affiliate_link_id = $4, published_at = NOW() WHERE id = $3',
+      ['published', slug, reviewId, affiliateLinkId]
     );
 
     res.json({

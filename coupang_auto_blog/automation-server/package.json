@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test",
+    "backfill:affiliate-links": "node scripts/backfillAffiliateLinks.js --dry-run",
+    "backfill:affiliate-links:apply": "node scripts/backfillAffiliateLinks.js --apply"
   },
   "keywords": [
     "coupang",

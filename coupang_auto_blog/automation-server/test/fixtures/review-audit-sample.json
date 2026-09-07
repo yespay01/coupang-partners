@@ -1,0 +1,36 @@
+{
+  "reviews": [
+    {
+      "id": "safe-1",
+      "slug": "bluetooth-earphone-guide",
+      "status": "published",
+      "productName": "블루투스 이어폰",
+      "category": "가전디지털",
+      "content": "블루투스 이어폰은 연결 방식과 배터리 시간을 비교해야 합니다. 로켓배송 가능 여부는 쿠팡 상품 페이지에서 확인하세요."
+    },
+    {
+      "id": "claim-1",
+      "slug": "vitamin-claim",
+      "status": "published",
+      "productName": "비타민 제품",
+      "category": "건강식품",
+      "content": "내돈내산으로 직접 먹어 보니 혈당이 줄어드는 효과가 있었고 현재 30% 할인 중입니다."
+    },
+    {
+      "id": "mismatch-1",
+      "slug": "water-storage-mismatch",
+      "status": "published",
+      "productName": "제주삼다수 500ml 20개",
+      "category": "식품",
+      "content": "제주삼다수 500ml 20개는 뚜껑이 있어 장난감을 넣기 좋은 수납 정리함입니다. 선반 공간도 깔끔하게 정리됩니다."
+    },
+    {
+      "id": "mismatch-2",
+      "slug": "silver-cleaner-clothing-mismatch",
+      "status": "published",
+      "product_name": "금 은 주얼리 클리너",
+      "category": "생활용품",
+      "content": "금 은 주얼리 클리너는 니트와 옷감의 보풀을 정리하고 의류 소매를 관리할 때 쓰기 좋습니다."
+    }
+  ]
+}

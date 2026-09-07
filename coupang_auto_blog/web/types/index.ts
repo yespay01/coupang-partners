@@ -25,6 +25,11 @@ export type SEOMeta = {
   ogImage: string;
 };
 
+export type AffiliateLinkReference = {
+  linkId: string;
+  goUrl?: string;
+};
+
 /**
  * Review - Firestore 문서 및 클라이언트 공통 타입
  */
@@ -44,6 +49,7 @@ export type Review = {
   charCount?: number;
   category?: string;
   affiliateUrl?: string;
+  affiliateLink?: AffiliateLinkReference;
   media?: MediaItem[];
 
   // 블로그 발행 관련

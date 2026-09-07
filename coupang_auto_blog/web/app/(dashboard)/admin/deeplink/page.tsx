@@ -200,7 +200,7 @@ export default function AdminDeeplinkPage() {
                       <a
                         href={result.shortenUrl}
                         target="_blank"
-                        rel="noopener noreferrer"
+                        rel="sponsored nofollow noopener noreferrer"
                         className="flex-1 truncate text-sm font-medium text-blue-600 hover:underline"
                       >
                         {result.shortenUrl}

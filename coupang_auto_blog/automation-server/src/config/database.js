@@ -40,6 +40,12 @@ export function getDb() {
   return pool;
 }
 
+export async function closeDatabase() {
+  if (!pool) return;
+  await pool.end();
+  pool = null;
+}
+
 /**
  * 데이터베이스 연결 테스트
  */

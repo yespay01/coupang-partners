@@ -8,6 +8,19 @@ import { generateText } from '../services/aiProviders.js';
 import { searchProducts } from '../services/coupang/products.js';
 import { naverSearch, formatNaverResults, getLatestLottoNumbers, formatLottoData, isLottoTopic } from '../services/webSearch.js';
 import { createDeeplinks } from '../services/coupang/deeplink.js';
+import {
+  affiliateUrlReasonMessage,
+  isShortAffiliateUrl,
+  isValidPartnerId,
+  validateAffiliateUrl,
+  validatePlainCoupangUrl,
+  validateProductApiProducts,
+  validateShortAffiliateUrl,
+} from '../services/coupang/affiliateUrl.js';
+import {
+  buildPublicGoUrl,
+  registerAffiliateLink,
+} from '../services/coupang/affiliateLinkRegistry.js';
 import { getSearchConsoleData } from '../services/googleSearchConsole.js';
 import { getNaverSearchData, saveNaverSaCookies, getNaverSaStatus } from '../services/naverSearchAdvisor.js';
 import fetch from 'node-fetch';
@@ -39,6 +52,85 @@ async function generateUniqueSlug(db, table, title) {
   let counter = 2;
   while (usedSlugs.has(`${base}-${counter}`)) counter++;
   return `${base}-${counter}`;
+}
+
+function affiliateUrlError(message, status = 400) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+/**
+ * 관리자가 입력한 URL을 검증된 제휴 URL로 변환한다.
+ * - 긴 제휴 URL: lptag 검증 후 그대로 저장
+ * - 일반 coupang.com URL: Deep Link API 변환 후 landingUrl로 검증
+ * - 신규 coupa.ng URL: 같은 응답의 landingUrl이 있을 때만 저장
+ * - 기존 DB의 동일한 coupa.ng URL: 변경 없이 보존
+ */
+async function resolveReviewAffiliateUrl({
+  candidateUrl,
+  candidateLandingUrl,
+  existingUrl,
+  coupangSettings,
+}) {
+  const value = typeof candidateUrl === 'string' ? candidateUrl.trim() : '';
+  if (!value) return { affiliateUrl: '', landingUrl: null, linkSource: null };
+
+  const partnerId = coupangSettings?.partnerId;
+  if (!isValidPartnerId(partnerId)) {
+    throw affiliateUrlError(affiliateUrlReasonMessage('invalid_partner_id'), 503);
+  }
+
+  const isUnchangedExistingShort =
+    isShortAffiliateUrl(value) &&
+    typeof existingUrl === 'string' &&
+    value === existingUrl.trim();
+
+  const affiliateValidation = validateAffiliateUrl(value, partnerId, {
+    landingUrl: candidateLandingUrl,
+    allowExistingShortUrl: isUnchangedExistingShort,
+  });
+  if (affiliateValidation.valid) {
+    return {
+      affiliateUrl: affiliateValidation.normalizedUrl,
+      landingUrl: affiliateValidation.landingUrl || null,
+      linkSource: affiliateValidation.preservedExisting ? 'legacy' : 'manual',
+    };
+  }
+
+  const plainValidation = validatePlainCoupangUrl(value);
+  if (!plainValidation.valid) {
+    throw affiliateUrlError(affiliateUrlReasonMessage(affiliateValidation.reason));
+  }
+
+  const { accessKey, secretKey, subId } = coupangSettings || {};
+  if (!accessKey || !secretKey) {
+    throw affiliateUrlError('쿠팡 Deep Link API가 설정되지 않았습니다.', 503);
+  }
+
+  const result = await createDeeplinks(
+    { urls: [plainValidation.normalizedUrl], subId },
+    { accessKey, secretKey }
+  );
+  if (!result.success || !result.deeplinks?.[0]) {
+    throw affiliateUrlError(result.message || '딥링크 변환에 실패했습니다.', 502);
+  }
+
+  const deeplink = result.deeplinks[0];
+  const deeplinkValidation = validateShortAffiliateUrl(
+    deeplink.shortenUrl,
+    deeplink.landingUrl,
+    partnerId
+  );
+  if (!deeplinkValidation.valid) {
+    throw affiliateUrlError(affiliateUrlReasonMessage(deeplinkValidation.reason), 502);
+  }
+
+  return {
+    affiliateUrl: deeplinkValidation.normalizedUrl,
+    landingUrl: deeplinkValidation.landingUrl,
+    linkSource: 'deeplink_api',
+  };
 }
 
 // ==================== Reviews ====================
@@ -131,27 +223,95 @@ router.get('/reviews/:id', async (req, res) => {
 router.put('/reviews/:id', async (req, res) => {
   try {
     const db = getDb();
-    const { content, status, productName, category, affiliateUrl } = req.body;
+    const { content, status, productName, category, affiliateUrl, affiliateLandingUrl } = req.body;
+    const existingResult = await db.query(
+      'SELECT slug, product_name, product_id, affiliate_url, affiliate_link_id FROM reviews WHERE id = $1',
+      [req.params.id]
+    );
+
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '리뷰를 찾을 수 없습니다.' });
+    }
+
+    const existingReview = existingResult.rows[0];
     const fields = [];
     const params = [];
     let idx = 1;
+    let resolvedAffiliateUrl;
 
     if (content !== undefined) { fields.push(`content = $${idx++}`); params.push(content); }
     if (status !== undefined) { fields.push(`status = $${idx++}`); params.push(status); }
     if (productName !== undefined) { fields.push(`product_name = $${idx++}`); params.push(productName); }
     if (category !== undefined) { fields.push(`category = $${idx++}`); params.push(category); }
-    if (affiliateUrl !== undefined) { fields.push(`affiliate_url = $${idx++}`); params.push(affiliateUrl); }
+
+    if (affiliateUrl !== undefined) {
+      const settings = await getSystemSettings();
+      const resolvedAffiliate = await resolveReviewAffiliateUrl({
+        candidateUrl: affiliateUrl,
+        candidateLandingUrl: affiliateLandingUrl,
+        existingUrl: existingReview.affiliate_url,
+        coupangSettings: settings.coupang,
+      });
+      resolvedAffiliateUrl = resolvedAffiliate.affiliateUrl;
+      fields.push(`affiliate_url = $${idx++}`);
+      params.push(resolvedAffiliateUrl);
+
+      if (resolvedAffiliateUrl && resolvedAffiliate.linkSource !== 'legacy') {
+        const affiliateLink = await registerAffiliateLink(db, {
+          productId: existingReview.product_id,
+          destinationUrl: resolvedAffiliateUrl,
+          landingUrl: resolvedAffiliate.landingUrl,
+          partnerId: settings.coupang.partnerId,
+          subId: settings.coupang.subId,
+          linkSource: resolvedAffiliate.linkSource,
+        });
+        fields.push(`affiliate_link_id = $${idx++}`);
+        params.push(affiliateLink.link_id);
+      } else if (!resolvedAffiliateUrl) {
+        fields.push(`affiliate_link_id = $${idx++}`);
+        params.push(null);
+      }
+    }
 
     if (status === 'published') {
+      // 수정 요청에 URL이 없어도 게시 직전에 기존 URL을 다시 검증한다.
+      if (resolvedAffiliateUrl === undefined) {
+        const settings = await getSystemSettings();
+        const resolvedAffiliate = await resolveReviewAffiliateUrl({
+          candidateUrl: existingReview.affiliate_url,
+          existingUrl: existingReview.affiliate_url,
+          coupangSettings: settings.coupang,
+        });
+        resolvedAffiliateUrl = resolvedAffiliate.affiliateUrl;
+        fields.push(`affiliate_url = $${idx++}`);
+        params.push(resolvedAffiliateUrl);
+
+        if (resolvedAffiliateUrl && resolvedAffiliate.linkSource !== 'legacy') {
+          const affiliateLink = await registerAffiliateLink(db, {
+            productId: existingReview.product_id,
+            destinationUrl: resolvedAffiliateUrl,
+            landingUrl: resolvedAffiliate.landingUrl,
+            partnerId: settings.coupang.partnerId,
+            subId: settings.coupang.subId,
+            linkSource: resolvedAffiliate.linkSource,
+          });
+          fields.push(`affiliate_link_id = $${idx++}`);
+          params.push(affiliateLink.link_id);
+        }
+      }
+
+      if (!resolvedAffiliateUrl) {
+        return res.status(400).json({
+          success: false,
+          message: '게시할 리뷰에는 검증된 쿠팡 제휴 URL이 필요합니다.',
+        });
+      }
+
       fields.push(`published_at = NOW()`);
 
       // slug가 없으면 상품명 기반으로 생성
-      const existing = await db.query(
-        'SELECT slug, product_name FROM reviews WHERE id = $1',
-        [req.params.id]
-      );
-      if (existing.rows.length > 0 && !existing.rows[0].slug) {
-        const pName = productName || existing.rows[0].product_name || '';
+      if (!existingReview.slug) {
+        const pName = productName || existingReview.product_name || '';
         const newSlug = await generateUniqueSlug(db, 'reviews', pName);
         fields.push(`slug = $${idx++}`);
         params.push(newSlug);
@@ -173,7 +333,7 @@ router.put('/reviews/:id', async (req, res) => {
     res.json({ success: true, data: mapReviewRow(result.rows[0]) });
   } catch (error) {
     console.error('리뷰 수정 오류:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.message });
   }
 });
 
@@ -767,9 +927,9 @@ router.post('/recipes/generate', async (req, res) => {
 
     // 쿠팡 재료 검색 (전체 재료)
     let coupangProducts = [];
-    const { accessKey, secretKey, subId } = settings.coupang || {};
+    const { accessKey, secretKey, partnerId, subId } = settings.coupang || {};
 
-    if (accessKey && secretKey && parsed.ingredients) {
+    if (accessKey && secretKey && isValidPartnerId(partnerId) && parsed.ingredients) {
       const searchPromises = parsed.ingredients.map(async (ingredient) => {
         try {
           const result = await searchProducts(
@@ -777,15 +937,39 @@ router.post('/recipes/generate', async (req, res) => {
             { accessKey, secretKey }
           );
           if (result.success && result.products && result.products.length > 0) {
-            const product = result.products[0];
+            const { validProducts, invalidProducts } = validateProductApiProducts(
+              result.products,
+              partnerId
+            );
+            const product = validProducts[0];
+            if (!product) {
+              logger.warn('레시피 재료 제휴 URL 검증 실패', {
+                ingredientName: ingredient.name,
+                productId: invalidProducts[0]?.productId,
+                reason: invalidProducts[0]?.reason,
+              });
+              return null;
+            }
+            const affiliateLink = await registerAffiliateLink(db, {
+              productId: product.productId,
+              destinationUrl: product.productUrl,
+              partnerId,
+              subId,
+              linkSource: 'product_api',
+            });
             return {
               ingredientName: ingredient.name,
               productId: product.productId,
               productName: product.productName,
               productPrice: product.productPrice,
               productImage: product.productImage,
+              // Product API의 검증된 원본 URL을 재딥링크 없이 사용한다.
               productUrl: product.productUrl,
               affiliateUrl: product.productUrl,
+              affiliateLink: {
+                linkId: String(affiliateLink.link_id),
+                goUrl: buildPublicGoUrl(String(affiliateLink.link_id)),
+              },
             };
           }
         } catch (err) {
@@ -1158,26 +1342,73 @@ router.post('/deeplink', async (req, res) => {
       return res.status(400).json({ success: false, message: '한 번에 최대 20개 URL만 변환할 수 있습니다.' });
     }
 
-    const settings = await getSystemSettings();
-    const { accessKey, secretKey, subId } = settings.coupang || {};
+    const normalizedUrls = [];
+    for (const url of urls) {
+      const validation = validatePlainCoupangUrl(url);
+      if (!validation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: affiliateUrlReasonMessage(validation.reason),
+        });
+      }
+      normalizedUrls.push(validation.normalizedUrl);
+    }
 
-    if (!accessKey || !secretKey) {
+    const settings = await getSystemSettings();
+    const { accessKey, secretKey, partnerId, subId } = settings.coupang || {};
+
+    if (!accessKey || !secretKey || !isValidPartnerId(partnerId)) {
       return res.status(503).json({ success: false, message: '쿠팡 API가 설정되지 않았습니다.' });
     }
 
-    const result = await createDeeplinks({ urls, subId }, { accessKey, secretKey });
+    const result = await createDeeplinks({ urls: normalizedUrls, subId }, { accessKey, secretKey });
 
     if (!result.success) {
       return res.status(502).json({ success: false, message: result.message || '딥링크 변환 실패' });
     }
 
+    const verifiedDeeplinks = [];
+    for (let i = 0; i < normalizedUrls.length; i += 1) {
+      const deeplink = result.deeplinks?.[i];
+      const validation = validateShortAffiliateUrl(
+        deeplink?.shortenUrl,
+        deeplink?.landingUrl,
+        partnerId
+      );
+      if (!validation.valid) {
+        logger.warn('딥링크 응답 제휴 URL 검증 실패', {
+          index: i,
+          reason: validation.reason,
+        });
+        return res.status(502).json({
+          success: false,
+          message: affiliateUrlReasonMessage(validation.reason),
+        });
+      }
+
+      const affiliateLink = await registerAffiliateLink(getDb(), {
+        destinationUrl: validation.normalizedUrl,
+        landingUrl: validation.landingUrl,
+        partnerId,
+        subId,
+        linkSource: 'deeplink_api',
+      });
+
+      verifiedDeeplinks.push({
+        originalUrl: normalizedUrls[i],
+        shortenUrl: validation.normalizedUrl,
+        landingUrl: validation.landingUrl,
+        affiliateLink: {
+          linkId: String(affiliateLink.link_id),
+          goUrl: buildPublicGoUrl(String(affiliateLink.link_id)),
+        },
+      });
+    }
+
     res.json({
       success: true,
       data: {
-        deeplinks: (result.deeplinks || []).map((dl, i) => ({
-          originalUrl: urls[i] || '',
-          shortenUrl: dl.shortenUrl || '',
-        })),
+        deeplinks: verifiedDeeplinks,
       },
     });
   } catch (error) {
@@ -1200,6 +1431,7 @@ router.post('/upload', async (req, res) => {
 // ==================== Helper Functions ====================
 
 function mapReviewRow(row) {
+  const linkId = row.affiliate_link_id ? String(row.affiliate_link_id) : null;
   return {
     id: String(row.id),
     productId: row.product_id,
@@ -1210,6 +1442,7 @@ function mapReviewRow(row) {
     status: row.status,
     category: row.category,
     affiliateUrl: row.affiliate_url,
+    affiliateLink: linkId ? { linkId, goUrl: buildPublicGoUrl(linkId) } : undefined,
     author: row.author,
     media: row.media,
     toneScore: row.tone_score ? parseFloat(row.tone_score) : undefined,
@@ -1222,6 +1455,7 @@ function mapReviewRow(row) {
 }
 
 function mapProductRow(row) {
+  const linkId = row.affiliate_link_id ? String(row.affiliate_link_id) : null;
   return {
     id: String(row.id),
     productId: row.product_id,
@@ -1232,6 +1466,7 @@ function mapProductRow(row) {
     categoryId: row.category_id,
     categoryName: row.category_name,
     affiliateUrl: row.affiliate_url,
+    affiliateLink: linkId ? { linkId, goUrl: buildPublicGoUrl(linkId) } : undefined,
     source: row.source,
     status: row.status,
     createdAt: row.created_at?.toISOString(),

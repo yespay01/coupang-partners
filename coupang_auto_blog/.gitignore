@@ -206,3 +206,10 @@ shopping_shorts_automation/douyin_media/
 shopping_shorts_automation/.streamlit/
 
 # 향후 프로젝트는 여기에 추가
+
+# ===== 로컬 검사·빌드 산출물 =====
+.firebase/
+.playwright-mcp/
+*.har
+*.lnk
+favicon-check.png

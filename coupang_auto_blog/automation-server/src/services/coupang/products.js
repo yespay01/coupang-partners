@@ -4,6 +4,10 @@
 
 import { logger } from "../../utils/logger.js";
 import { coupangRequest } from "./client.js";
+import {
+  getCoupangSearchCooldown,
+  registerCoupangSearchRateLimit,
+} from "./searchPolicy.js";
 
 /**
  * 상품 검색 API
@@ -21,11 +25,28 @@ export async function searchProducts(params, credentials) {
   const path = `/v2/providers/affiliate_open_api/apis/openapi/products/search?${queryParams.toString()}`;
 
   try {
+    const cooldown = getCoupangSearchCooldown();
+    if (cooldown) {
+      return {
+        success: false,
+        message: cooldown.message,
+        products: [],
+        rateLimited: true,
+        blockedUntil: cooldown.blockedUntil.toISOString(),
+      };
+    }
     const result = await coupangRequest("GET", path, accessKey, secretKey);
 
     if (result.rCode != 0) {
       logger.warn("Coupang search failed:", result.rMessage);
-      return { success: false, message: result.rMessage, products: [] };
+      const blockedUntil = registerCoupangSearchRateLimit(result.rMessage);
+      return {
+        success: false,
+        message: result.rMessage,
+        products: [],
+        rateLimited: Boolean(blockedUntil),
+        blockedUntil: blockedUntil?.toISOString(),
+      };
     }
 
     return {

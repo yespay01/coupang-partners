@@ -346,7 +346,7 @@ export function ProductList({
                     <a
                       href={product.productUrl}
                       target="_blank"
-                      rel="noopener noreferrer"
+                      rel="sponsored nofollow noopener noreferrer"
                       className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
                     >
                       제휴 링크

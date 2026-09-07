@@ -70,7 +70,7 @@ function ReviewCard({ review }: { review: PublishedReview }) {
               </span>
             )}
             <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition line-clamp-2">
-              {review.productName || `상품 리뷰 #${review.id.slice(0, 6)}`}
+              {review.productName || `상품 가이드 #${review.id.slice(0, 6)}`}
             </h3>
             <p className="mt-2 text-sm text-slate-600 line-clamp-3">
               {truncateContent(review.content || "", 150)}
@@ -80,7 +80,7 @@ function ReviewCard({ review }: { review: PublishedReview }) {
         <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
           <span suppressHydrationWarning>{formatDate(review.createdAt || "")}</span>
           <span className="inline-flex items-center gap-1 font-semibold text-orange-600 group-hover:text-orange-700 transition">
-            최저가·후기 보기
+            상품 정보 보기
             <svg
               className="w-4 h-4"
               fill="none"
@@ -105,10 +105,10 @@ function EmptyState() {
   return (
     <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-12 text-center">
       <h3 className="text-lg font-semibold text-slate-700 mb-2">
-        아직 게시된 리뷰가 없습니다
+        아직 게시된 상품 가이드가 없습니다
       </h3>
       <p className="text-sm text-slate-500 mb-6">
-        관리자가 리뷰를 승인하면 여기에 표시됩니다.
+        새 상품 가이드가 게시되면 여기에 표시됩니다.
       </p>
       <Link
         href="/"
@@ -184,7 +184,7 @@ export function ReviewsListClient({
         {filteredReviews.length > 0 ? (
           <>
             <div className="mb-4 text-sm text-slate-500">
-              총 {filteredReviews.length}개의 리뷰
+              총 {filteredReviews.length}개의 상품 가이드
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {filteredReviews.map((review) => (

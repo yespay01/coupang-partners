@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const navItems = [
-  { label: "리뷰", href: "/" },
+  { label: "상품 모음", href: "/" },
   { label: "요리", href: "/recipes" },
   { label: "뉴스", href: "/news" },
   { label: "검색", href: "/search" },

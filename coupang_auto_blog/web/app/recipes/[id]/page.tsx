@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
+import { AffiliateOutboundLink } from "@/components/AffiliateOutboundLink";
 
 export const revalidate = 3600;
 export const dynamicParams = true;
@@ -20,11 +22,13 @@ interface Recipe {
   ingredients: { name: string; amount: string }[];
   instructions: string;
   coupangProducts: {
+    productId?: string;
     ingredientName: string;
     productName: string;
     productPrice: number;
     productImage: string;
     affiliateUrl: string;
+    affiliateLink?: { linkId: string; goUrl?: string };
   }[];
   imageUrl?: string;
   viewCount: number;
@@ -104,6 +108,9 @@ export default async function RecipeDetailPage({ params }: PageProps) {
   const { id } = await params;
   const recipe = await getRecipe(id);
   if (!recipe) notFound();
+  const affiliateProducts = recipe.coupangProducts?.filter((product) =>
+    Boolean(product.affiliateLink?.linkId || product.affiliateUrl)
+  );
 
   const description = recipe.description
     ? recipe.description.slice(0, 160)
@@ -228,18 +235,26 @@ export default async function RecipeDetailPage({ params }: PageProps) {
         </section>
 
         {/* Coupang Products */}
-        {recipe.coupangProducts && recipe.coupangProducts.length > 0 && (
+        {affiliateProducts && affiliateProducts.length > 0 && (
           <section className="mb-10">
             <h2 className="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200">
               쿠팡에서 재료 구매하기
             </h2>
+            <AffiliateDisclosure className="mb-4" />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {recipe.coupangProducts.map((product, i) => (
-                <a
+              {affiliateProducts.map((product, i) => (
+                <AffiliateOutboundLink
                   key={i}
-                  href={product.affiliateUrl || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={product.affiliateLink?.linkId ? undefined : product.affiliateUrl}
+                  linkId={product.affiliateLink?.linkId}
+                  impressionEventName="product_card_impression"
+                  tracking={{
+                    productName: product.productName,
+                    productId: product.productId,
+                    contentId: recipe.id,
+                    surface: "recipe",
+                    position: "recipe_card",
+                  }}
                   className="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
                   {product.productImage && (
@@ -258,14 +273,11 @@ export default async function RecipeDetailPage({ params }: PageProps) {
                     {product.productName}
                   </div>
                   <div className="mt-2 text-xs font-semibold text-orange-600">
-                    쿠팡에서 최저가 확인 &rarr;
+                    쿠팡에서 현재가 확인 &rarr;
                   </div>
-                </a>
-              ))}
+                </AffiliateOutboundLink>
+                ))}
             </div>
-            <p className="mt-3 text-xs text-slate-400">
-              이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
-            </p>
           </section>
         )}
 

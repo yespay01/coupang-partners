@@ -162,6 +162,10 @@ const routes = await Promise.all([
   import('./routes/recipe.js'),
   import('./routes/news.js'),
   import('./routes/search.js'),
+  import('./routes/analytics.js'),
+  import('./routes/outbound.js'),
+  import('./routes/optimization.js'),
+  import('./routes/priceHistory.js'),
 ]);
 
 // Routes
@@ -173,6 +177,10 @@ app.use('/api/admin', routes[3].default);
 app.use('/api', routes[4].default); // public recipes API
 app.use('/api', routes[5].default); // public news API
 app.use('/api', routes[6].default); // public search API
+app.use('/api', routes[7].default); // public analytics ingest
+app.use('/api', routes[8].default); // verified affiliate redirect
+app.use('/api/admin', routes[9].default); // authenticated CTR diagnostics
+app.use('/api', routes[10].default); // public observed price history
 
 // Error handler
 app.use((err, req, res, next) => {

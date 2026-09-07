@@ -123,7 +123,7 @@ export function PromptTemplates() {
     }
 
     const confirmed = confirm(
-      `기본 템플릿 "${defaultTpl.name}"을 권장 버전으로 교체합니다.\n\n- 시스템 프롬프트·리뷰 템플릿: SEO 강화 버전 (장단점·꿀팁·추천대상 포함)\n- 글자수: ${RECOMMENDED_REVIEW_LENGTH.minLength}~${RECOMMENDED_REVIEW_LENGTH.maxLength}자 (검색 노출에 유리한 분량)\n\n그 외 설정(톤 점수, 가이드라인, 카테고리)은 그대로 유지됩니다.\n\n계속하시겠습니까?`
+      `기본 템플릿 "${defaultTpl.name}"을 권장 버전으로 교체합니다.\n\n- 시스템 프롬프트·상품 가이드 템플릿: 확인된 정보와 용도·구성·옵션·주의점 기반\n- 글자수: ${RECOMMENDED_REVIEW_LENGTH.minLength}~${RECOMMENDED_REVIEW_LENGTH.maxLength}자 (구매 판단에 필요한 선택 기준을 설명하는 분량)\n\n그 외 설정(톤 점수, 가이드라인, 카테고리)은 그대로 유지됩니다.\n\n계속하시겠습니까?`
     );
     if (!confirmed) return;
 
@@ -160,7 +160,7 @@ export function PromptTemplates() {
         throw new Error(data.error || "설정 동기화 실패");
       }
 
-      alert("기본 템플릿이 권장 버전으로 업데이트되었습니다.\n다음 자동 리뷰 생성부터 새 프롬프트가 적용됩니다.");
+      alert("기본 템플릿이 권장 버전으로 업데이트되었습니다.\n다음 자동 상품 가이드 생성부터 새 프롬프트가 적용됩니다.");
       await loadTemplates();
     } catch (err) {
       alert(err instanceof Error ? err.message : "권장 프롬프트 적용 중 오류 발생");

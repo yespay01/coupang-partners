@@ -4,7 +4,12 @@
  */
 
 import { apiClient } from "./apiClient";
-import { COUPANG_CATEGORIES } from "@/types/settings";
+import {
+  COUPANG_CATEGORIES,
+  DEFAULT_REVIEW_TEMPLATE,
+  DEFAULT_SYSTEM_PROMPT,
+  RECOMMENDED_REVIEW_LENGTH,
+} from "@/types/settings";
 
 export type SystemSettings = {
   ai: {
@@ -152,10 +157,10 @@ export function getDefaultSettings(): SystemSettings {
       maxTokens: 1024,
     },
     prompt: {
-      systemPrompt: "당신은 전문적인 상품 리뷰 작성자입니다.",
-      reviewTemplate: "",
-      minLength: 90,
-      maxLength: 170,
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
+      reviewTemplate: DEFAULT_REVIEW_TEMPLATE,
+      minLength: RECOMMENDED_REVIEW_LENGTH.minLength,
+      maxLength: RECOMMENDED_REVIEW_LENGTH.maxLength,
       toneScoreThreshold: 0.4,
     },
     images: {

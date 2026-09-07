@@ -2,6 +2,11 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import {
+  getAnalyticsSurface,
+  getPageViewId,
+  sendAnalyticsEvent,
+} from "@/lib/analytics";
 
 function getReferrerDomain(url: string): string {
   if (!url) return "direct";
@@ -86,6 +91,33 @@ export function VisitorTracker() {
       utm_campaign: searchParams.get("utm_campaign"),
       device_type: getDeviceType(),
     };
+
+    const locationKey = `${pathname}${window.location.search}`;
+    getPageViewId(locationKey);
+    const surface = getAnalyticsSurface(pathname);
+    const contentId = getPageSlug(pathname) || undefined;
+    const source = getReferrerDomain(referrer);
+
+    sendAnalyticsEvent({
+      eventName: "page_view",
+      surface,
+      contentId,
+      source,
+    });
+
+    if (
+      pathname === "/" ||
+      pathname === "/reviews" ||
+      pathname === "/recipes" ||
+      pathname.startsWith("/collections/")
+    ) {
+      sendAnalyticsEvent({
+        eventName: "list_view",
+        surface,
+        contentId,
+        source,
+      });
+    }
 
     // fire-and-forget: 에러가 나도 페이지에 영향 없음
     fetch("/api/track", {
