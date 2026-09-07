@@ -1844,8 +1844,21 @@ router.put('/credentials/naver-sa', requireAdmin, async (req, res) => {
     }
 
     await saveNaverSaCookies(cookies, siteHash);
+    const status = await getNaverSaStatus();
 
-    res.json({ success: true, message: '네이버 SA 쿠키가 업데이트되었습니다.' });
+    if (status.status !== 'active') {
+      return res.status(422).json({
+        success: false,
+        message: status.message || '네이버 세션을 확인할 수 없습니다.',
+        data: status,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: '네이버 SA 쿠키가 업데이트되었습니다.',
+      data: status,
+    });
   } catch (error) {
     console.error('네이버 SA 쿠키 업데이트 오류:', error);
     res.status(500).json({ success: false, message: error.message });

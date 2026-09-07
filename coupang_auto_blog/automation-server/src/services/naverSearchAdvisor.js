@@ -143,15 +143,21 @@ export async function refreshNaverSession() {
       redirect: 'manual',
     });
 
-    // 302 redirect to login = 세션 만료
-    if (response.status === 302) {
+    // 리다이렉트가 로그인 요구인지, 콘솔 내 정상 이동인지 API로 확인한다.
+    if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location') || '';
-      if (location.includes('nidlogin') || location.includes('nid.naver.com')) {
+      const status = await getNaverSaStatus();
+      if (location.includes('nidlogin') || location.includes('nid.naver.com') || status.status === 'expired') {
         logger.warn('네이버 SA 세션 만료 감지');
         try {
           await notifySlack('⚠️ 네이버 서치어드바이저 세션 쿠키가 만료되었습니다. 크롬에서 네이버 로그인 후 쿠키 동기화를 실행하세요.');
         } catch {}
         return { refreshed: false, reason: 'session_expired' };
+      }
+
+      if (status.status === 'active') {
+        logger.info('네이버 SA 세션 유효 - API 확인 완료');
+        return { refreshed: true, reason: 'session_alive_via_api' };
       }
     }
 
