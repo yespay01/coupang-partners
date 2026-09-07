@@ -99,14 +99,17 @@ async function resolveCronSchedules() {
         expr: hhmmToCronExpression(collectTime, '0 2 * * *'),
       },
       review: {
+        enabled: reviewGeneration.enabled === true,
         label: reviewTime,
         expr: hhmmToCronExpression(reviewTime, '0 3 * * *'),
       },
       newsMorning: {
+        enabled: newsGeneration.enabled === true,
         label: newsMorning,
         expr: hhmmToCronExpression(newsMorning, '0 7 * * *'),
       },
       newsAfternoon: {
+        enabled: newsGeneration.enabled === true,
         label: newsAfternoon,
         expr: hhmmToCronExpression(newsAfternoon, '0 18 * * *'),
       },
@@ -115,9 +118,9 @@ async function resolveCronSchedules() {
     console.error('⚠️ Failed to load cron schedules from settings. Using defaults:', getErrorMessage(error));
     return {
       collect: { enabled: false, label: '02:00', expr: '0 2 * * *' },
-      review: { label: '03:00', expr: '0 3 * * *' },
-      newsMorning: { label: '07:00', expr: '0 7 * * *' },
-      newsAfternoon: { label: '18:00', expr: '0 18 * * *' },
+      review: { enabled: false, label: '03:00', expr: '0 3 * * *' },
+      newsMorning: { enabled: false, label: '07:00', expr: '0 7 * * *' },
+      newsAfternoon: { enabled: false, label: '18:00', expr: '0 18 * * *' },
     };
   }
 }
@@ -335,7 +338,7 @@ function stopTask(task) {
 }
 
 function scheduleKeyFromSnapshot(snapshot) {
-  return `${snapshot.collect.enabled}|${snapshot.collect.expr}|${snapshot.review.expr}|${snapshot.newsMorning.expr}|${snapshot.newsAfternoon.expr}`;
+  return `${snapshot.collect.enabled}|${snapshot.collect.expr}|${snapshot.review.enabled}|${snapshot.review.expr}|${snapshot.newsMorning.enabled}|${snapshot.newsMorning.expr}|${snapshot.newsAfternoon.enabled}|${snapshot.newsAfternoon.expr}`;
 }
 
 function applyCronSchedules(schedules) {
@@ -350,29 +353,35 @@ function applyCronSchedules(schedules) {
       })
     : null;
 
-  reviewGenerationTask = cron.schedule(schedules.review.expr, runScheduledReviewGeneration, {
-    timezone: 'Asia/Seoul'
-  });
+  reviewGenerationTask = schedules.review.enabled
+    ? cron.schedule(schedules.review.expr, runScheduledReviewGeneration, {
+        timezone: 'Asia/Seoul'
+      })
+    : null;
 
-  newsMorningTask = cron.schedule(
-    schedules.newsMorning.expr,
-    () => runScheduledNewsGeneration('morning'),
-    { timezone: 'Asia/Seoul' }
-  );
+  newsMorningTask = schedules.newsMorning.enabled
+    ? cron.schedule(
+        schedules.newsMorning.expr,
+        () => runScheduledNewsGeneration('morning'),
+        { timezone: 'Asia/Seoul' }
+      )
+    : null;
 
-  newsAfternoonTask = cron.schedule(
-    schedules.newsAfternoon.expr,
-    () => runScheduledNewsGeneration('afternoon'),
-    { timezone: 'Asia/Seoul' }
-  );
+  newsAfternoonTask = schedules.newsAfternoon.enabled
+    ? cron.schedule(
+        schedules.newsAfternoon.expr,
+        () => runScheduledNewsGeneration('afternoon'),
+        { timezone: 'Asia/Seoul' }
+      )
+    : null;
 
   currentScheduleSnapshot = schedules;
 
   console.log('✅ Cron schedules applied:');
   console.log(`   - Product collection: ${productCollectionTask ? `Every day at ${schedules.collect.label} KST` : 'disabled'}`);
-  console.log(`   - Review generation: Every day at ${schedules.review.label} KST`);
-  console.log(`   - News (morning): Every day at ${schedules.newsMorning.label} KST`);
-  console.log(`   - News (afternoon): Every day at ${schedules.newsAfternoon.label} KST`);
+  console.log(`   - Review generation: ${reviewGenerationTask ? `Every day at ${schedules.review.label} KST` : 'disabled'}`);
+  console.log(`   - News (morning): ${newsMorningTask ? `Every day at ${schedules.newsMorning.label} KST` : 'disabled'}`);
+  console.log(`   - News (afternoon): ${newsAfternoonTask ? `Every day at ${schedules.newsAfternoon.label} KST` : 'disabled'}`);
 }
 
 async function syncCronSchedulesIfNeeded() {
@@ -454,9 +463,9 @@ export async function initCronJobs() {
   console.log('✅ Cron jobs initialized:');
   if (currentScheduleSnapshot) {
     console.log(`   - Product collection: ${productCollectionTask ? `Every day at ${currentScheduleSnapshot.collect.label} KST` : 'disabled'}`);
-    console.log(`   - Review generation: Every day at ${currentScheduleSnapshot.review.label} KST`);
-    console.log(`   - News (morning): Every day at ${currentScheduleSnapshot.newsMorning.label} KST`);
-    console.log(`   - News (afternoon): Every day at ${currentScheduleSnapshot.newsAfternoon.label} KST`);
+    console.log(`   - Review generation: ${reviewGenerationTask ? `Every day at ${currentScheduleSnapshot.review.label} KST` : 'disabled'}`);
+    console.log(`   - News (morning): ${newsMorningTask ? `Every day at ${currentScheduleSnapshot.newsMorning.label} KST` : 'disabled'}`);
+    console.log(`   - News (afternoon): ${newsAfternoonTask ? `Every day at ${currentScheduleSnapshot.newsAfternoon.label} KST` : 'disabled'}`);
   }
   console.log('   - Log cleanup: Every Sunday at 12:00 AM KST');
   console.log('   - Naver SA keep-alive: Every 6 hours');
