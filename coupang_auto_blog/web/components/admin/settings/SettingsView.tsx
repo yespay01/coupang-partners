@@ -1,54 +1,15 @@
 "use client";
 
-import { useSystemSettings, useSettingsValidation } from "@/hooks/useSystemSettings";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { TopicSettings } from "./TopicSettings";
-import { AISettings } from "./AISettings";
-import { PromptTemplates } from "./PromptTemplates";
-import { ImageSettings } from "./ImageSettings";
 import { CoupangSettings } from "./CoupangSettings";
 
-const TABS = [
-  { id: "coupang", label: "쿠팡 API" },
-  { id: "topics", label: "주제 설정" },
-  { id: "ai", label: "AI 설정" },
-  { id: "templates", label: "프롬프트" },
-  { id: "images", label: "이미지 설정" },
-] as const;
-
-type TabId = (typeof TABS)[number]["id"];
-
 export function SettingsView() {
-  const { activeTab, setActiveTab, hasUnsavedChanges } = useSettingsStore();
-  const { isLoading, isSaving, error, saveSettings, discardChanges, resetSettings } = useSystemSettings();
-  const { validateAll } = useSettingsValidation();
+  const { hasUnsavedChanges } = useSettingsStore();
+  const { isLoading, isSaving, error, saveSettings, discardChanges } = useSystemSettings();
 
   const handleSave = async () => {
-    // 검증은 경고만 표시하고 저장은 진행
-    const errors = validateAll();
-    if (errors.length > 0) {
-      const proceed = confirm(
-        `다음 항목이 완전하지 않습니다:\n\n${errors.join("\n")}\n\n그래도 저장하시겠습니까?`
-      );
-      if (!proceed) return;
-    }
     await saveSettings();
-  };
-
-  const handleReset = async () => {
-    const confirmed = confirm(
-      "⚠️ 설정을 기본값으로 초기화합니다.\n\n보존되는 항목:\n• API 키 (쿠팡, OpenAI, Anthropic, Google)\n\n초기화되는 항목:\n• 카테고리 선택\n• 키워드\n• AI 모델 선택\n• 프롬프트\n\n계속하시겠습니까?"
-    );
-    if (!confirmed) return;
-    await resetSettings();
-  };
-
-  const handleTabChange = (tabId: TabId) => {
-    if (hasUnsavedChanges) {
-      const confirmed = confirm("저장하지 않은 변경사항이 있습니다. 탭을 변경하시겠습니까?");
-      if (!confirmed) return;
-    }
-    setActiveTab(tabId);
   };
 
   if (isLoading) {
@@ -69,20 +30,13 @@ export function SettingsView() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">시스템 설정</h1>
           <p className="mt-1 text-sm text-slate-500">
-            쿠팡 API와 생성 품질 설정을 한 곳에서 관리합니다.
+            가격 관측에 사용할 쿠팡 API 연결을 관리합니다.
           </p>
         </div>
         <div className="flex items-center gap-3">
           {hasUnsavedChanges && (
             <span className="text-sm text-amber-600">저장하지 않은 변경사항이 있습니다</span>
           )}
-          <button
-            onClick={handleReset}
-            disabled={isSaving}
-            className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-          >
-            초기화
-          </button>
           <button
             onClick={discardChanges}
             disabled={!hasUnsavedChanges || isSaving}
@@ -107,32 +61,8 @@ export function SettingsView() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="mb-6 border-b border-slate-200">
-        <nav className="-mb-px flex gap-6">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Tab Content */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        {activeTab === "topics" && <TopicSettings />}
-        {activeTab === "ai" && <AISettings />}
-        {activeTab === "templates" && <PromptTemplates />}
-        {activeTab === "images" && <ImageSettings />}
-        {activeTab === "coupang" && <CoupangSettings />}
+        <CoupangSettings />
       </div>
     </div>
   );

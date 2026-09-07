@@ -34,16 +34,6 @@ export function DashboardNav() {
         딥링크
       </Link>
       <span className="text-slate-500/60">|</span>
-      <Link href="/admin/recipes" className="hover:text-white">
-        요리
-      </Link>
-      <Link href="/admin/recipe-prompt" className="hover:text-white">
-        레시피 설정
-      </Link>
-      <Link href="/admin/news" className="hover:text-white">
-        뉴스
-      </Link>
-      <span className="text-slate-500/60">|</span>
       <Link href="/admin/logs" className="hover:text-white">
         로그 뷰어
       </Link>
