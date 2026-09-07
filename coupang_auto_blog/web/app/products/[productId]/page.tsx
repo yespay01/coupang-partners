@@ -72,10 +72,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { productId } = await params;
   const product = await getProduct(productId);
   if (!product) return { title: "상품을 찾을 수 없습니다", robots: { index: false, follow: false } };
+  const normalizedName = product.productName.replace(/\s+/g, " ").trim();
+  const titleName = normalizedName.length > 38 ? `${normalizedName.slice(0, 38)}…` : normalizedName;
+  const observedPrice = product.currentPriceKrw == null
+    ? ""
+    : ` 최근 관측가 ${Math.round(product.currentPriceKrw).toLocaleString("ko-KR")}원.`;
   return {
-    title: `${product.productName} 가격 흐름 | 세모링크`,
-    description: `${product.productName}의 실제 관측 가격 이력과 쿠팡 현재 판매 정보를 확인하세요.`,
+    title: `${titleName} 가격 변동`,
+    description: `${normalizedName}의${observedPrice} 최근 90일 실제 관측 가격 흐름과 쿠팡 현재 판매 정보를 확인하세요.`.slice(0, 160),
     alternates: { canonical: `https://semolink.store/products/${encodeURIComponent(product.productId)}` },
+    openGraph: {
+      title: `${titleName} 가격 변동 | 세모링크`,
+      description: `${normalizedName}의 실제 관측 가격 흐름을 확인하세요.`,
+      type: "website",
+      ...(product.productImage ? { images: [{ url: product.productImage, alt: normalizedName }] } : {}),
+    },
   };
 }
 
@@ -87,9 +98,32 @@ export default async function ProductPage({ params }: PageProps) {
   const currentPrice = formatPrice(product.currentPriceKrw);
   const observedAt = formatObservedAt(product.priceObservedAt);
   const chartAvailable = history?.chartStatus === "available" && history.points.length >= 2;
+  const canonicalUrl = `https://semolink.store/products/${encodeURIComponent(product.productId)}`;
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.productName,
+    sku: product.productId,
+    ...(product.productImage ? { image: [product.productImage] } : {}),
+    ...(product.categoryName ? { category: product.categoryName } : {}),
+    ...(product.currentPriceKrw != null
+      ? {
+          offers: {
+            "@type": "Offer",
+            url: canonicalUrl,
+            priceCurrency: "KRW",
+            price: Math.round(product.currentPriceKrw),
+          },
+        }
+      : {}),
+  };
 
   return (
     <div className="min-h-screen bg-[#f7f7f5]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c") }}
+      />
       <SiteHeader />
       <main className="pb-24 pt-28">
         <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">

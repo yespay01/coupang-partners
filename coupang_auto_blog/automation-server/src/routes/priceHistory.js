@@ -35,9 +35,12 @@ export async function loadProductSitemapRows(db, currentPartnerId, pagination = 
   const result = await db.query(
     `SELECT p.product_id, p.product_image, p.updated_at,
             COUNT(*) OVER()::int AS total_count
-       FROM products p
-       JOIN affiliate_links al ON al.link_id = p.affiliate_link_id
-      WHERE p.product_name IS NOT NULL AND p.product_name <> ''
+      FROM products p
+      JOIN affiliate_links al ON al.link_id = p.affiliate_link_id
+      WHERE EXISTS (
+        SELECT 1 FROM price_observations po WHERE po.product_id = p.product_id
+      )
+        AND p.product_name IS NOT NULL AND p.product_name <> ''
         AND al.is_active = TRUE
         AND al.validation_status = 'verified'
         AND al.partner_tracking_code = $1

@@ -10,10 +10,10 @@ export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 정적 페이지
   const staticPages: MetadataRoute.Sitemap = [
-    { url: SITE_URL, lastModified: new Date(), changeFrequency: "daily", priority: 1.0 },
-    { url: `${SITE_URL}/recipes`, lastModified: new Date(), changeFrequency: "daily", priority: 0.9 },
-    { url: `${SITE_URL}/news`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
-    { url: `${SITE_URL}/search`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.5 },
+    { url: SITE_URL, changeFrequency: "daily", priority: 1.0 },
+    { url: `${SITE_URL}/recipes`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${SITE_URL}/news`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${SITE_URL}/search`, changeFrequency: "weekly", priority: 0.5 },
   ];
 
   const shouldSkipDynamicFetch = process.env.NEXT_PHASE === "phase-production-build";

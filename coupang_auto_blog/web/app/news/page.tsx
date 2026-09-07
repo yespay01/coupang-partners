@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  title: "뉴스 | 세모링크",
+  title: "소비 트렌드와 쇼핑 소식",
   description:
     "최신 소비 트렌드와 쇼핑 뉴스를 전해드립니다. 세모링크에서 트렌드를 확인하세요.",
   alternates: {

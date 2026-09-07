@@ -92,7 +92,8 @@ export async function saveProduct(product, source, client, db = getDb()) {
         product.categoryName,
         product.affiliateUrl,
         source,
-        'pending',
+        // 신규 상품은 리뷰 대기열이 아니라 가격 관측 대상으로 저장한다.
+        'tracked',
         affiliateLink.link_id,
       ]
     );

@@ -112,8 +112,8 @@ export default async function HomePage() {
         <section className="mx-auto max-w-7xl px-4 pb-8 sm:px-6">
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">Daily discovery</p><h2 className="mt-1 text-lg font-extrabold text-slate-950">매일 새 상품을 최대 100개씩 추가합니다</h2></div>
-              <p className="text-xs text-slate-500">베스트 · 골드박스 · PL 묶음 갱신 + 검색·클릭 우선 + 전체 순환</p>
+              <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">Daily discovery</p><h2 className="mt-1 text-lg font-extrabold text-slate-950">매일 신규 상품을 발견해 가격 관측에 편입합니다</h2></div>
+              <p className="text-xs text-slate-500">베스트 · 골드박스 · 실제 검색 수요를 반영하고 확인된 상품만 추가합니다.</p>
             </div>
           </div>
         </section>

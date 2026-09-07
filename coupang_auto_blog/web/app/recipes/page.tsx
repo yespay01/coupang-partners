@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  title: "요리 레시피 | 세모링크",
+  title: "요리 레시피",
   description:
     "다양한 레시피와 함께 필요한 재료를 쿠팡에서 바로 구매하세요. 세모링크에서 맛있는 레시피를 확인하세요.",
   alternates: {
