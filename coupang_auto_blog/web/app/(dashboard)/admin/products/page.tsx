@@ -3,15 +3,9 @@
 import { useState } from "react";
 import { ProductList } from "@/components/admin/ProductList";
 import { useProducts, useProductStats } from "@/hooks/useProducts";
-import type { ProductFilters, ProductStatus } from "@/types";
+import type { ProductFilters } from "@/types";
 
 const DEFAULT_FILTERS: ProductFilters = {
-  statuses: {
-    pending: true,
-    processing: true,
-    completed: true,
-    failed: true,
-  },
   dateRange: "all",
   search: "",
   source: "all",
@@ -48,9 +42,9 @@ export default function ProductsPage() {
       <div className="mx-auto max-w-6xl space-y-6">
         {/* 헤더 */}
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">수집된 상품</h1>
+          <h1 className="text-2xl font-bold text-slate-900">가격 관측 상품</h1>
           <p className="mt-1 text-sm text-slate-500">
-            쿠팡 API를 통해 수집된 상품 목록을 확인하고 관리합니다.
+            쿠팡 API에서 확인한 최신 가격과 관측 상태를 확인합니다.
           </p>
         </div>
 
@@ -64,28 +58,18 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            {stats.bySource && Object.entries(stats.bySource).map(([source, count]) => {
-              const sourceLabels: Record<string, string> = {
-                keyword: "키워드",
-                category: "카테고리",
-                goldbox: "골드박스",
-                coupangPL: "쿠팡 PL",
-              };
-
-              return (
-                <div
-                  key={source}
-                  className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-                >
-                  <div className="text-sm font-medium text-slate-600">
-                    {sourceLabels[source] || source}
-                  </div>
-                  <div className="mt-1 text-2xl font-bold text-slate-900">
-                    {(count as number).toLocaleString()}
-                  </div>
+            {[
+              { label: "가격 관측", value: stats.tracked ?? 0 },
+              { label: "미관측", value: stats.untracked ?? 0 },
+              { label: "오늘 관측", value: stats.observedToday ?? 0 },
+            ].map((metric) => (
+              <div key={metric.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="text-sm font-medium text-slate-600">{metric.label}</div>
+                <div className="mt-1 text-2xl font-bold text-slate-900">
+                  {Number(metric.value).toLocaleString()}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
 

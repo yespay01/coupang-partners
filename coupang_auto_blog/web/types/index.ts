@@ -121,6 +121,11 @@ export type Product = {
   productId: string;
   productName: string;
   productPrice: number;
+  currentPriceKrw?: number | null;
+  priceObservedAt?: string | null;
+  priceObservationSource?: "collection" | "daily_search_match" | null;
+  priceObservationCount?: number;
+  priceChangeKrw?: number | null;
   productImage: string;
   productUrl: string;
   categoryId?: string;
@@ -182,7 +187,6 @@ export type LogFilters = {
 };
 
 export type ProductFilters = {
-  statuses: Record<ProductStatus, boolean>;
   dateRange: DatePreset;
   search: string;
   source: string;

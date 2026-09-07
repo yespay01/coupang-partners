@@ -28,10 +28,7 @@ export function DashboardNav() {
       </Link>
       <span className="text-slate-500/60">|</span>
       <Link href="/admin/products" className="hover:text-white">
-        수집 상품
-      </Link>
-      <Link href="/admin/test-collect" className="hover:text-white">
-        상품 수집
+        가격 관측
       </Link>
       <Link href="/admin/deeplink" className="hover:text-white">
         딥링크

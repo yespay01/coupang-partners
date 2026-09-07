@@ -3,26 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
-import type { Product, ProductFilters, ProductPageResult, DatePreset, ProductStatus } from "@/types";
+import type { ProductFilters, ProductPageResult } from "@/types";
 import { queryKeys } from "@/types";
-
-/**
- * 날짜 범위에 따른 시작 날짜 계산
- */
-function getDateFromPreset(preset: DatePreset): Date | null {
-  const now = new Date();
-  switch (preset) {
-    case "24h":
-      return new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    case "7d":
-      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    case "30d":
-      return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    case "all":
-    default:
-      return null;
-  }
-}
 
 /**
  * 상품 목록 조회 훅 (간소화 버전)
@@ -42,15 +24,6 @@ export function useProducts(filters: Partial<ProductFilters> = {}) {
         offset: String(offset),
       });
 
-      if (filters.statuses) {
-        const statusArray = Object.entries(filters.statuses)
-          .filter(([_, enabled]) => enabled)
-          .map(([status]) => status);
-        if (statusArray.length > 0) {
-          params.append('statuses', statusArray.join(','));
-        }
-      }
-
       if (filters.search) {
         params.append('search', filters.search);
       }
@@ -60,11 +33,7 @@ export function useProducts(filters: Partial<ProductFilters> = {}) {
       }
 
       if (filters.dateRange && filters.dateRange !== 'all') {
-        const startDate = getDateFromPreset(filters.dateRange);
-        if (startDate) {
-          params.append('startDate', startDate.toISOString());
-          params.append('endDate', new Date().toISOString());
-        }
+        params.append('dateRange', filters.dateRange);
       }
 
       const response = await fetch(`/api/admin/products?${params.toString()}`, {
@@ -106,7 +75,7 @@ export function useProducts(filters: Partial<ProductFilters> = {}) {
 
   useEffect(() => {
     setPageIndex(0);
-  }, [filters.statuses, filters.search, filters.source, filters.dateRange, filters.limit]);
+  }, [filters.search, filters.source, filters.dateRange, filters.limit]);
 
   return {
     ...queryResult,

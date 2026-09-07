@@ -380,29 +380,44 @@ router.delete('/reviews/:id', async (req, res) => {
 router.get('/products', async (req, res) => {
   try {
     const db = getDb();
-    const { limit = 20, offset = 0, statuses, search, source, dateRange } = req.query;
+    const { limit = 20, offset = 0, search, source, dateRange } = req.query;
 
-    let query = 'SELECT * FROM products';
+    let query = `
+      SELECT p.*,
+             latest.price_krw AS latest_price_krw,
+             latest.observed_at AS price_observed_at,
+             latest.observation_source AS price_observation_source,
+             latest.observation_count,
+             latest.previous_price_krw
+        FROM products p
+        LEFT JOIN LATERAL (
+          SELECT po.price_krw, po.observed_at, po.observation_source,
+                 (SELECT COUNT(*)::int
+                    FROM price_observations counted
+                   WHERE counted.product_id = p.product_id) AS observation_count,
+                 (SELECT previous.price_krw
+                    FROM price_observations previous
+                   WHERE previous.product_id = p.product_id
+                   ORDER BY previous.observed_at DESC
+                   OFFSET 1 LIMIT 1) AS previous_price_krw
+            FROM price_observations po
+           WHERE po.product_id = p.product_id
+           ORDER BY po.observed_at DESC
+           LIMIT 1
+        ) latest ON TRUE`;
     let countQuery = 'SELECT COUNT(*) as count FROM products';
     const conditions = [];
     const params = [];
     let paramIdx = 1;
 
-    if (statuses) {
-      const statusList = statuses.split(',');
-      conditions.push(`status = ANY($${paramIdx}::text[])`);
-      params.push(statusList);
-      paramIdx++;
-    }
-
     if (search) {
-      conditions.push(`(product_name ILIKE $${paramIdx} OR product_id ILIKE $${paramIdx})`);
+      conditions.push(`(p.product_name ILIKE $${paramIdx} OR p.product_id ILIKE $${paramIdx})`);
       params.push(`%${search}%`);
       paramIdx++;
     }
 
     if (source) {
-      conditions.push(`source ILIKE $${paramIdx}`);
+      conditions.push(`p.source ILIKE $${paramIdx}`);
       params.push(`%${source}%`);
       paramIdx++;
     }
@@ -410,13 +425,13 @@ router.get('/products', async (req, res) => {
     if (dateRange && dateRange !== 'all') {
       const hours = dateRange === '24h' ? 24 : dateRange === '7d' ? 168 : dateRange === '30d' ? 720 : 0;
       if (hours > 0) {
-        conditions.push(`created_at >= NOW() - INTERVAL '${hours} hours'`);
+        conditions.push(`p.created_at >= NOW() - INTERVAL '${hours} hours'`);
       }
     }
 
     const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
-    query += where + ` ORDER BY created_at DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
-    countQuery += where;
+    query += where + ` ORDER BY latest.observed_at DESC NULLS LAST, p.updated_at DESC, p.id DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+    countQuery += where.replaceAll('p.', '');
 
     const countParams = [...params];
     params.push(parseInt(limit), parseInt(offset));
@@ -448,8 +463,24 @@ router.get('/products/stats', async (req, res) => {
   try {
     const db = getDb();
 
-    const [totalResult, sourceResult, statusResult] = await Promise.all([
-      db.query('SELECT COUNT(*) as count FROM products'),
+    const [coverageResult, sourceResult] = await Promise.all([
+      db.query(`
+        SELECT COUNT(*)::int AS total_count,
+               COUNT(*) FILTER (
+                 WHERE EXISTS (
+                   SELECT 1 FROM price_observations po
+                    WHERE po.product_id = p.product_id
+                 )
+               )::int AS tracked_count,
+               COUNT(*) FILTER (
+                 WHERE EXISTS (
+                   SELECT 1 FROM price_observations po
+                    WHERE po.product_id = p.product_id
+                      AND po.business_date_kst = (NOW() AT TIME ZONE 'Asia/Seoul')::date
+                 )
+               )::int AS observed_today_count
+          FROM products p
+      `),
       db.query(`
         SELECT
           CASE
@@ -463,21 +494,23 @@ router.get('/products/stats', async (req, res) => {
         FROM products
         GROUP BY source_group
       `),
-      db.query('SELECT status, COUNT(*) as count FROM products GROUP BY status'),
     ]);
 
     const bySource = {};
     sourceResult.rows.forEach(row => { bySource[row.source_group] = parseInt(row.count); });
 
-    const byStatus = {};
-    statusResult.rows.forEach(row => { byStatus[row.status] = parseInt(row.count); });
+    const coverage = coverageResult.rows[0] || {};
+    const total = Number(coverage.total_count || 0);
+    const tracked = Number(coverage.tracked_count || 0);
 
     res.json({
       success: true,
       data: {
-        total: parseInt(totalResult.rows[0].count),
+        total,
+        tracked,
+        untracked: Math.max(total - tracked, 0),
+        observedToday: Number(coverage.observed_today_count || 0),
         bySource,
-        byStatus,
       },
     });
   } catch (error) {
@@ -1461,6 +1494,13 @@ function mapProductRow(row) {
     productId: row.product_id,
     productName: row.product_name,
     productPrice: row.product_price,
+    currentPriceKrw: row.latest_price_krw == null ? null : Number(row.latest_price_krw),
+    priceObservedAt: row.price_observed_at?.toISOString?.() || row.price_observed_at || null,
+    priceObservationSource: row.price_observation_source || null,
+    priceObservationCount: Number(row.observation_count || 0),
+    priceChangeKrw: row.latest_price_krw == null || row.previous_price_krw == null
+      ? null
+      : Number(row.latest_price_krw) - Number(row.previous_price_krw),
     productImage: row.product_image,
     productUrl: row.product_url,
     categoryId: row.category_id,

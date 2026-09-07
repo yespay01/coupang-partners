@@ -94,6 +94,7 @@ async function resolveCronSchedules() {
 
     return {
       collect: {
+        enabled: automation.enabled === true,
         label: collectTime,
         expr: hhmmToCronExpression(collectTime, '0 2 * * *'),
       },
@@ -113,7 +114,7 @@ async function resolveCronSchedules() {
   } catch (error) {
     console.error('⚠️ Failed to load cron schedules from settings. Using defaults:', getErrorMessage(error));
     return {
-      collect: { label: '02:00', expr: '0 2 * * *' },
+      collect: { enabled: false, label: '02:00', expr: '0 2 * * *' },
       review: { label: '03:00', expr: '0 3 * * *' },
       newsMorning: { label: '07:00', expr: '0 7 * * *' },
       newsAfternoon: { label: '18:00', expr: '0 18 * * *' },
@@ -202,6 +203,12 @@ async function runScheduledProductCollection() {
   console.log('⏰ Running scheduled product collection...');
 
   try {
+    const settings = await fetchAutomationSettings();
+    if (settings?.automation?.enabled !== true) {
+      console.log('ℹ️ Product auto-collection is disabled in settings.');
+      return;
+    }
+
     const response = await axios.post(`${API_BASE}/api/collect/auto`, {}, {
       headers: getCronAuthHeaders(),
     });
@@ -328,7 +335,7 @@ function stopTask(task) {
 }
 
 function scheduleKeyFromSnapshot(snapshot) {
-  return `${snapshot.collect.expr}|${snapshot.review.expr}|${snapshot.newsMorning.expr}|${snapshot.newsAfternoon.expr}`;
+  return `${snapshot.collect.enabled}|${snapshot.collect.expr}|${snapshot.review.expr}|${snapshot.newsMorning.expr}|${snapshot.newsAfternoon.expr}`;
 }
 
 function applyCronSchedules(schedules) {
@@ -337,9 +344,11 @@ function applyCronSchedules(schedules) {
   stopTask(newsMorningTask);
   stopTask(newsAfternoonTask);
 
-  productCollectionTask = cron.schedule(schedules.collect.expr, runScheduledProductCollection, {
-    timezone: 'Asia/Seoul'
-  });
+  productCollectionTask = schedules.collect.enabled
+    ? cron.schedule(schedules.collect.expr, runScheduledProductCollection, {
+        timezone: 'Asia/Seoul'
+      })
+    : null;
 
   reviewGenerationTask = cron.schedule(schedules.review.expr, runScheduledReviewGeneration, {
     timezone: 'Asia/Seoul'
@@ -360,7 +369,7 @@ function applyCronSchedules(schedules) {
   currentScheduleSnapshot = schedules;
 
   console.log('✅ Cron schedules applied:');
-  console.log(`   - Product collection: Every day at ${schedules.collect.label} KST`);
+  console.log(`   - Product collection: ${productCollectionTask ? `Every day at ${schedules.collect.label} KST` : 'disabled'}`);
   console.log(`   - Review generation: Every day at ${schedules.review.label} KST`);
   console.log(`   - News (morning): Every day at ${schedules.newsMorning.label} KST`);
   console.log(`   - News (afternoon): Every day at ${schedules.newsAfternoon.label} KST`);
@@ -444,7 +453,7 @@ export async function initCronJobs() {
 
   console.log('✅ Cron jobs initialized:');
   if (currentScheduleSnapshot) {
-    console.log(`   - Product collection: Every day at ${currentScheduleSnapshot.collect.label} KST`);
+    console.log(`   - Product collection: ${productCollectionTask ? `Every day at ${currentScheduleSnapshot.collect.label} KST` : 'disabled'}`);
     console.log(`   - Review generation: Every day at ${currentScheduleSnapshot.review.label} KST`);
     console.log(`   - News (morning): Every day at ${currentScheduleSnapshot.newsMorning.label} KST`);
     console.log(`   - News (afternoon): Every day at ${currentScheduleSnapshot.newsAfternoon.label} KST`);

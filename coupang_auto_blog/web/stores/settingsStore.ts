@@ -85,7 +85,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   isLoading: true,
   isSaving: false,
   error: null,
-  activeTab: "automation",
+  activeTab: "coupang",
   hasUnsavedChanges: false,
 
   // 기본 액션

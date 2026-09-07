@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import type { Product, ProductFilters, DatePreset, ProductStatus } from "@/types";
+import type { Product, ProductFilters, DatePreset } from "@/types";
 
 type ProductListProps = {
   products: Product[];
@@ -16,20 +16,6 @@ type ProductListProps = {
   onNextPage?: () => void;
   onPrevPage?: () => void;
   onFirstPage?: () => void;
-};
-
-const STATUS_LABELS: Record<ProductStatus, string> = {
-  pending: "대기중",
-  processing: "처리중",
-  completed: "완료",
-  failed: "실패",
-};
-
-const STATUS_COLORS: Record<ProductStatus, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  processing: "bg-blue-100 text-blue-800",
-  completed: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
 };
 
 const DATE_PRESETS: { value: DatePreset; label: string }[] = [
@@ -62,22 +48,6 @@ export function ProductList({
 
   const handleDateChange = (dateRange: DatePreset) => {
     onFilterChange({ ...filters, dateRange });
-  };
-
-  const handleStatusToggle = (status: ProductStatus) => {
-    const currentStatuses = filters.statuses || {
-      pending: true,
-      processing: true,
-      completed: true,
-      failed: true,
-    };
-    onFilterChange({
-      ...filters,
-      statuses: {
-        ...currentStatuses,
-        [status]: !currentStatuses[status],
-      },
-    });
   };
 
   const handleDeleteProduct = async (product: Product) => {
@@ -170,28 +140,6 @@ export function ProductList({
             </div>
           </div>
 
-          {/* 상태 필터 */}
-          <div className="min-w-0 flex-1">
-            <label className="mb-2 block text-sm font-medium text-slate-700">상태</label>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(STATUS_LABELS) as ProductStatus[]).map((status) => {
-                const isActive = filters.statuses?.[status] ?? true;
-                return (
-                  <button
-                    key={status}
-                    onClick={() => handleStatusToggle(status)}
-                    className={`rounded-lg border px-3 py-1 text-sm font-medium whitespace-nowrap ${
-                      isActive
-                        ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-slate-300 bg-white text-slate-400 hover:bg-slate-50"
-                    }`}
-                  >
-                    {STATUS_LABELS[status]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
       </div>
 
@@ -277,21 +225,28 @@ export function ProductList({
                     <h3 className="text-base font-semibold text-slate-900">
                       {product.productName}
                     </h3>
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs font-medium ${
-                        STATUS_COLORS[product.status]
-                      }`}
-                    >
-                      {STATUS_LABELS[product.status]}
+                    <span className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${
+                      product.priceObservedAt
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-slate-100 text-slate-600"
+                    }`}>
+                      {product.priceObservedAt
+                        ? `가격 관측 ${product.priceObservationCount || 1}회`
+                        : "미관측"}
                     </span>
                   </div>
 
                   <div className="mb-2 flex items-center gap-4 text-sm text-slate-600">
                     <span className="font-semibold text-blue-600">
-                      {product.productPrice.toLocaleString()}원
+                      {Number(product.currentPriceKrw ?? product.productPrice ?? 0).toLocaleString()}원
                     </span>
+                    {product.priceChangeKrw != null && product.priceChangeKrw !== 0 && (
+                      <span className={product.priceChangeKrw < 0 ? "font-medium text-emerald-600" : "font-medium text-rose-600"}>
+                        {product.priceChangeKrw > 0 ? "+" : ""}{product.priceChangeKrw.toLocaleString()}원
+                      </span>
+                    )}
                     <span className="text-slate-400">|</span>
-                    <span>{getSourceLabel(product.source)}</span>
+                    <span>{product.source ? getSourceLabel(product.source) : "기타"}</span>
                     {product.categoryName && (
                       <>
                         <span className="text-slate-400">|</span>
@@ -300,10 +255,13 @@ export function ProductList({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                     <span>
-                      수집일: {new Date(product.createdAt).toLocaleString("ko-KR")}
+                      최근 관측: {product.priceObservedAt
+                        ? new Date(product.priceObservedAt).toLocaleString("ko-KR")
+                        : "아직 없음"}
                     </span>
+                    <span>등록: {new Date(product.createdAt).toLocaleString("ko-KR")}</span>
                   </div>
 
                   {/* 링크 버튼 */}

@@ -2,7 +2,6 @@
 
 import { useSystemSettings, useSettingsValidation } from "@/hooks/useSystemSettings";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { AutomationSettings } from "./AutomationSettings";
 import { TopicSettings } from "./TopicSettings";
 import { AISettings } from "./AISettings";
 import { PromptTemplates } from "./PromptTemplates";
@@ -11,7 +10,6 @@ import { CoupangSettings } from "./CoupangSettings";
 
 const TABS = [
   { id: "coupang", label: "쿠팡 API" },
-  { id: "automation", label: "자동화" },
   { id: "topics", label: "주제 설정" },
   { id: "ai", label: "AI 설정" },
   { id: "templates", label: "프롬프트" },
@@ -39,7 +37,7 @@ export function SettingsView() {
 
   const handleReset = async () => {
     const confirmed = confirm(
-      "⚠️ 설정을 기본값으로 초기화합니다.\n\n보존되는 항목:\n• API 키 (쿠팡, OpenAI, Anthropic, Google)\n• 자동화 설정 (활성화, 스케줄, 수집 상품 수)\n\n초기화되는 항목:\n• 카테고리 선택\n• 키워드\n• AI 모델 선택\n• 프롬프트\n\n계속하시겠습니까?"
+      "⚠️ 설정을 기본값으로 초기화합니다.\n\n보존되는 항목:\n• API 키 (쿠팡, OpenAI, Anthropic, Google)\n\n초기화되는 항목:\n• 카테고리 선택\n• 키워드\n• AI 모델 선택\n• 프롬프트\n\n계속하시겠습니까?"
     );
     if (!confirmed) return;
     await resetSettings();
@@ -71,7 +69,7 @@ export function SettingsView() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">시스템 설정</h1>
           <p className="mt-1 text-sm text-slate-500">
-            쿠팡 API, 자동화, 생성 품질 설정을 한 곳에서 관리합니다.
+            쿠팡 API와 생성 품질 설정을 한 곳에서 관리합니다.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -130,7 +128,6 @@ export function SettingsView() {
 
       {/* Tab Content */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        {activeTab === "automation" && <AutomationSettings />}
         {activeTab === "topics" && <TopicSettings />}
         {activeTab === "ai" && <AISettings />}
         {activeTab === "templates" && <PromptTemplates />}
