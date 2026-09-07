@@ -83,7 +83,9 @@ function AdminDashboardViewContent({
   const pageTitle = title ?? headerCopy.title;
   const pageDescription = description ?? headerCopy.description;
   const showMetrics = resolvedView === "overview";
-  const showReviews = resolvedView === "overview" || resolvedView === "reviews";
+  // 후기 승인은 전용 /admin/reviews 페이지에서만 표시한다.
+  // 대시보드에도 같은 작업 테이블이 노출돼 메뉴와 본문이 중복되는 문제를 방지한다.
+  const showReviews = resolvedView === "reviews";
   const showLogs = resolvedView === "logs";
 
   const router = useRouter();
