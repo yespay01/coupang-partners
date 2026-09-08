@@ -82,8 +82,23 @@ test('eligible 세션 100 미만이면 UX 제안과 승자 선언을 금지한�
   const result = generateImprovementCandidates(rows, { businessDateKst: END_DATE, now: NOW });
 
   assert.ok(result.candidates.some((candidate) => candidate.candidateKey.includes('insufficient_daily_sample')));
+  const candidate = result.candidates.find((item) => item.candidateKey.includes('insufficient_daily_sample'));
+  assert.equal(candidate.title, '유효 노출 세션 부족 · 유입 확대 우선');
+  assert.equal(candidate.recommendation.action, 'increase_eligible_exposure');
+  assert.match(candidate.recommendation.nextAction, /Search Console/);
   assert.equal(result.candidates.some((candidate) => candidate.candidateType === 'ux_experiment'), false);
   assert.ok(result.candidates.every((candidate) => candidate.winnerDeclared === false));
+});
+
+test('이벤트 0건은 측정 장애와 실제 노출 부족을 구분하도록 제안한다', () => {
+  const result = generateImprovementCandidates([
+    { business_date_kst: END_DATE, data_status: 'no_data', total_events: 0 },
+  ], { businessDateKst: END_DATE, now: NOW });
+  const candidate = result.candidates[0];
+
+  assert.equal(candidate.recommendation.action, 'diagnose_zero_traffic');
+  assert.match(candidate.hypothesis, /유입·노출 부족/);
+  assert.ok(candidate.recommendation.checks.includes('search_impressions'));
 });
 
 test('봇·중복·orphan 비율 이상은 데이터 품질 후보이며 UX 제안을 억제한다', () => {

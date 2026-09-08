@@ -86,6 +86,7 @@ type AnalyticsStats = {
     id: number;
     page_type: string;
     page_slug: string;
+    page_title: string | null;
     page_url: string;
     referrer_domain: string;
     keyword: string;
@@ -127,6 +128,7 @@ const DEVICE_COLORS: Record<string, string> = {
 
 const PAGE_TYPE_LABELS: Record<string, string> = {
   home: "홈",
+  product: "상품",
   review: "리뷰",
   recipe: "레시피",
   news: "뉴스",
@@ -868,9 +870,13 @@ export default function AnalyticsPage() {
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
                           {PAGE_TYPE_LABELS[v.page_type] || v.page_type}
                         </span>
-                        {v.page_slug && (
-                          <span className="ml-1 text-[10px] text-slate-400 truncate max-w-[100px] inline-block align-bottom">
+                        {(v.page_title || v.page_slug) && (
+                          <span
+                            className="ml-1 inline-block max-w-[240px] truncate align-bottom text-[11px] text-slate-600"
+                            title={v.page_title || v.page_slug}
+                          >
                             {(() => {
+                              if (v.page_title) return v.page_title;
                               try {
                                 return decodeURIComponent(v.page_slug);
                               } catch {

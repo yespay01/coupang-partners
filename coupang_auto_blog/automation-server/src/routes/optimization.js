@@ -124,6 +124,9 @@ export function mapCandidate(row) {
     expectedImpact: typeof recommendation.expectedImpact === 'string'
       ? recommendation.expectedImpact
       : null,
+    nextAction: typeof recommendation.nextAction === 'string'
+      ? recommendation.nextAction
+      : null,
     uncertainty: typeof primaryMetric.uncertainty === 'string' ? primaryMetric.uncertainty : null,
     risk: Array.isArray(row.risks) && row.risks.length > 0 ? row.risks.join(' · ') : null,
     sample: {

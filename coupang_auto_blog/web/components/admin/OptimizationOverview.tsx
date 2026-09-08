@@ -340,6 +340,11 @@ export default function OptimizationOverview({ data, error }: Props) {
                     )}
                     {candidate.risk && <span>위험: {candidate.risk}</span>}
                   </div>
+                  {candidate.nextAction && (
+                    <p className="mt-2 rounded-md bg-blue-50 px-2.5 py-2 text-[11px] font-medium text-blue-800">
+                      다음 작업: {candidate.nextAction}
+                    </p>
+                  )}
                   {candidate.guardrails.length > 0 && (
                     <div className="mt-2 space-y-1">
                       {candidate.guardrails.map((guardrail, index) => (

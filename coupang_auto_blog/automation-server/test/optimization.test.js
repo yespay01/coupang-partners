@@ -86,9 +86,10 @@ test('anomaly/candidate/job DTO는 frontend 필드 계약을 정확히 제공한
     created_at: '2026-08-25T00:00:00Z',
   });
   assert.deepEqual(Object.keys(candidate), [
-    'id', 'title', 'status', 'rationale', 'evidence', 'expectedImpact', 'uncertainty',
-    'risk', 'sample', 'guardrails', 'createdAt',
+    'id', 'title', 'status', 'rationale', 'evidence', 'expectedImpact', 'nextAction',
+    'uncertainty', 'risk', 'sample', 'guardrails', 'createdAt',
   ]);
+  assert.equal(candidate.nextAction, null);
   assert.deepEqual(candidate.sample, {
     eligibleSessions: 10,
     conversions: 2,

@@ -1606,6 +1606,39 @@ router.get('/stats', async (req, res) => {
 
 // ==================== Visitor Analytics ====================
 
+const visitorPageTitleSql = `
+  CASE
+    WHEN vl.page_url LIKE '/products/%' THEN (
+      SELECT p.product_name
+      FROM products p
+      WHERE p.product_id = vl.page_slug
+      LIMIT 1
+    )
+    WHEN vl.page_url LIKE '/reviews/%' OR vl.page_url LIKE '/review/%' THEN (
+      SELECT COALESCE(r.product_name, r.title)
+      FROM reviews r
+      WHERE r.slug = vl.page_slug OR r.id::text = vl.page_slug
+      ORDER BY CASE WHEN r.slug = vl.page_slug THEN 0 ELSE 1 END
+      LIMIT 1
+    )
+    WHEN vl.page_url LIKE '/recipes/%' THEN (
+      SELECT r.title
+      FROM recipes r
+      WHERE r.slug = vl.page_slug OR r.id::text = vl.page_slug
+      ORDER BY CASE WHEN r.slug = vl.page_slug THEN 0 ELSE 1 END
+      LIMIT 1
+    )
+    WHEN vl.page_url LIKE '/news/%' THEN (
+      SELECT n.title
+      FROM news n
+      WHERE n.slug = vl.page_slug OR n.id::text = vl.page_slug
+      ORDER BY CASE WHEN n.slug = vl.page_slug THEN 0 ELSE 1 END
+      LIMIT 1
+    )
+    ELSE NULL
+  END AS page_title
+`;
+
 /**
  * GET /api/admin/analytics/visitors
  * 방문자 로그 목록 (페이징, 필터)
@@ -1615,7 +1648,7 @@ router.get('/analytics/visitors', async (req, res) => {
     const db = getDb();
     const { limit = 50, offset = 0, dateRange, page_type, referrer_domain } = req.query;
 
-    let query = 'SELECT * FROM visitor_logs';
+    let query = `SELECT vl.*, ${visitorPageTitleSql} FROM visitor_logs vl`;
     let countQuery = 'SELECT COUNT(*) as count FROM visitor_logs';
     const conditions = [];
     const params = [];
@@ -1710,7 +1743,10 @@ router.get('/analytics/stats', async (req, res) => {
         GROUP BY page_type ORDER BY count DESC
       `),
       db.query(`
-        SELECT * FROM visitor_logs ORDER BY created_at DESC LIMIT 20
+        SELECT vl.*, ${visitorPageTitleSql}
+        FROM visitor_logs vl
+        ORDER BY vl.created_at DESC
+        LIMIT 20
       `),
     ]);
 

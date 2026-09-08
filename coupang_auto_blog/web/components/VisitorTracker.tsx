@@ -48,6 +48,7 @@ function getDeviceType(): "mobile" | "tablet" | "desktop" {
 
 function getPageType(pathname: string): string {
   if (pathname === "/" || pathname === "") return "home";
+  if (pathname.startsWith("/products/")) return "product";
   if (pathname.startsWith("/reviews/")) return "review";
   if (pathname.startsWith("/recipes/")) return "recipe";
   if (pathname.startsWith("/news/")) return "news";

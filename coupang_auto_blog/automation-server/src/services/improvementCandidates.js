@@ -181,13 +181,28 @@ function diagnosticSample(current, windowRows, thresholds) {
 }
 
 function dataQualityProposal(current, windowRows, options) {
-  const { thresholds, now, code, title, evidence, priorityScore, rollbackPlan } = options;
+  const {
+    thresholds,
+    now,
+    code,
+    title,
+    evidence,
+    priorityScore,
+    rollbackPlan,
+    hypothesis = '측정 데이터가 정상화되기 전에는 CTR 개선 방향을 신뢰할 수 없다.',
+    recommendation = {
+      action: 'investigate_measurement',
+      humanApprovalRequired: true,
+      uiChange: false,
+      contentChange: false,
+    },
+  } = options;
   return proposal({
     businessDateKst: current.businessDateKst,
     key: `data_quality:${code}:all`,
     type: 'data_quality',
     title,
-    hypothesis: '측정 데이터가 정상화되기 전에는 CTR 개선 방향을 신뢰할 수 없다.',
+    hypothesis,
     priorityScore,
     evidence,
     sample: diagnosticSample(current, windowRows, thresholds),
@@ -200,12 +215,7 @@ function dataQualityProposal(current, windowRows, options) {
     guardrails: requiredGuardrails(),
     rollbackPlan,
     risks: ['불완전한 데이터를 성과 하락으로 오인할 위험'],
-    recommendation: {
-      action: 'investigate_measurement',
-      humanApprovalRequired: true,
-      uiChange: false,
-      contentChange: false,
-    },
+    recommendation,
     now,
   });
 }
@@ -299,6 +309,15 @@ export function generateImprovementCandidates(rawRows, options = {}) {
         totalEvents: current.totalEvents,
       },
       priorityScore: 100,
+      hypothesis: '원천 이벤트가 없어 측정 장애인지 실제 유입·노출 부족인지 먼저 구분해야 한다.',
+      recommendation: {
+        action: 'diagnose_zero_traffic',
+        nextAction: '수집 상태를 확인한 뒤 정상이라면 검색 색인·노출과 내부 상품 노출 확대를 우선한다.',
+        checks: ['event_collection', 'search_index_coverage', 'search_impressions', 'internal_product_impressions'],
+        humanApprovalRequired: true,
+        uiChange: false,
+        contentChange: false,
+      },
       rollbackPlan: 'UI와 콘텐츠는 현재 상태를 유지하고 이벤트 수집 복구 후 해당 날짜 rollup만 재계산한다.',
     }));
     return finalize();
@@ -405,9 +424,9 @@ export function generateImprovementCandidates(rawRows, options = {}) {
       businessDateKst,
       key: 'measurement:insufficient_daily_sample:all',
       type: 'measurement',
-      title: '일일 성과 표본 부족',
-      hypothesis: '하루 표본으로 UI 개선의 승패를 판단하면 우연을 학습할 가능성이 높다.',
-      priorityScore: 75,
+      title: '유효 노출 세션 부족 · 유입 확대 우선',
+      hypothesis: '측정이 정상인데 유효 노출 세션이 부족하므로 CTR 실험보다 검색 발견성과 방문 후 상품 노출을 먼저 늘려야 한다.',
+      priorityScore: 85,
       evidence: {
         currentEligibleSessions: current.eligibleSessions,
         minimumDailyEligibleSessions: thresholds.minimumDailyEligibleSessions,
@@ -417,13 +436,19 @@ export function generateImprovementCandidates(rawRows, options = {}) {
         name: 'qualified_outbound_ctr_pct',
         current: current.qualifiedCtrPct,
         baseline: null,
-        uncertainty: '표본 부족으로 방향성 판단을 보류한다.',
+        uncertainty: 'CTR 승패 판단은 보류하지만 노출 확대 작업까지 멈출 이유는 없다.',
       },
       guardrails: requiredGuardrails(),
-      rollbackPlan: '기존 UI를 유지하고 최소 14일 동안 complete 데이터만 추가 수집한다.',
-      risks: ['하루치 변동을 실제 효과로 오인할 위험'],
+      rollbackPlan: 'CTR 실험은 시작하지 않고 색인·내부 연결 변경은 한 종류씩 적용해 노출 감소 시 직전 구조로 되돌린다.',
+      risks: [
+        '사이트 내 eligible 세션만으로 검색 노출 부족과 검색 CTR 부족을 구분할 수 없음',
+        '여러 노출 구조를 동시에 바꾸면 증가 원인을 분리하기 어려움',
+      ],
       recommendation: {
-        action: 'collect_more_data',
+        action: 'increase_eligible_exposure',
+        nextAction: 'Search Console·네이버 노출을 비교해 색인 부족이면 발견 경로를, 노출 대비 방문 부족이면 검색 스니펫을, 방문 대비 eligible 부족이면 내부 상품 연결을 개선한다.',
+        expectedImpact: '실험 가능한 유효 노출 세션을 더 빠르게 확보하고 병목별 개선 근거를 축적한다.',
+        workstreams: ['search_discovery', 'search_snippet_ctr', 'internal_product_distribution'],
         humanApprovalRequired: true,
         uiChange: false,
         contentChange: false,

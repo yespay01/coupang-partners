@@ -51,6 +51,7 @@ export type ImprovementCandidate = {
   rationale: string;
   evidence: string | null;
   expectedImpact: string | null;
+  nextAction: string | null;
   uncertainty: string | null;
   risk: string | null;
   sample: {
@@ -225,6 +226,9 @@ const normalizeCandidate = (value: unknown, index: number): ImprovementCandidate
     ),
     evidence: asNullableString(row.evidence) || summarizeRecord(row.evidence),
     expectedImpact: asNullableString(row.expectedImpact),
+    nextAction:
+      asNullableString(row.nextAction) ||
+      asNullableString(asRecord(row.recommendation).nextAction),
     uncertainty:
       asNullableString(row.uncertainty) ||
       asNullableString(asRecord(row.primaryMetric).uncertainty),
