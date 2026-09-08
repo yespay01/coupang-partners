@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { AffiliateOutboundLink } from "@/components/AffiliateOutboundLink";
 import { PriceHistoryChart, type PriceHistoryPoint } from "@/components/PriceHistoryChart";
+import { ProductCard, type HomeProduct } from "@/components/HomeProductCollection";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { buildProductSearchMetadata } from "@/lib/productSeo";
@@ -54,6 +55,27 @@ async function getPriceHistory(productId: string) {
   return fetchJson<PriceHistory>(`/api/products/${encodeURIComponent(productId)}/price-history?days=90`);
 }
 
+async function getRelatedProducts(categoryId: string | null, currentProductId: string): Promise<HomeProduct[]> {
+  if (!categoryId) return [];
+  const data = await fetchJson<{ products?: ProductSummary[] }>(
+    `/api/products?limit=9&categoryId=${encodeURIComponent(categoryId)}`
+  );
+  return (Array.isArray(data?.products) ? data.products : [])
+    .filter((item) => item.productId !== currentProductId)
+    .slice(0, 8)
+    .map((item) => ({
+      id: item.productId,
+      productId: item.productId,
+      productName: item.productName,
+      productPrice: item.currentPriceKrw ?? undefined,
+      priceObservedAt: item.priceObservedAt ?? undefined,
+      productImage: item.productImage ?? undefined,
+      category: item.categoryName ?? undefined,
+      createdAt: item.updatedAt ?? undefined,
+      affiliateLink: item.affiliateLink,
+    }));
+}
+
 function formatPrice(value: number | null) {
   return value == null ? null : `${Math.round(value).toLocaleString("ko-KR")}원`;
 }
@@ -93,6 +115,7 @@ export default async function ProductPage({ params }: PageProps) {
   const { productId } = await params;
   const [product, history] = await Promise.all([getProduct(productId), getPriceHistory(productId)]);
   if (!product) notFound();
+  const relatedProducts = await getRelatedProducts(product.categoryId, product.productId);
 
   const currentPrice = formatPrice(product.currentPriceKrw);
   const observedAt = formatObservedAt(product.priceObservedAt);
@@ -195,7 +218,41 @@ export default async function ProductPage({ params }: PageProps) {
             </div>
           )}
         </section>
+
+        {relatedProducts.length > 0 && (
+          <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6" aria-labelledby="related-products-title">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">Related products</p>
+                <h2 id="related-products-title" className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                  {product.categoryName || "같은 카테고리"} 상품 더 보기
+                </h2>
+              </div>
+              {product.categoryId && (
+                <Link href={`/collections/${encodeURIComponent(product.categoryId)}`} className="shrink-0 text-sm font-bold text-orange-600 hover:text-orange-700">
+                  전체 보기 →
+                </Link>
+              )}
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+              {relatedProducts.map((item, index) => (
+                <ProductCard key={item.id} product={item} index={index} surface="related" />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
+      {product.affiliateLink?.linkId && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur md:hidden">
+          <AffiliateOutboundLink
+            linkId={product.affiliateLink.linkId}
+            tracking={{ productId: product.productId, productName: product.productName, contentId: product.productId, surface: "detail", position: "product_detail_sticky" }}
+            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-orange-500 px-5 text-sm font-extrabold text-white hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2"
+          >
+            쿠팡에서 현재가 확인 <span aria-hidden="true" className="ml-1">↗</span>
+          </AffiliateOutboundLink>
+        </div>
+      )}
       <SiteFooter />
     </div>
   );

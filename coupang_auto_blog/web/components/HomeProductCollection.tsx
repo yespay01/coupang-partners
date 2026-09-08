@@ -55,7 +55,7 @@ export function ProductCard({
 }: {
   product: HomeProduct;
   index: number;
-  surface?: "home" | "collection";
+  surface?: "home" | "collection" | "related";
 }) {
   const image = product.productImage;
   const price = formatPrice(product.productPrice);
