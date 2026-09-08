@@ -101,6 +101,67 @@ test('이벤트 0건은 측정 장애와 실제 노출 부족을 구분하도록
   assert.ok(candidate.recommendation.checks.includes('search_impressions'));
 });
 
+test('검색 데이터로 Google 발견 부족과 네이버 검색 CTR 부족을 각각 제안한다', () => {
+  const rows = completeRows({ days: 14 });
+  const result = generateImprovementCandidates(rows, {
+    businessDateKst: END_DATE,
+    now: NOW,
+    searchPerformance: {
+      windowDays: 30,
+      capturedAt: NOW.toISOString(),
+      sources: [
+        { source: 'google', configured: true, impressions: 6, clicks: 0, ctrPct: 0 },
+        { source: 'naver', configured: true, impressions: 19659, clicks: 202, ctrPct: 1.03 },
+      ],
+    },
+  });
+  const google = result.candidates.find((item) => item.candidateKey === 'acquisition:google:search_discovery');
+  const naver = result.candidates.find((item) => item.candidateKey === 'acquisition:naver:search_snippet_ctr');
+
+  assert.equal(google.recommendation.action, 'improve_search_discovery');
+  assert.equal(google.evidence.impressions, 6);
+  assert.equal(naver.recommendation.action, 'improve_search_snippet');
+  assert.equal(naver.evidence.ctrPct, 1.03);
+  assert.ok(result.candidates.every((candidate) => candidate.winnerDeclared === false));
+});
+
+test('검색 연동이 없거나 노출과 CTR이 기준 이상이면 검색 개선후보를 만들지 않는다', () => {
+  const result = generateImprovementCandidates(completeRows(), {
+    businessDateKst: END_DATE,
+    now: NOW,
+    searchPerformance: {
+      windowDays: 30,
+      sources: [
+        { source: 'google', configured: false, impressions: 0, clicks: 0, ctrPct: 0 },
+        { source: 'naver', configured: true, impressions: 1000, clicks: 30, ctrPct: 3, observedAt: NOW.toISOString() },
+      ],
+    },
+  });
+
+  assert.equal(result.candidates.some((item) => item.candidateKey.startsWith('acquisition:')), false);
+});
+
+test('오래된 검색 스냅샷은 노출 진단에 쓰지 않고 최신성 복구 후보로 분류한다', () => {
+  const result = generateImprovementCandidates(completeRows(), {
+    businessDateKst: END_DATE,
+    now: NOW,
+    searchPerformance: {
+      windowDays: 30,
+      sources: [{
+        source: 'naver',
+        configured: true,
+        impressions: 19659,
+        clicks: 202,
+        ctrPct: 1.03,
+        observedAt: '2026-08-20T00:00:00.000Z',
+      }],
+    },
+  });
+
+  assert.ok(result.candidates.some((item) => item.candidateKey === 'data_quality:naver_search_snapshot_stale:all'));
+  assert.equal(result.candidates.some((item) => item.candidateKey.startsWith('acquisition:naver:')), false);
+});
+
 test('봇·중복·orphan 비율 이상은 데이터 품질 후보이며 UX 제안을 억제한다', () => {
   const rows = completeRows();
   Object.assign(rows.at(-1), {

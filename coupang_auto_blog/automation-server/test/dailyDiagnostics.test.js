@@ -35,12 +35,17 @@ test('전일 rollup 성공 후에만 job_runs를 자체 관리하는 후보 coor
       order.push({ type: 'candidate', options });
       return { candidates: [{ candidateId: 'one' }], stored: 1, dataStatus: 'ready' };
     },
+    async loadSearchPerformance(options) {
+      order.push({ type: 'search', options });
+      return { windowDays: 30, sources: [{ source: 'google', configured: true, impressions: 6 }] };
+    },
   });
 
   assert.equal(result.startDate, '2026-08-18');
   assert.equal(result.businessDateKst, '2026-08-24');
-  assert.deepEqual(order.map((item) => item.type), ['rollup', 'candidate']);
-  assert.equal(order[1].options.persist, true);
+  assert.deepEqual(order.map((item) => item.type), ['rollup', 'search', 'candidate']);
+  assert.equal(order[2].options.persist, true);
+  assert.equal(order[2].options.searchPerformance.sources[0].impressions, 6);
 });
 
 test('후보 job 실패는 자체 감사 구현을 존중하며 coordinator가 오류를 다시 전달한다', async () => {
@@ -54,6 +59,7 @@ test('후보 job 실패는 자체 감사 구현을 존중하며 coordinator가 �
         return [{ businessDateKst: endDate, status: 'success' }];
       },
       async generateCandidates() { throw candidateError; },
+      async loadSearchPerformance() { return { windowDays: 30, sources: [] }; },
     }),
     /candidate generation failed/
   );
@@ -69,6 +75,7 @@ test('전일 rollup이 성공하지 않으면 후보 생성 자체를 막는다'
         return [{ businessDateKst: endDate, status: 'skipped_locked' }];
       },
       async generateCandidates() { generated = true; },
+      async loadSearchPerformance() { throw new Error('must not load search data'); },
     }),
     /rollup이 성공하지 않아/
   );

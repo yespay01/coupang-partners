@@ -4,6 +4,7 @@ import {
   recalculateDailyMetricRange,
 } from './dailyMetrics.js';
 import { runImprovementCandidateJob } from './improvementCandidates.js';
+import { loadSearchPerformanceSnapshot } from './searchPerformance.js';
 
 export const MAX_DIAGNOSTIC_LOOKBACK_DAYS = 7;
 
@@ -33,6 +34,7 @@ export async function runDailyDiagnosticsCoordinator(db, {
   lookbackDays = MAX_DIAGNOSTIC_LOOKBACK_DAYS,
   recalculate = recalculateDailyMetricRange,
   generateCandidates = runImprovementCandidateJob,
+  loadSearchPerformance = loadSearchPerformanceSnapshot,
 } = {}) {
   const dates = getPreviousKstBusinessDates(now, lookbackDays);
   const startDate = dates[0];
@@ -48,11 +50,14 @@ export async function runDailyDiagnosticsCoordinator(db, {
     throw error;
   }
 
+  const searchPerformance = await loadSearchPerformance({ now, dateRange: '30d' });
+
   // runImprovementCandidateJob가 advisory lock과 job_runs 성공/실패 기록을 소유한다.
   const candidateResult = await generateCandidates(db, {
     businessDateKst,
     persist: true,
     now,
+    searchPerformance,
   });
-  return { businessDateKst, startDate, rollups, candidateResult, status: 'success' };
+  return { businessDateKst, startDate, rollups, searchPerformance, candidateResult, status: 'success' };
 }

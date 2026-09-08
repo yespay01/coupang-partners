@@ -16,6 +16,9 @@ export const DIAGNOSTIC_THRESHOLDS = Object.freeze({
   ctrRelativeDecline: 0.2,
   ctrAbsoluteDeclinePercentagePoints: 0.5,
   sourceStaleAfterHours: 48,
+  minimumSearchImpressionsPerDay: 10,
+  maximumLowSearchCtrPct: 1.5,
+  searchSnapshotStaleAfterHours: 48,
 });
 
 function finiteNumber(value, fallback = 0) {
@@ -180,6 +183,138 @@ function diagnosticSample(current, windowRows, thresholds) {
   };
 }
 
+function searchPerformanceProposals(current, windowRows, options) {
+  const { thresholds, now, searchPerformance } = options;
+  const windowDays = Math.max(1, finiteNumber(searchPerformance?.windowDays, 30));
+  const minimumImpressions = thresholds.minimumSearchImpressionsPerDay * windowDays;
+  const sourceLabels = { google: 'Google', naver: '네이버' };
+  const candidates = [];
+
+  for (const rawSource of Array.isArray(searchPerformance?.sources) ? searchPerformance.sources : []) {
+    if (rawSource?.configured !== true) continue;
+    const source = String(rawSource.source || '').toLowerCase();
+    if (!sourceLabels[source]) continue;
+    const label = sourceLabels[source];
+    const impressions = finiteNumber(rawSource.impressions, 0);
+    const clicks = finiteNumber(rawSource.clicks, 0);
+    const observedAt = rawSource.observedAt || searchPerformance?.capturedAt || null;
+    const observedDate = observedAt ? new Date(observedAt) : null;
+    const ageHours = observedDate && !Number.isNaN(observedDate.getTime())
+      ? (now.getTime() - observedDate.getTime()) / 3_600_000
+      : null;
+    if (ageHours == null || ageHours > thresholds.searchSnapshotStaleAfterHours) {
+      candidates.push(proposal({
+        businessDateKst: current.businessDateKst,
+        key: `data_quality:${source}_search_snapshot_stale:all`,
+        type: 'data_quality',
+        title: `${label} 검색 데이터 최신성 부족`,
+        hypothesis: `${label} 검색 데이터가 오래되어 현재 노출 병목을 신뢰성 있게 분류할 수 없다.`,
+        priorityScore: 93,
+        evidence: {
+          source,
+          observedAt,
+          ageHours,
+          maximumAgeHours: thresholds.searchSnapshotStaleAfterHours,
+        },
+        sample: diagnosticSample(current, windowRows, thresholds),
+        primaryMetric: {
+          name: `${source}_search_snapshot_age_hours`,
+          current: ageHours,
+          baseline: thresholds.searchSnapshotStaleAfterHours,
+          uncertainty: '최신 검색 성과가 들어오기 전에는 과거 노출 패턴을 현재 상태로 간주하지 않는다.',
+        },
+        guardrails: requiredGuardrails(),
+        rollbackPlan: '검색 구조 변경을 보류하고 최신 데이터 동기화 후 후보를 다시 생성한다.',
+        risks: ['오래된 검색 성과를 현재 병목으로 오인할 위험'],
+        recommendation: {
+          action: 'refresh_search_performance',
+          nextAction: `${label} 검색 성과 연동을 복구하고 최신 30일 노출·클릭 데이터를 다시 수집한다.`,
+          humanApprovalRequired: true,
+          uiChange: false,
+          contentChange: false,
+        },
+        now,
+      }));
+      continue;
+    }
+    const ctrPct = impressions > 0
+      ? finiteNumber(rawSource.ctrPct, (100 * clicks) / impressions)
+      : 0;
+    const commonEvidence = {
+      source,
+      windowDays,
+      impressions,
+      clicks,
+      ctrPct,
+      observedAt,
+    };
+
+    if (impressions < minimumImpressions) {
+      candidates.push(proposal({
+        businessDateKst: current.businessDateKst,
+        key: `acquisition:${source}:search_discovery`,
+        type: 'measurement',
+        title: `${label} 검색 발견·노출 부족`,
+        hypothesis: `${label}의 검색 노출량이 진단 기준보다 낮아 CTR 실험보다 색인 범위와 검색엔진의 페이지 발견 경로를 먼저 개선해야 한다.`,
+        priorityScore: source === 'google' ? 92 : 88,
+        evidence: { ...commonEvidence, minimumImpressions },
+        sample: diagnosticSample(current, windowRows, thresholds),
+        primaryMetric: {
+          name: `${source}_search_impressions`,
+          current: impressions,
+          baseline: minimumImpressions,
+          uncertainty: '검색 노출은 지연 반영되므로 변경 후 최소 7일 추세로 재평가한다.',
+        },
+        guardrails: requiredGuardrails(),
+        rollbackPlan: 'canonical·robots·사이트맵 오류가 발생하면 직전 색인 구조로 즉시 되돌린다.',
+        risks: ['가치가 낮은 페이지를 대량 생성하면 검색 품질을 악화시킬 수 있음'],
+        recommendation: {
+          action: 'improve_search_discovery',
+          nextAction: '색인 가능 URL 수와 사이트맵 처리 상태를 확인하고 카테고리·컬렉션 허브 및 관련 상품 내부 링크를 보강한다.',
+          expectedImpact: `${label}이 더 많은 유효 상품 페이지를 발견하고 검색 결과에 노출할 기반을 만든다.`,
+          humanApprovalRequired: true,
+          uiChange: false,
+          contentChange: false,
+        },
+        now,
+      }));
+      continue;
+    }
+
+    if (ctrPct < thresholds.maximumLowSearchCtrPct) {
+      candidates.push(proposal({
+        businessDateKst: current.businessDateKst,
+        key: `acquisition:${source}:search_snippet_ctr`,
+        type: 'measurement',
+        title: `${label} 검색 노출 대비 클릭 부족`,
+        hypothesis: `${label} 노출은 확보됐지만 검색 CTR이 낮아 검색어와 제목·설명의 일치도를 먼저 개선해야 한다.`,
+        priorityScore: 87,
+        evidence: { ...commonEvidence, maximumLowSearchCtrPct: thresholds.maximumLowSearchCtrPct },
+        sample: diagnosticSample(current, windowRows, thresholds),
+        primaryMetric: {
+          name: `${source}_search_ctr_pct`,
+          current: ctrPct,
+          baseline: thresholds.maximumLowSearchCtrPct,
+          uncertainty: '브랜드·순위·검색 의도 구성이 달라 전체 CTR만으로 개별 페이지 원인을 확정할 수 없다.',
+        },
+        guardrails: requiredGuardrails(),
+        rollbackPlan: '변경 페이지의 7일 노출 또는 CTR이 악화되면 이전 제목·설명으로 되돌린다.',
+        risks: ['검색어 근거 없이 제목을 과장하면 사용자 신뢰와 검색 품질을 해칠 수 있음'],
+        recommendation: {
+          action: 'improve_search_snippet',
+          nextAction: '노출 상위·CTR 하위 검색어와 페이지를 연결해 상품명·가격 관측 가치가 드러나는 제목과 설명부터 한 묶음씩 개선한다.',
+          expectedImpact: `${label}의 기존 노출을 실제 방문으로 전환해 유효 노출 세션을 늘린다.`,
+          humanApprovalRequired: true,
+          uiChange: false,
+          contentChange: true,
+        },
+        now,
+      }));
+    }
+  }
+  return candidates;
+}
+
 function dataQualityProposal(current, windowRows, options) {
   const {
     thresholds,
@@ -286,7 +421,11 @@ export function generateImprovementCandidates(rawRows, options = {}) {
     data_status: 'no_data',
   });
   const last14 = consecutiveWindow(rowsByDate, businessDateKst, 14);
-  const candidates = [];
+  const candidates = searchPerformanceProposals(current, last14, {
+    thresholds,
+    now,
+    searchPerformance: options.searchPerformance,
+  });
   const finalize = () => {
     for (const candidate of candidates) validateImprovementCandidate(candidate);
     return {
