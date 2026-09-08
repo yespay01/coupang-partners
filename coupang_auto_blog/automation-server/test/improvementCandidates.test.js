@@ -198,6 +198,8 @@ test('저장 시 같은 key의 과거 proposed를 먼저 expired 처리하고 �
   assert.match(calls[0].sql, /SET status = 'expired'/);
   assert.match(calls[0].sql, /status = 'proposed'/);
   assert.match(calls[1].sql, /WHERE improvement_candidates\.status = 'proposed'/);
+  assert.match(calls[1].sql, /title = EXCLUDED\.title/);
+  assert.match(calls[1].sql, /hypothesis = EXCLUDED\.hypothesis/);
   assert.doesNotMatch(calls.map((call) => call.sql).join('\n'), /UPDATE\s+(?:products|reviews)/i);
 });
 

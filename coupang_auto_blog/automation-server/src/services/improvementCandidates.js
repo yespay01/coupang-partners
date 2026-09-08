@@ -642,6 +642,10 @@ export async function persistProposedCandidates(db, candidates) {
          $1,$2,$3,$4,$5,$6,$7,'proposed',$8,$9::jsonb,$10::jsonb,$11::jsonb,
          $12::jsonb,$13,$14::jsonb,$15::jsonb,FALSE,TRUE,FALSE,$16
        ) ON CONFLICT (candidate_key, business_date_kst) DO UPDATE SET
+         candidate_type = EXCLUDED.candidate_type,
+         surface = EXCLUDED.surface,
+         title = EXCLUDED.title,
+         hypothesis = EXCLUDED.hypothesis,
          priority_score = EXCLUDED.priority_score,
          evidence = EXCLUDED.evidence,
          sample = EXCLUDED.sample,
