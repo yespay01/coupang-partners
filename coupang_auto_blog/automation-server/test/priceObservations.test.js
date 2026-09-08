@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { refreshExistingProductPrices, saveProduct } from '../src/routes/collect.js';
 import {
   loadProductSitemapRows,
+  loadPublicProductCategories,
   mapPriceCoverage,
   mapPublicProductSummary,
   parsePriceHistoryDays,
@@ -93,6 +94,7 @@ test('공개 상품 요약은 표시 필드와 검증된 중앙 링크만 반환
     latest_price_krw: '12900',
     last_observed_at: new Date('2026-08-28T03:00:00Z'),
     product_image: 'https://example.com/product.jpg',
+    category_id: '1016',
     category_name: '디지털',
     updated_at: new Date('2026-08-28T03:00:00Z'),
     link_id: LINK_ID,
@@ -115,6 +117,7 @@ test('공개 상품 요약은 표시 필드와 검증된 중앙 링크만 반환
     currentPriceKrw: 12900,
     priceObservedAt: '2026-08-28T03:00:00.000Z',
     productImage: 'https://example.com/product.jpg',
+    categoryId: '1016',
     categoryName: '디지털',
     updatedAt: '2026-08-28T03:00:00.000Z',
     affiliateLink: { linkId: LINK_ID, goUrl: `/go/${LINK_ID}` },
@@ -129,6 +132,32 @@ test('공개 상품 요약은 표시 필드와 검증된 중앙 링크만 반환
     link_source: 'product_api', validation_status: 'verified', is_active: true,
   }, 'AF9999999');
   assert.equal(mismatch.affiliateLink, undefined);
+});
+
+test('공개 카테고리 허브는 가격 관측·검증 링크가 있는 카테고리만 반환한다', async () => {
+  const calls = [];
+  const db = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+      return { rows: [{
+        category_id: '1016',
+        category_name: '가전디지털',
+        product_count: '24',
+        updated_at: new Date('2026-09-08T00:00:00Z'),
+      }] };
+    },
+  };
+
+  assert.deepEqual(await loadPublicProductCategories(db, PARTNER_ID), [{
+    categoryId: '1016',
+    categoryName: '가전디지털',
+    productCount: 24,
+    updatedAt: '2026-09-08T00:00:00.000Z',
+  }]);
+  assert.match(calls[0].sql, /price_observations/);
+  assert.match(calls[0].sql, /HAVING COUNT\(DISTINCT p\.product_id\) >= 3/);
+  assert.deepEqual(calls[0].params, [PARTNER_ID]);
+  assert.deepEqual(await loadPublicProductCategories(db, null), []);
 });
 
 test('가격 추적 커버리지는 전체·추적·미추적·오늘 관측을 일관되게 계산한다', () => {

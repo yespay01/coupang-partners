@@ -48,10 +48,18 @@ function formatPrice(price?: number) {
   return `${Math.round(price!).toLocaleString("ko-KR")}원`;
 }
 
-function ProductCard({ product, index }: { product: HomeProduct; index: number }) {
+export function ProductCard({
+  product,
+  index,
+  surface = "home",
+}: {
+  product: HomeProduct;
+  index: number;
+  surface?: "home" | "collection";
+}) {
   const image = product.productImage;
   const price = formatPrice(product.productPrice);
-  const position = `home_collection_${index + 1}`;
+  const position = `${surface}_collection_${index + 1}`;
   const detailHref = product.productId
     ? `/products/${encodeURIComponent(product.productId)}`
     : null;
@@ -61,7 +69,7 @@ function ProductCard({ product, index }: { product: HomeProduct; index: number }
       className="h-full"
       event={{
         eventName: "product_card_impression",
-        surface: "home",
+        surface,
         contentId: product.slug ?? product.id,
         productId: product.productId,
         position,
@@ -109,7 +117,7 @@ function ProductCard({ product, index }: { product: HomeProduct; index: number }
             {product.affiliateLink?.linkId ? (
               <AffiliateOutboundLink
                 linkId={product.affiliateLink.linkId}
-                tracking={{ reviewId: product.id, reviewSlug: product.slug, productName: product.productName, productId: product.productId, contentId: product.slug ?? product.id, surface: "home", position }}
+                tracking={{ reviewId: product.id, reviewSlug: product.slug, productName: product.productName, productId: product.productId, contentId: product.slug ?? product.id, surface, position }}
                 className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-orange-500 px-3 py-2.5 text-center text-sm font-bold text-white transition hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2"
               >
                 쿠팡에서 현재가 확인 <span aria-hidden="true">↗</span>

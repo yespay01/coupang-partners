@@ -11,6 +11,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 정적 페이지
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL, changeFrequency: "daily", priority: 1.0 },
+    { url: `${SITE_URL}/collections`, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_URL}/recipes`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE_URL}/news`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${SITE_URL}/search`, changeFrequency: "weekly", priority: 0.5 },
@@ -37,6 +38,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           priority: 0.8,
           ...(product.productImage ? { images: [product.productImage] } : {}),
         }));
+    }
+  } catch {
+    // automation-server 미응답 시 빈 배열
+  }
+
+  let collectionPages: MetadataRoute.Sitemap = [];
+  try {
+    const res = await fetch(`${AUTOMATION_SERVER_URL}/api/products/categories`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      const categories: { categoryId: string; updatedAt?: string }[] = data.data?.categories || [];
+      collectionPages = categories.map((category) => ({
+        url: `${SITE_URL}/collections/${encodeURIComponent(category.categoryId)}`,
+        lastModified: category.updatedAt ? new Date(category.updatedAt) : undefined,
+        changeFrequency: "daily" as const,
+        priority: 0.85,
+      }));
     }
   } catch {
     // automation-server 미응답 시 빈 배열
@@ -82,5 +100,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // automation-server 미응답 시 빈 배열
   }
 
-  return [...staticPages, ...productPages, ...recipePages, ...newsPages];
+  return [...staticPages, ...collectionPages, ...productPages, ...recipePages, ...newsPages];
 }

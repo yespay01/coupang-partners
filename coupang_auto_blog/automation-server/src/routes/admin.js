@@ -1635,6 +1635,13 @@ const visitorPageTitleSql = `
       ORDER BY CASE WHEN n.slug = vl.page_slug THEN 0 ELSE 1 END
       LIMIT 1
     )
+    WHEN vl.page_url LIKE '/collections/%' THEN (
+      SELECT p.category_name
+      FROM products p
+      WHERE p.category_id = vl.page_slug
+        AND p.category_name IS NOT NULL
+      LIMIT 1
+    )
     ELSE NULL
   END AS page_title
 `;

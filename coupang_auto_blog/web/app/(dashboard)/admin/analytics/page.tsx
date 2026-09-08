@@ -129,6 +129,8 @@ const DEVICE_COLORS: Record<string, string> = {
 const PAGE_TYPE_LABELS: Record<string, string> = {
   home: "홈",
   product: "상품",
+  collection: "카테고리",
+  collections: "카테고리 목록",
   review: "리뷰",
   recipe: "레시피",
   news: "뉴스",

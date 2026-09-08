@@ -17,6 +17,7 @@ type ProductSummary = {
   currentPriceKrw: number | null;
   priceObservedAt: string | null;
   productImage: string | null;
+  categoryId: string | null;
   categoryName: string | null;
   updatedAt: string | null;
   affiliateLink?: { linkId: string; goUrl?: string };
@@ -130,7 +131,13 @@ export default async function ProductPage({ params }: PageProps) {
           <nav className="mb-5 flex items-center gap-2 text-xs font-semibold text-slate-500" aria-label="현재 위치">
             <Link href="/" className="hover:text-orange-600">상품 모음</Link>
             <span aria-hidden="true">/</span>
-            <span className="truncate text-slate-700">{product.categoryName || "상품 정보"}</span>
+            {product.categoryId && product.categoryName ? (
+              <Link href={`/collections/${encodeURIComponent(product.categoryId)}`} className="truncate text-slate-700 hover:text-orange-600">
+                {product.categoryName}
+              </Link>
+            ) : (
+              <span className="truncate text-slate-700">상품 정보</span>
+            )}
           </nav>
 
           <div className="grid gap-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center">

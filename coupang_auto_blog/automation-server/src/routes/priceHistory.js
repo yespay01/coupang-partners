@@ -96,6 +96,7 @@ export function mapPublicProductSummary(row, currentPartnerId) {
       ? row.last_observed_at.toISOString()
       : row.last_observed_at || null,
     productImage: row.product_image || null,
+    categoryId: row.category_id || null,
     categoryName: row.category_name || null,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
     affiliateLink: validation.valid && goUrl ? { linkId, goUrl } : undefined,
@@ -126,7 +127,7 @@ async function getCurrentPartnerId() {
 }
 
 const PUBLIC_PRODUCT_SELECT = `
-  SELECT p.product_id, p.product_name, p.product_image, p.category_name, p.updated_at,
+  SELECT p.product_id, p.product_name, p.product_image, p.category_id, p.category_name, p.updated_at,
          latest.price_krw AS latest_price_krw,
          latest.observed_at AS last_observed_at,
          al.link_id, al.destination_url, al.landing_url,
@@ -143,19 +144,60 @@ const PUBLIC_PRODUCT_SELECT = `
     LEFT JOIN affiliate_links al ON al.link_id = p.affiliate_link_id
 `;
 
+export async function loadPublicProductCategories(db, currentPartnerId) {
+  if (!currentPartnerId) return [];
+  const result = await db.query(
+    `SELECT p.category_id, p.category_name,
+            COUNT(DISTINCT p.product_id)::int AS product_count,
+            MAX(p.updated_at) AS updated_at
+       FROM products p
+       JOIN affiliate_links al ON al.link_id = p.affiliate_link_id
+      WHERE p.category_id IS NOT NULL AND p.category_id <> ''
+        AND p.category_name IS NOT NULL AND p.category_name <> ''
+        AND EXISTS (SELECT 1 FROM price_observations po WHERE po.product_id = p.product_id)
+        AND al.is_active = TRUE
+        AND al.validation_status = 'verified'
+        AND al.partner_tracking_code = $1
+      GROUP BY p.category_id, p.category_name
+      HAVING COUNT(DISTINCT p.product_id) >= 3
+      ORDER BY product_count DESC, p.category_name ASC
+      LIMIT 100`,
+    [currentPartnerId]
+  );
+  return result.rows.map((row) => ({
+    categoryId: String(row.category_id),
+    categoryName: row.category_name,
+    productCount: Number(row.product_count),
+    updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at || null,
+  }));
+}
+
 /** GET /api/products?limit=100 - 리뷰 본문과 분리된 공개 상품 목록 */
 router.get('/products', async (req, res) => {
   try {
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 100);
     const offset = Math.min(Math.max(Number.parseInt(req.query.offset, 10) || 0, 0), 100000);
+    const categoryId = String(req.query.categoryId || '').trim();
+    if (categoryId && !PRODUCT_ID_PATTERN.test(categoryId)) {
+      return res.status(400).json({ success: false, message: 'categoryId가 올바르지 않습니다.' });
+    }
     const currentPartnerId = await getCurrentPartnerId();
+    const categoryFilter = categoryId ? ' AND p.category_id = $3' : '';
+    const observedFilter = categoryId
+      ? ' AND EXISTS (SELECT 1 FROM price_observations listed_po WHERE listed_po.product_id = p.product_id)'
+      : '';
+    const listParams = categoryId ? [limit, offset, categoryId] : [limit, offset];
+    const countCategoryFilter = categoryId ? ' AND p.category_id = $2' : '';
+    const countParams = categoryId ? [currentPartnerId, categoryId] : [currentPartnerId];
     const [result, countResult] = await Promise.all([
       getDb().query(
         `${PUBLIC_PRODUCT_SELECT}
          WHERE p.product_name IS NOT NULL AND p.product_name <> ''
+         ${categoryFilter}
+         ${observedFilter}
          ORDER BY latest.observed_at DESC NULLS LAST, p.updated_at DESC, p.id DESC
          LIMIT $1 OFFSET $2`,
-        [limit, offset]
+        listParams
       ),
       currentPartnerId
         ? getDb().query(
@@ -172,8 +214,10 @@ router.get('/products', async (req, res) => {
             WHERE p.product_name IS NOT NULL AND p.product_name <> ''
               AND al.is_active = TRUE
               AND al.validation_status = 'verified'
-              AND al.partner_tracking_code = $1`,
-          [currentPartnerId]
+              AND al.partner_tracking_code = $1
+              ${countCategoryFilter}
+              ${observedFilter}`,
+          countParams
         )
         : Promise.resolve({ rows: [{}] }),
     ]);
@@ -188,6 +232,17 @@ router.get('/products', async (req, res) => {
         priceCoverage: mapPriceCoverage(countResult.rows[0]),
       },
     });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/** GET /api/products/categories - 검색엔진과 사용자가 탐색할 공개 카테고리 허브 */
+router.get('/products/categories', async (_req, res) => {
+  try {
+    const currentPartnerId = await getCurrentPartnerId();
+    const categories = await loadPublicProductCategories(getDb(), currentPartnerId);
+    return res.json({ success: true, data: { categories } });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

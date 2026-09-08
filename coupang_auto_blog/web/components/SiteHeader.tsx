@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { label: "추천템", href: "/", key: "review" },
+  { label: "카테고리", href: "/collections", key: "collections" },
   { label: "요리", href: "/recipes", key: "recipes" },
   { label: "뉴스", href: "/news", key: "news" },
   { label: "최저가 검색", href: "/search", key: "search" },
@@ -13,6 +14,7 @@ const navItems = [
 
 function getActiveKey(pathname: string): string {
   if (pathname === "/" || pathname.startsWith("/review")) return "review";
+  if (pathname.startsWith("/collections")) return "collections";
   if (pathname.startsWith("/recipes")) return "recipes";
   if (pathname.startsWith("/news")) return "news";
   if (pathname.startsWith("/search")) return "search";
