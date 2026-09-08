@@ -282,6 +282,24 @@ function searchPerformanceProposals(current, windowRows, options) {
     }
 
     if (ctrPct < thresholds.maximumLowSearchCtrPct) {
+      const targetPages = (Array.isArray(rawSource.pages) ? rawSource.pages : [])
+        .filter((page) => finiteNumber(page?.impressions, 0) >= thresholds.minimumSearchImpressionsPerDay)
+        .filter((page) => finiteNumber(page?.ctrPct, 0) < thresholds.maximumLowSearchCtrPct)
+        .sort((a, b) => finiteNumber(b.impressions, 0) - finiteNumber(a.impressions, 0))
+        .slice(0, 10);
+      const targetKeywords = (Array.isArray(rawSource.keywords) ? rawSource.keywords : [])
+        .filter((keyword) => finiteNumber(keyword?.impressions, 0) >= thresholds.minimumSearchImpressionsPerDay)
+        .filter((keyword) => finiteNumber(keyword?.ctrPct, 0) < thresholds.maximumLowSearchCtrPct)
+        .sort((a, b) => finiteNumber(b.impressions, 0) - finiteNumber(a.impressions, 0))
+        .slice(0, 10);
+      const legacyReviewImpressions = targetPages
+        .filter((page) => String(page?.page || '').includes('/reviews/'))
+        .reduce((total, page) => total + finiteNumber(page?.impressions, 0), 0);
+      const targetPageImpressions = targetPages
+        .reduce((total, page) => total + finiteNumber(page?.impressions, 0), 0);
+      const legacyReviewSharePct = targetPageImpressions > 0
+        ? Number(((100 * legacyReviewImpressions) / targetPageImpressions).toFixed(1))
+        : 0;
       candidates.push(proposal({
         businessDateKst: current.businessDateKst,
         key: `acquisition:${source}:search_snippet_ctr`,
@@ -289,7 +307,13 @@ function searchPerformanceProposals(current, windowRows, options) {
         title: `${label} 검색 노출 대비 클릭 부족`,
         hypothesis: `${label} 노출은 확보됐지만 검색 CTR이 낮아 검색어와 제목·설명의 일치도를 먼저 개선해야 한다.`,
         priorityScore: 87,
-        evidence: { ...commonEvidence, maximumLowSearchCtrPct: thresholds.maximumLowSearchCtrPct },
+        evidence: {
+          ...commonEvidence,
+          maximumLowSearchCtrPct: thresholds.maximumLowSearchCtrPct,
+          targetPages,
+          targetKeywords,
+          legacyReviewSharePct,
+        },
         sample: diagnosticSample(current, windowRows, thresholds),
         primaryMetric: {
           name: `${source}_search_ctr_pct`,
@@ -302,7 +326,9 @@ function searchPerformanceProposals(current, windowRows, options) {
         risks: ['검색어 근거 없이 제목을 과장하면 사용자 신뢰와 검색 품질을 해칠 수 있음'],
         recommendation: {
           action: 'improve_search_snippet',
-          nextAction: '노출 상위·CTR 하위 검색어와 페이지를 연결해 상품명·가격 관측 가치가 드러나는 제목과 설명부터 한 묶음씩 개선한다.',
+          nextAction: legacyReviewSharePct >= 50
+            ? '노출이 남은 기존 /reviews/ URL의 영구 리디렉션을 유지하면서, 연결된 상품 페이지 제목을 상품명·실제 관측 가격 중심으로 개선한다.'
+            : '노출 상위·CTR 하위 검색어와 페이지를 연결해 상품명·실제 관측 가격이 드러나는 제목과 설명부터 한 묶음씩 개선한다.',
           expectedImpact: `${label}의 기존 노출을 실제 방문으로 전환해 유효 노출 세션을 늘린다.`,
           humanApprovalRequired: true,
           uiChange: false,

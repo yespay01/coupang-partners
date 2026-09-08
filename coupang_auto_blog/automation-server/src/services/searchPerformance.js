@@ -3,6 +3,20 @@ function finiteNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeSearchRows(rows, labelKey) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      [labelKey]: String(row?.[labelKey] || '').slice(0, 2000),
+      impressions: finiteNumber(row?.impressions),
+      clicks: finiteNumber(row?.clicks),
+      ctrPct: finiteNumber(row?.ctr),
+      position: finiteNumber(row?.position),
+    }))
+    .filter((row) => row[labelKey] && row.impressions > 0)
+    .sort((a, b) => b.impressions - a.impressions)
+    .slice(0, 50);
+}
+
 async function loadGoogleSearchPerformance(dateRange) {
   const { getSearchConsoleData } = await import('./googleSearchConsole.js');
   return getSearchConsoleData(dateRange);
@@ -25,6 +39,8 @@ export function normalizeSearchPerformanceSource(source, data, observedAt) {
     ctrPct: Number.isFinite(providedCtr)
       ? providedCtr
       : impressions > 0 ? (100 * clicks) / impressions : 0,
+    keywords: normalizeSearchRows(data?.keywords, 'keyword'),
+    pages: normalizeSearchRows(data?.pages, 'page'),
     observedAt: data?.cookieUpdatedAt || observedAt,
     message: typeof data?.message === 'string' ? data.message : null,
   };

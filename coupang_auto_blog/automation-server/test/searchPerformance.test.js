@@ -19,6 +19,8 @@ test('검색 성과 소스의 숫자와 CTR을 정규화한다', () => {
       impressions: 200,
       clicks: 4,
       ctrPct: 2,
+      keywords: [],
+      pages: [],
       observedAt: '2026-09-08T00:00:00.000Z',
       message: null,
     }
@@ -36,6 +38,7 @@ test('Google과 네이버 중 한 소스가 실패해도 나머지 검색 성과
         totalClicks: 202,
         averageCtr: 1.03,
         cookieUpdatedAt: '2026-09-07T23:55:00.000Z',
+        pages: [{ page: 'https://semolink.store/products/1', impressions: 40, clicks: 1, ctr: 2.5, position: 2 }],
       };
     },
   });
@@ -45,4 +48,5 @@ test('Google과 네이버 중 한 소스가 실패해도 나머지 검색 성과
   assert.equal(snapshot.sources[0].message, 'gsc unavailable');
   assert.equal(snapshot.sources[1].impressions, 19659);
   assert.equal(snapshot.sources[1].observedAt, '2026-09-07T23:55:00.000Z');
+  assert.equal(snapshot.sources[1].pages[0].page, 'https://semolink.store/products/1');
 });

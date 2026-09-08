@@ -111,7 +111,14 @@ test('검색 데이터로 Google 발견 부족과 네이버 검색 CTR 부족을
       capturedAt: NOW.toISOString(),
       sources: [
         { source: 'google', configured: true, impressions: 6, clicks: 0, ctrPct: 0 },
-        { source: 'naver', configured: true, impressions: 19659, clicks: 202, ctrPct: 1.03 },
+        {
+          source: 'naver', configured: true, impressions: 19659, clicks: 202, ctrPct: 1.03,
+          pages: [
+            { page: 'https://semolink.store/reviews/legacy-product', impressions: 738, clicks: 4, ctrPct: 0.5 },
+            { page: 'https://semolink.store/products/2', impressions: 284, clicks: 4, ctrPct: 1.4 },
+          ],
+          keywords: [{ keyword: '홈플래닛 선풍기', impressions: 228, clicks: 3, ctrPct: 1.3 }],
+        },
       ],
     },
   });
@@ -122,6 +129,10 @@ test('검색 데이터로 Google 발견 부족과 네이버 검색 CTR 부족을
   assert.equal(google.evidence.impressions, 6);
   assert.equal(naver.recommendation.action, 'improve_search_snippet');
   assert.equal(naver.evidence.ctrPct, 1.03);
+  assert.equal(naver.evidence.targetPages[0].page, 'https://semolink.store/reviews/legacy-product');
+  assert.equal(naver.evidence.targetKeywords[0].keyword, '홈플래닛 선풍기');
+  assert.equal(naver.evidence.legacyReviewSharePct, 72.2);
+  assert.match(naver.recommendation.nextAction, /영구 리디렉션/);
   assert.ok(result.candidates.every((candidate) => candidate.winnerDeclared === false));
 });
 

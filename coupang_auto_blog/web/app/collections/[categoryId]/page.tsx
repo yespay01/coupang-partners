@@ -5,6 +5,7 @@ import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { ProductCard, type HomeProduct } from "@/components/HomeProductCollection";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { buildCategorySearchMetadata } from "@/lib/productSeo";
 
 export const dynamic = "force-dynamic";
 
@@ -64,10 +65,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { categoryId } = await params;
   const collection = await getCollection(categoryId);
   if (!collection) return { title: "카테고리를 찾을 수 없습니다", robots: { index: false, follow: false } };
+  const searchMeta = buildCategorySearchMetadata(collection.categoryName, collection.totalCount);
   return {
-    title: `${collection.categoryName} 쿠팡 상품 가격 비교`,
-    description: `${collection.categoryName} 상품 ${collection.totalCount.toLocaleString("ko-KR")}개의 최근 실제 관측 가격과 쿠팡 판매 정보를 비교하세요.`.slice(0, 160),
+    title: searchMeta.title,
+    description: searchMeta.description,
     alternates: { canonical: `https://semolink.store/collections/${encodeURIComponent(categoryId)}` },
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: `${searchMeta.title} | 세모링크`,
+      description: searchMeta.description,
+      type: "website",
+    },
   };
 }
 

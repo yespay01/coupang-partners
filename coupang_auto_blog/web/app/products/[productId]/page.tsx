@@ -6,6 +6,7 @@ import { AffiliateOutboundLink } from "@/components/AffiliateOutboundLink";
 import { PriceHistoryChart, type PriceHistoryPoint } from "@/components/PriceHistoryChart";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { buildProductSearchMetadata } from "@/lib/productSeo";
 
 export const dynamic = "force-dynamic";
 
@@ -73,20 +74,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { productId } = await params;
   const product = await getProduct(productId);
   if (!product) return { title: "상품을 찾을 수 없습니다", robots: { index: false, follow: false } };
-  const normalizedName = product.productName.replace(/\s+/g, " ").trim();
-  const titleName = normalizedName.length > 38 ? `${normalizedName.slice(0, 38)}…` : normalizedName;
-  const observedPrice = product.currentPriceKrw == null
-    ? ""
-    : ` 최근 관측가 ${Math.round(product.currentPriceKrw).toLocaleString("ko-KR")}원.`;
+  const searchMeta = buildProductSearchMetadata(product.productName, product.currentPriceKrw);
   return {
-    title: `${titleName} 가격 변동`,
-    description: `${normalizedName}의${observedPrice} 최근 90일 실제 관측 가격 흐름과 쿠팡 현재 판매 정보를 확인하세요.`.slice(0, 160),
+    title: searchMeta.title,
+    description: searchMeta.description,
     alternates: { canonical: `https://semolink.store/products/${encodeURIComponent(product.productId)}` },
+    robots: { index: true, follow: true },
     openGraph: {
-      title: `${titleName} 가격 변동 | 세모링크`,
-      description: `${normalizedName}의 실제 관측 가격 흐름을 확인하세요.`,
+      title: `${searchMeta.title} | 세모링크`,
+      description: searchMeta.description,
       type: "website",
-      ...(product.productImage ? { images: [{ url: product.productImage, alt: normalizedName }] } : {}),
+      ...(product.productImage ? { images: [{ url: product.productImage, alt: searchMeta.normalizedName }] } : {}),
     },
   };
 }
