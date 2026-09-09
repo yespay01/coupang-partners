@@ -20,6 +20,20 @@ export type DailyAnalyticsRollup = {
   updatedAt: string | null;
 };
 
+export type PlacementAnalyticsMetric = {
+  surface: string;
+  position: string;
+  eligibleImpressionSessions: number;
+  qualifiedOutboundSessions: number;
+  rawOutboundSessions: number;
+  orphanOutboundSessions: number;
+  qualifiedOutboundCtrPct: number | null;
+  impressionEventCount: number;
+  outboundEventCount: number;
+  firstBusinessDate: string | null;
+  lastBusinessDate: string | null;
+};
+
 export type AnalyticsAnomaly = {
   id: string;
   title: string;
@@ -76,6 +90,7 @@ export type AnalyticsJobStatus = {
 export type AnalyticsOptimizationSnapshot = {
   generatedAt: string | null;
   rollups: DailyAnalyticsRollup[];
+  placements: PlacementAnalyticsMetric[];
   anomalies: AnalyticsAnomaly[];
   candidates: ImprovementCandidate[];
   jobs: AnalyticsJobStatus[];
@@ -164,6 +179,23 @@ const normalizeRollup = (value: unknown): DailyAnalyticsRollup => {
     calculatedAt: asNullableString(row.calculatedAt),
     createdAt: asNullableString(row.createdAt),
     updatedAt: asNullableString(row.updatedAt),
+  };
+};
+
+const normalizePlacement = (value: unknown): PlacementAnalyticsMetric => {
+  const row = asRecord(value);
+  return {
+    surface: asString(row.surface, "unknown"),
+    position: asString(row.position, "unknown"),
+    eligibleImpressionSessions: asNumber(row.eligibleImpressionSessions),
+    qualifiedOutboundSessions: asNumber(row.qualifiedOutboundSessions),
+    rawOutboundSessions: asNumber(row.rawOutboundSessions),
+    orphanOutboundSessions: asNumber(row.orphanOutboundSessions),
+    qualifiedOutboundCtrPct: asNullableNumber(row.qualifiedOutboundCtrPct),
+    impressionEventCount: asNumber(row.impressionEventCount),
+    outboundEventCount: asNumber(row.outboundEventCount),
+    firstBusinessDate: asNullableString(row.firstBusinessDate),
+    lastBusinessDate: asNullableString(row.lastBusinessDate),
   };
 };
 
@@ -306,6 +338,7 @@ export function normalizeOptimizationSnapshot(
     rollups: asArray(data.rollups)
       .map(normalizeRollup)
       .filter((row) => row.businessDate.length > 0),
+    placements: asArray(data.placements).map(normalizePlacement),
     anomalies: asArray(data.anomalies).map(normalizeAnomaly),
     candidates: asArray(data.candidates).map(normalizeCandidate),
     jobs: asArray(data.jobs).map(normalizeJob),

@@ -9,6 +9,7 @@ export type AnalyticsEventName =
 export type AnalyticsSurface =
   | "home"
   | "collection"
+  | "related"
   | "detail"
   | "legacy_detail"
   | "search"

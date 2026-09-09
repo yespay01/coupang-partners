@@ -11,7 +11,7 @@ export const PUBLIC_ANALYTICS_EVENT_NAMES = new Set([
 
 const INTERNAL_EVENT_NAMES = new Set(['outbound_click']);
 const SURFACES = new Set([
-  'home', 'collection', 'category', 'detail', 'search', 'recipe',
+  'home', 'collection', 'related', 'category', 'detail', 'search', 'recipe',
   'compare', 'alerts', 'deals', 'unknown',
   'legacy_detail', 'other',
 ]);

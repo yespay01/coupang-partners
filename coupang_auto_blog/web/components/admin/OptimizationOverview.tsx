@@ -93,6 +93,22 @@ const anomalyStatusLabel: Record<AnalyticsAnomaly["status"], string> = {
   resolved: "해결됨",
 };
 
+const surfaceLabel: Record<string, string> = {
+  home: "홈",
+  search: "검색",
+  collection: "카테고리",
+  related: "관련 상품",
+  detail: "상품 상세",
+  review: "기존 리뷰",
+  unknown: "미분류",
+  other: "기타",
+};
+
+const positionLabel: Record<string, string> = {
+  product_detail_primary: "상세 본문 CTA",
+  product_detail_sticky: "모바일 고정 CTA",
+};
+
 export default function OptimizationOverview({ data, error }: Props) {
   if (error) {
     return (
@@ -280,6 +296,84 @@ export default function OptimizationOverview({ data, error }: Props) {
           </p>
         </>
       )}
+
+      <div className="rounded-lg border border-slate-200 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800">화면·배치별 전환</h3>
+            <p className="mt-1 text-[11px] text-slate-500">
+              선택한 조회 기간에서 같은 화면·배치를 본 세션과 해당 배치를 클릭한 세션만 교차합니다.
+            </p>
+          </div>
+          <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
+            원천 이벤트 실시간 집계
+          </span>
+        </div>
+        {data.placements.length === 0 ? (
+          <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+            <p className="text-xs text-slate-500">조회 기간의 배치별 노출 데이터가 없습니다.</p>
+          </div>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-[11px] font-semibold text-slate-500">
+                  <th className="pb-2 pr-3">화면</th>
+                  <th className="pb-2 pr-3">배치</th>
+                  <th className="pb-2 pr-3 text-right">유효 노출 세션</th>
+                  <th className="pb-2 pr-3 text-right">적격 이동 세션</th>
+                  <th className="pb-2 pr-3 text-right">적격 CTR</th>
+                  <th className="pb-2 pr-3 text-right">고아 이동</th>
+                  <th className="pb-2 text-right">관측 기간</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.placements.map((placement) => {
+                  const placementLowSample = placement.eligibleImpressionSessions < 100;
+                  return (
+                    <tr key={`${placement.surface}:${placement.position}`} className="border-b border-slate-100 last:border-0">
+                      <td className="py-2 pr-3 font-semibold text-slate-700">
+                        {surfaceLabel[placement.surface] || placement.surface}
+                      </td>
+                      <td className="py-2 pr-3 text-slate-600">
+                        {positionLabel[placement.position] || placement.position}
+                        {placementLowSample && (
+                          <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
+                            표본 부족
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 text-right text-slate-600">
+                        {number(placement.eligibleImpressionSessions)}
+                      </td>
+                      <td className="py-2 pr-3 text-right text-slate-600">
+                        {number(placement.qualifiedOutboundSessions)}
+                      </td>
+                      <td className="py-2 pr-3 text-right font-semibold text-violet-700">
+                        {placement.qualifiedOutboundCtrPct === null
+                          ? "-"
+                          : `${placement.qualifiedOutboundCtrPct.toFixed(2)}%`}
+                      </td>
+                      <td className="py-2 pr-3 text-right text-slate-500">
+                        {number(placement.orphanOutboundSessions)}
+                      </td>
+                      <td className="py-2 text-right text-[11px] text-slate-400">
+                        {placement.firstBusinessDate || "-"}
+                        {placement.lastBusinessDate && placement.lastBusinessDate !== placement.firstBusinessDate
+                          ? ` ~ ${placement.lastBusinessDate}`
+                          : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="mt-2 text-[10px] text-slate-400">
+          배치별 100 세션 미만은 성과 승자를 확정하지 않습니다. 고아 이동은 같은 배치의 노출과 연결되지 않은 클릭입니다.
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="rounded-lg border border-slate-200 p-4">

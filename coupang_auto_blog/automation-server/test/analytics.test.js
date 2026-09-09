@@ -57,6 +57,12 @@ test('한글 content_id와 도메인 source를 유실 없이 허용하고 raw ID
   assert.equal('ignored_field' in result.event, false);
 });
 
+test('관련 상품 surface의 노출과 클릭 컨텍스를 허용한다', () => {
+  const result = sanitizeAnalyticsEvent(event({ surface: 'related' }), SECRET);
+  assert.equal(result.valid, true);
+  assert.equal(result.event.surface, 'related');
+});
+
 test('분석 비밀값은 하드코딩 fallback을 사용하지 않는다', () => {
   assert.equal(getAnalyticsHashSecret({}), null);
   assert.equal(getAnalyticsHashSecret({ JWT_SECRET: 'your-jwt-secret' }), null);

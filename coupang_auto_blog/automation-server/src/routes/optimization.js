@@ -78,6 +78,93 @@ export function mapRollup(row) {
   };
 }
 
+export const PLACEMENT_METRICS_QUERY = `
+  WITH scoped_events AS (
+    SELECT event_name, session_id_hash,
+           COALESCE(NULLIF(surface, ''), 'unknown') AS surface,
+           COALESCE(NULLIF(position, ''), 'unknown') AS position,
+           business_date_kst
+      FROM analytics_events
+     WHERE business_date_kst BETWEEN $1::date AND $2::date
+       AND is_bot = FALSE
+       AND session_id_hash IS NOT NULL
+       AND event_name IN ('product_card_impression', 'cta_impression', 'outbound_click')
+  ),
+  impression_metrics AS (
+    SELECT surface, position,
+           COUNT(DISTINCT session_id_hash)::int AS eligible_impression_sessions,
+           COUNT(*)::int AS impression_events,
+           MIN(business_date_kst) AS first_business_date,
+           MAX(business_date_kst) AS last_business_date
+      FROM scoped_events
+     WHERE event_name IN ('product_card_impression', 'cta_impression')
+     GROUP BY surface, position
+  ),
+  outbound_metrics AS (
+    SELECT surface, position,
+           COUNT(DISTINCT session_id_hash)::int AS raw_outbound_sessions,
+           COUNT(*)::int AS outbound_events
+      FROM scoped_events
+     WHERE event_name = 'outbound_click'
+     GROUP BY surface, position
+  ),
+  qualified_metrics AS (
+    SELECT impression.surface, impression.position,
+           COUNT(DISTINCT impression.session_id_hash)::int AS qualified_outbound_sessions
+      FROM scoped_events impression
+      JOIN scoped_events outbound
+        ON outbound.session_id_hash = impression.session_id_hash
+       AND outbound.surface = impression.surface
+       AND outbound.position = impression.position
+       AND outbound.event_name = 'outbound_click'
+     WHERE impression.event_name IN ('product_card_impression', 'cta_impression')
+     GROUP BY impression.surface, impression.position
+  ),
+  placement_keys AS (
+    SELECT surface, position FROM impression_metrics
+    UNION
+    SELECT surface, position FROM outbound_metrics
+  )
+  SELECT keys.surface, keys.position,
+         COALESCE(impressions.eligible_impression_sessions, 0) AS eligible_impression_sessions,
+         COALESCE(qualified.qualified_outbound_sessions, 0) AS qualified_outbound_sessions,
+         COALESCE(outbounds.raw_outbound_sessions, 0) AS raw_outbound_sessions,
+         COALESCE(impressions.impression_events, 0) AS impression_events,
+         COALESCE(outbounds.outbound_events, 0) AS outbound_events,
+         impressions.first_business_date,
+         impressions.last_business_date
+    FROM placement_keys keys
+    LEFT JOIN impression_metrics impressions USING (surface, position)
+    LEFT JOIN outbound_metrics outbounds USING (surface, position)
+    LEFT JOIN qualified_metrics qualified USING (surface, position)
+   ORDER BY eligible_impression_sessions DESC, raw_outbound_sessions DESC,
+            keys.surface ASC, keys.position ASC
+`;
+
+export function mapPlacementMetric(row) {
+  const eligibleSessions = Math.max(0, numberValue(row.eligible_impression_sessions));
+  const qualifiedSessions = Math.min(
+    eligibleSessions,
+    Math.max(0, numberValue(row.qualified_outbound_sessions))
+  );
+  const rawOutboundSessions = Math.max(0, numberValue(row.raw_outbound_sessions));
+  return {
+    surface: row.surface || 'unknown',
+    position: row.position || 'unknown',
+    eligibleImpressionSessions: eligibleSessions,
+    qualifiedOutboundSessions: qualifiedSessions,
+    rawOutboundSessions,
+    orphanOutboundSessions: Math.max(0, rawOutboundSessions - qualifiedSessions),
+    qualifiedOutboundCtrPct: eligibleSessions > 0
+      ? Number(((qualifiedSessions / eligibleSessions) * 100).toFixed(4))
+      : null,
+    impressionEventCount: Math.max(0, numberValue(row.impression_events)),
+    outboundEventCount: Math.max(0, numberValue(row.outbound_events)),
+    firstBusinessDate: dateOnly(row.first_business_date),
+    lastBusinessDate: dateOnly(row.last_business_date),
+  };
+}
+
 export function mapAnomaly(row) {
   const details = row.details || {};
   const evidenceParts = [
@@ -168,13 +255,14 @@ async function loadCandidatesIfAvailable(db, startDate, endDate) {
 
 export async function getOptimizationSnapshot(db, { dateRange = '30d', now = new Date() } = {}) {
   const { days, startDate, endDate } = parseOptimizationDateRange(dateRange, now);
-  const [rollupResult, anomalyResult, jobResult, candidates] = await Promise.all([
+  const [rollupResult, placementResult, anomalyResult, jobResult, candidates] = await Promise.all([
     db.query(
       `SELECT * FROM daily_metric_rollups
         WHERE business_date_kst BETWEEN $1::date AND $2::date
         ORDER BY business_date_kst ASC`,
       [startDate, endDate]
     ),
+    db.query(PLACEMENT_METRICS_QUERY, [startDate, endDate]),
     db.query(
       `SELECT * FROM metric_anomalies
         WHERE business_date_kst BETWEEN $1::date AND $2::date
@@ -202,6 +290,7 @@ export async function getOptimizationSnapshot(db, { dateRange = '30d', now = new
     generatedAt: now.toISOString(),
     dataStatus,
     rollups,
+    placements: placementResult.rows.map(mapPlacementMetric),
     anomalies: anomalyResult.rows.map(mapAnomaly),
     candidates,
     jobs: jobResult.rows.map(mapJob),

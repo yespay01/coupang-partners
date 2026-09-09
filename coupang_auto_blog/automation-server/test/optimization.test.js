@@ -6,7 +6,9 @@ import {
   mapAnomaly,
   mapCandidate,
   mapJob,
+  mapPlacementMetric,
   mapRollup,
+  PLACEMENT_METRICS_QUERY,
   parseOptimizationDateRange,
 } from '../src/routes/optimization.js';
 
@@ -49,6 +51,38 @@ test('rollup DTO는 숫자형 PG 문자열을 camelCase 숫자로 변환한다',
     'impressionEvents', 'outboundEvents', 'totalEvents', 'botEvents', 'duplicateEvents',
   ]);
   assert.equal(dto.impressionEvents, dto.impressionEventCount);
+});
+
+test('배치별 CTR은 같은 surface·position의 노출/이동 세션만 교차한다', () => {
+  assert.match(PLACEMENT_METRICS_QUERY, /outbound\.surface = impression\.surface/);
+  assert.match(PLACEMENT_METRICS_QUERY, /outbound\.position = impression\.position/);
+  assert.match(PLACEMENT_METRICS_QUERY, /is_bot = FALSE/);
+  assert.match(PLACEMENT_METRICS_QUERY, /COUNT\(DISTINCT session_id_hash\)/);
+
+  const dto = mapPlacementMetric({
+    surface: 'detail',
+    position: 'product_detail_sticky',
+    eligible_impression_sessions: '20',
+    qualified_outbound_sessions: '5',
+    raw_outbound_sessions: '7',
+    impression_events: '22',
+    outbound_events: '7',
+    first_business_date: '2026-09-08',
+    last_business_date: '2026-09-09',
+  });
+  assert.deepEqual(dto, {
+    surface: 'detail',
+    position: 'product_detail_sticky',
+    eligibleImpressionSessions: 20,
+    qualifiedOutboundSessions: 5,
+    rawOutboundSessions: 7,
+    orphanOutboundSessions: 2,
+    qualifiedOutboundCtrPct: 25,
+    impressionEventCount: 22,
+    outboundEventCount: 7,
+    firstBusinessDate: '2026-09-08',
+    lastBusinessDate: '2026-09-09',
+  });
 });
 
 test('anomaly/candidate/job DTO는 frontend 필드 계약을 정확히 제공한다', () => {
@@ -122,6 +156,7 @@ test('optimization snapshot은 rollups/anomalies/candidates/jobs 통합 계약�
     async query(sql, params = []) {
       calls.push({ sql, params });
       if (/daily_metric_rollups/.test(sql)) return { rows: [] };
+      if (/WITH scoped_events/.test(sql)) return { rows: [] };
       if (/metric_anomalies/.test(sql)) return { rows: [] };
       if (/job_runs/.test(sql)) return { rows: [] };
       if (/improvement_candidates/.test(sql)) {
@@ -140,6 +175,7 @@ test('optimization snapshot은 rollups/anomalies/candidates/jobs 통합 계약�
     generatedAt: '2026-08-25T03:00:00.000Z',
     dataStatus: 'no_data',
     rollups: [],
+    placements: [],
     anomalies: [],
     candidates: [],
     jobs: [],

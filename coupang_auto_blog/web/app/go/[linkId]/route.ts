@@ -14,6 +14,7 @@ const CONTENT_ID_PATTERN = /^[\p{L}\p{N}._:-]{1,120}$/u;
 const SURFACES = new Set([
   "home",
   "collection",
+  "related",
   "detail",
   "legacy_detail",
   "search",

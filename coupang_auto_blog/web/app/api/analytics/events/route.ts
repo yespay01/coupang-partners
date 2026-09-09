@@ -19,6 +19,7 @@ const EVENT_NAMES = new Set([
 const SURFACES = new Set([
   "home",
   "collection",
+  "related",
   "detail",
   "legacy_detail",
   "search",
