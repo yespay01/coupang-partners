@@ -146,3 +146,21 @@ export function buildGoUrl(
 
   return `/go/${encodeURIComponent(linkId)}?${params.toString()}`;
 }
+
+/**
+ * Server-rendered affiliate links need a useful fallback before hydration.
+ * A page-view ID is client-only, but surface/position are stable and let the
+ * redirect tracker attribute no-JS or interrupted-click traffic correctly.
+ */
+export function buildGoUrlWithoutPageView(
+  linkId: string,
+  context: Omit<AnalyticsEventInput, "eventName" | "linkId">
+): string {
+  const params = new URLSearchParams();
+  params.set("surface", context.surface);
+  if (context.position) params.set("position", context.position);
+  if (context.contentId) params.set("content_id", context.contentId);
+  if (context.productId) params.set("product_id", context.productId);
+
+  return `/go/${encodeURIComponent(linkId)}?${params.toString()}`;
+}

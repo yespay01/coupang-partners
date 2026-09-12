@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAnalyticsImpression } from "@/hooks/useAnalyticsImpression";
 import {
   buildGoUrl,
+  buildGoUrlWithoutPageView,
   getAnalyticsSurface,
   type AnalyticsEventName,
   type AnalyticsSurface,
@@ -47,6 +48,12 @@ export function AffiliateOutboundLink({
 }: AffiliateOutboundLinkProps) {
   const pathname = usePathname();
   const surface = tracking?.surface ?? getAnalyticsSurface(pathname);
+  const goContext = {
+    surface,
+    contentId: tracking?.contentId ?? tracking?.reviewSlug,
+    productId: tracking?.productId,
+    position: tracking?.position,
+  };
   const impressionRef = useAnalyticsImpression<HTMLAnchorElement>({
     eventName: impressionEventName,
     surface,
@@ -61,12 +68,7 @@ export function AffiliateOutboundLink({
     if (event.defaultPrevented) return;
 
     if (linkId) {
-      event.currentTarget.href = buildGoUrl(linkId, {
-        surface,
-        contentId: tracking?.contentId ?? tracking?.reviewSlug,
-        productId: tracking?.productId,
-        position: tracking?.position,
-      });
+      event.currentTarget.href = buildGoUrl(linkId, goContext);
       return;
     }
 
@@ -96,7 +98,7 @@ export function AffiliateOutboundLink({
     <a
       {...props}
       ref={impressionRef}
-      href={linkId ? `/go/${encodeURIComponent(linkId)}` : href}
+      href={linkId ? buildGoUrlWithoutPageView(linkId, goContext) : href}
       target="_blank"
       rel={COUPANG_AFFILIATE_REL}
       onClick={handleClick}
