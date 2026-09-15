@@ -60,6 +60,7 @@ export function ProductCard({
   const image = product.productImage;
   const price = formatPrice(product.productPrice);
   const position = `${surface}_collection_${index + 1}`;
+  const isPriorityImage = index < 4;
   const detailHref = product.productId
     ? `/products/${encodeURIComponent(product.productId)}`
     : null;
@@ -81,10 +82,24 @@ export function ProductCard({
           <div className="aspect-square">
             {image && detailHref ? (
               <Link href={detailHref} aria-label={`${product.productName || "상품"} 가격 흐름 보기`} className="block h-full w-full">
-                <img src={image} alt={product.productName || "상품 이미지"} className="h-full w-full object-contain p-3 transition duration-500 group-hover:scale-105" />
+                <img
+                  src={image}
+                  alt={product.productName || "상품 이미지"}
+                  loading={isPriorityImage ? "eager" : "lazy"}
+                  fetchPriority={isPriorityImage ? "high" : "low"}
+                  decoding="async"
+                  className="h-full w-full object-contain p-3 transition duration-500 group-hover:scale-105"
+                />
               </Link>
             ) : image ? (
-              <img src={image} alt={product.productName || "상품 이미지"} className="h-full w-full object-contain p-3" />
+              <img
+                src={image}
+                alt={product.productName || "상품 이미지"}
+                loading={isPriorityImage ? "eager" : "lazy"}
+                fetchPriority={isPriorityImage ? "high" : "low"}
+                decoding="async"
+                className="h-full w-full object-contain p-3"
+              />
             ) : (
               <div className="flex h-full items-center justify-center text-xs font-medium text-slate-400">이미지 준비 중</div>
             )}

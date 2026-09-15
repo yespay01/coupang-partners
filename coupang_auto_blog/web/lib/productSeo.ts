@@ -21,6 +21,14 @@ function observedPriceLabel(price: number | null) {
   return `${Math.round(price).toLocaleString("ko-KR")}원`;
 }
 
+function subjectJosa(value: string) {
+  const last = value.trim().at(-1);
+  if (!last) return "은";
+  const code = last.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return "은";
+  return (code - 0xac00) % 28 === 0 ? "는" : "은";
+}
+
 export function buildProductSearchMetadata(productName: string, currentPriceKrw: number | null) {
   const normalizedName = normalizeText(productName);
   const price = observedPriceLabel(currentPriceKrw);
@@ -59,7 +67,7 @@ export function buildProductPlainText(productName: string, categoryName: string 
     : `${normalizedName} 가격은 쿠팡 판매 상태에 따라 달라질 수 있어 현재가 확인이 필요합니다.`;
 
   return {
-    intro: `${normalizedName}은 ${normalizedCategory} 카테고리에서 가격 흐름을 확인할 수 있는 상품입니다. ${priceText}`,
+    intro: `${normalizedName}${subjectJosa(normalizedName)} ${normalizedCategory} 카테고리에서 가격 흐름을 확인할 수 있는 상품입니다. ${priceText}`,
     basis: "세모링크는 쿠팡 API에서 확인한 실제 응답 가격과 관측 시각만 기록하며, 임의로 가격을 추정하거나 과거 값을 현재 가격처럼 표시하지 않습니다.",
     compare: `${normalizedCategory} 상품을 비교할 때는 현재가, 최근 관측 시각, 같은 카테고리의 대체 상품을 함께 확인하는 것이 좋습니다.`,
   };
