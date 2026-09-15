@@ -5,7 +5,7 @@ import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { ProductCard, type HomeProduct } from "@/components/HomeProductCollection";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { buildCategorySearchMetadata } from "@/lib/productSeo";
+import { buildCategoryPlainText, buildCategorySearchMetadata } from "@/lib/productSeo";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +83,7 @@ export default async function CollectionPage({ params }: PageProps) {
   const { categoryId } = await params;
   const collection = await getCollection(categoryId);
   if (!collection) notFound();
+  const plainText = buildCategoryPlainText(collection.categoryName, collection.totalCount);
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -95,10 +96,19 @@ export default async function CollectionPage({ params }: PageProps) {
       url: `https://semolink.store/products/${encodeURIComponent(product.productId || product.id)}`,
     })),
   };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "카테고리", item: "https://semolink.store/collections" },
+      { "@type": "ListItem", position: 2, name: collection.categoryName, item: `https://semolink.store/collections/${encodeURIComponent(collection.categoryId)}` },
+    ],
+  };
 
   return (
     <div className="min-h-screen bg-[#f7f7f5]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c") }} />
       <SiteHeader />
       <main className="mx-auto max-w-7xl px-4 pb-24 pt-32 sm:px-6">
         <nav className="text-xs font-semibold text-slate-500" aria-label="현재 위치">
@@ -112,8 +122,36 @@ export default async function CollectionPage({ params }: PageProps) {
           <p className="mt-4 text-sm leading-6 text-slate-600">실제 가격 관측값과 검증된 쿠팡 이동 링크가 있는 상품 {collection.totalCount.toLocaleString("ko-KR")}개를 모았습니다.</p>
           <AffiliateDisclosure className="mt-5" />
         </header>
+        <section className="mt-8 grid gap-4 md:grid-cols-3" aria-label={`${collection.categoryName} 가격 비교 안내`}>
+          <article className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h2 className="text-base font-black text-slate-950">{collection.categoryName} 상품 모음</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{plainText.intro}</p>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h2 className="text-base font-black text-slate-950">가격 관측 기준</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{plainText.basis}</p>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h2 className="text-base font-black text-slate-950">탐색 연결</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{plainText.compare}</p>
+          </article>
+        </section>
         <section className="mt-10 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
           {collection.products.map((product, index) => <ProductCard key={product.id} product={product} index={index} surface="collection" />)}
+        </section>
+        <section className="mt-12 rounded-2xl border border-slate-200 bg-white p-5" aria-labelledby="collection-index-title">
+          <h2 id="collection-index-title" className="text-lg font-black text-slate-950">{collection.categoryName} 주요 상품 목록</h2>
+          <div className="mt-4 columns-1 gap-8 sm:columns-2 lg:columns-3">
+            {collection.products.slice(0, 60).map((product) => (
+              <Link
+                key={product.id}
+                href={`/products/${encodeURIComponent(product.productId || product.id)}`}
+                className="mb-2 block break-inside-avoid text-sm font-semibold leading-6 text-slate-700 hover:text-orange-700"
+              >
+                {product.productName}
+              </Link>
+            ))}
+          </div>
         </section>
       </main>
       <SiteFooter />

@@ -33,7 +33,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         .filter((product) => product.productId)
         .map((product) => ({
           url: `${SITE_URL}/products/${encodeURIComponent(product.productId)}`,
-          lastModified: product.updatedAt ? new Date(product.updatedAt) : new Date(),
+          ...(product.updatedAt ? { lastModified: new Date(product.updatedAt) } : {}),
           changeFrequency: "weekly" as const,
           priority: 0.8,
           ...(product.productImage ? { images: [product.productImage] } : {}),
@@ -71,7 +71,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const recipes: { id: string; slug?: string; updatedAt?: string }[] = data.data?.recipes || [];
       recipePages = recipes.map((r) => ({
         url: `${SITE_URL}/recipes/${r.slug || r.id}`,
-        lastModified: r.updatedAt ? new Date(r.updatedAt) : new Date(),
+        ...(r.updatedAt ? { lastModified: new Date(r.updatedAt) } : {}),
         changeFrequency: "weekly" as const,
         priority: 0.7,
       }));
@@ -91,7 +91,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const newsList: { id: string; slug?: string; updatedAt?: string }[] = data.data?.news || [];
       newsPages = newsList.map((n) => ({
         url: `${SITE_URL}/news/${n.slug || n.id}`,
-        lastModified: n.updatedAt ? new Date(n.updatedAt) : new Date(),
+        ...(n.updatedAt ? { lastModified: new Date(n.updatedAt) } : {}),
         changeFrequency: "weekly" as const,
         priority: 0.6,
       }));

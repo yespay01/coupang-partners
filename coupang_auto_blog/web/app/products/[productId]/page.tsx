@@ -7,7 +7,7 @@ import { PriceHistoryChart, type PriceHistoryPoint } from "@/components/PriceHis
 import { ProductCard, type HomeProduct } from "@/components/HomeProductCollection";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { buildProductSearchMetadata } from "@/lib/productSeo";
+import { buildProductPlainText, buildProductSearchMetadata } from "@/lib/productSeo";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +92,16 @@ function formatObservedAt(value: string | null) {
   }).format(new Date(value));
 }
 
+function formatShortDate(value: string | null) {
+  if (!value) return null;
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(value));
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { productId } = await params;
   const product = await getProduct(productId);
@@ -119,8 +129,16 @@ export default async function ProductPage({ params }: PageProps) {
 
   const currentPrice = formatPrice(product.currentPriceKrw);
   const observedAt = formatObservedAt(product.priceObservedAt);
+  const observedDate = formatShortDate(product.priceObservedAt);
   const chartAvailable = history?.chartStatus === "available" && history.points.length >= 2;
   const canonicalUrl = `https://semolink.store/products/${encodeURIComponent(product.productId)}`;
+  const plainText = buildProductPlainText(product.productName, product.categoryName, product.currentPriceKrw);
+  const lowPrice = history?.points.length
+    ? Math.min(...history.points.map((point) => point.priceKrw))
+    : null;
+  const highPrice = history?.points.length
+    ? Math.max(...history.points.map((point) => point.priceKrw))
+    : null;
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -138,6 +156,44 @@ export default async function ProductPage({ params }: PageProps) {
           },
         }
       : {}),
+    additionalProperty: [
+      { "@type": "PropertyValue", name: "가격 관측 방식", value: "쿠팡 API 실제 응답 가격" },
+      ...(observedDate ? [{ "@type": "PropertyValue", name: "최근 관측일", value: observedDate }] : []),
+      ...(history?.pointCount != null ? [{ "@type": "PropertyValue", name: "90일 관측 횟수", value: String(history.pointCount) }] : []),
+    ],
+  };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "상품 모음", item: "https://semolink.store" },
+      ...(product.categoryId && product.categoryName
+        ? [{ "@type": "ListItem", position: 2, name: product.categoryName, item: `https://semolink.store/collections/${encodeURIComponent(product.categoryId)}` }]
+        : []),
+      { "@type": "ListItem", position: product.categoryId && product.categoryName ? 3 : 2, name: product.productName, item: canonicalUrl },
+    ],
+  };
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: `${product.productName} 가격은 어떻게 확인하나요?`,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "세모링크는 쿠팡 API에서 실제로 관측한 가격과 관측 시각을 표시합니다. 최종 현재가는 쿠팡 이동 후 판매 페이지에서 다시 확인해야 합니다.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "가격 그래프가 없으면 상품 정보가 없는 건가요?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "아닙니다. 가격 관측값이 2개 이상 쌓이면 90일 가격 흐름 그래프가 표시됩니다.",
+        },
+      },
+    ],
   };
 
   return (
@@ -145,6 +201,14 @@ export default async function ProductPage({ params }: PageProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c") }}
       />
       <SiteHeader />
       <main className="pb-24 pt-28">
@@ -199,6 +263,34 @@ export default async function ProductPage({ params }: PageProps) {
                 </div>
               )}
             </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6" aria-labelledby="product-search-summary-title">
+          <div className="grid gap-4 md:grid-cols-3">
+            <article className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">Product facts</p>
+              <h2 id="product-search-summary-title" className="mt-2 text-lg font-black text-slate-950">{product.productName} 가격 확인 정보</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{plainText.intro}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">Observation basis</p>
+              <h2 className="mt-2 text-lg font-black text-slate-950">관측 기준</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{plainText.basis}</p>
+              {lowPrice != null && highPrice != null && (
+                <p className="mt-3 text-sm font-bold text-slate-800">90일 관측 범위: {formatPrice(lowPrice)} ~ {formatPrice(highPrice)}</p>
+              )}
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">Compare</p>
+              <h2 className="mt-2 text-lg font-black text-slate-950">비교 포인트</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{plainText.compare}</p>
+              {product.categoryId && product.categoryName && (
+                <Link href={`/collections/${encodeURIComponent(product.categoryId)}`} className="mt-4 inline-flex text-sm font-bold text-orange-600 hover:text-orange-700">
+                  {product.categoryName} 상품 더 보기 →
+                </Link>
+              )}
+            </article>
           </div>
         </section>
 
