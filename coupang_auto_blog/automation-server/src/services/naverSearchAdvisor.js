@@ -2,6 +2,10 @@ import fetch from 'node-fetch';
 import { logger } from '../utils/logger.js';
 import { getDb } from '../config/database.js';
 import { notifySlack } from './slack.js';
+import {
+  normalizeExternalProductDemandKeyword,
+  recordProductSearchDemand,
+} from './searchDemand.js';
 
 const NAVER_SA_API_BASE = 'https://searchadvisor.naver.com/api-console/report/expose';
 const NAVER_SA_CONSOLE_URL = 'https://searchadvisor.naver.com/console/board';
@@ -91,7 +95,59 @@ export async function saveNaverSearchSnapshot(dateRange, report) {
     [SNAPSHOT_DB_KEY, JSON.stringify(next)]
   );
 
-  return normalizeNaverReport(report, capturedAt);
+  const normalized = normalizeNaverReport(report, capturedAt);
+  const seededDemand = await seedProductDemandFromNaverReport(db, normalized, capturedAt);
+  return { ...normalized, seededDemand };
+}
+
+async function seedProductDemandFromNaverReport(db, normalizedReport, capturedAt) {
+  const keywords = Array.isArray(normalizedReport?.keywords) ? normalizedReport.keywords : [];
+  const candidates = new Map();
+  for (const row of keywords) {
+    const keyword = normalizeExternalProductDemandKeyword(row.keyword);
+    if (!keyword) continue;
+    const impressions = Math.max(0, Number(row.impressions) || 0);
+    const clicks = Math.max(0, Number(row.clicks) || 0);
+    if (impressions < 1 && clicks < 1) continue;
+    const score = impressions + clicks * 20;
+    const current = candidates.get(keyword);
+    if (!current || score > current.score) {
+      candidates.set(keyword, {
+        keyword,
+        sourceKeyword: row.keyword,
+        impressions,
+        clicks,
+        score,
+      });
+    }
+  }
+
+  const selected = [...candidates.values()]
+    .sort((a, b) => b.score - a.score || a.keyword.localeCompare(b.keyword, 'ko-KR'))
+    .slice(0, 30);
+
+  const recorded = [];
+  for (const item of selected) {
+    const weight = Math.min(20, Math.max(2, Math.ceil(item.impressions / 100) + item.clicks * 3));
+    const result = await recordProductSearchDemand(db, item.keyword, new Date(capturedAt), weight);
+    if (result.recorded) {
+      recorded.push({
+        keyword: result.normalizedKeyword,
+        sourceKeyword: item.sourceKeyword,
+        impressions: item.impressions,
+        clicks: item.clicks,
+        weight,
+        rollingCount: result.rollingCount,
+      });
+    }
+  }
+
+  return {
+    source: 'naver_search_advisor',
+    candidateCount: candidates.size,
+    recordedCount: recorded.length,
+    keywords: recorded,
+  };
 }
 
 async function getNaverSearchSnapshot(dateRange) {

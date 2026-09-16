@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { persistPopularSearchProduct } from '../src/routes/search.js';
 import {
   getPopularSearchDemandKeywords,
+  normalizeExternalProductDemandKeyword,
   normalizeProductSearchKeyword,
   recordProductSearchDemand,
 } from '../src/services/searchDemand.js';
@@ -18,6 +19,12 @@ test('상품 검색 수요는 2~50자 정상 키워드만 일관되게 정규화
   assert.equal(normalizeProductSearchKeyword('https://example.com'), null);
 });
 
+test('외부 검색 키워드는 후기성 수식어를 제거해 상품 수집 키워드로 바꾼다', () => {
+  assert.equal(normalizeExternalProductDemandKeyword(' 다우니 호텔 컬렉션 후기 '), '다우니 호텔 컬렉션');
+  assert.equal(normalizeExternalProductDemandKeyword('비렌느 스팟 엑스 내돈내산'), '비렌느 스팟 엑스');
+  assert.equal(normalizeExternalProductDemandKeyword('가격'), null);
+});
+
 test('검색 수요는 KST 일별 upsert 후 14일 누적수를 반환한다', async () => {
   const calls = [];
   const db = { async query(sql, params) {
@@ -29,9 +36,26 @@ test('검색 수요는 KST 일별 upsert 후 14일 누적수를 반환한다', a
   );
   assert.equal(result.recorded, true);
   assert.equal(result.rollingCount, 3);
+  assert.equal(calls[0].params[2], 1);
   assert.match(calls[0].sql, /ON CONFLICT \(business_date_kst, normalized_keyword\) DO UPDATE/);
   assert.match(calls[0].sql, /AT TIME ZONE 'Asia\/Seoul'/);
 });
+
+test('외부 검색 수요는 가중치를 누적 기록할 수 있다', async () => {
+  const calls = [];
+  const db = { async query(sql, params) {
+    calls.push({ sql, params });
+    return { rows: [{ rolling_count: 7 }] };
+  } };
+  const result = await recordProductSearchDemand(
+    db, '다우니 호텔 컬렉션', new Date('2026-09-16T00:00:00Z'), 6
+  );
+  assert.equal(result.recorded, true);
+  assert.equal(result.rollingCount, 7);
+  assert.equal(calls[0].params[2], 6);
+  assert.match(calls[0].sql, /search_count = product_search_demand.search_count \+ EXCLUDED.search_count/);
+});
+
 
 test('자동 수집은 14일간 2회 이상 검색된 인기 키워드만 사용한다', async () => {
   const calls = [];

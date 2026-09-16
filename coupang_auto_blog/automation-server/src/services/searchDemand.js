@@ -10,19 +10,30 @@ export function normalizeProductSearchKeyword(value) {
   return normalized;
 }
 
-export async function recordProductSearchDemand(db, keyword, now = new Date()) {
+export function normalizeExternalProductDemandKeyword(value) {
+  const normalized = normalizeProductSearchKeyword(value);
+  if (!normalized) return null;
+  const cleaned = normalized
+    .replace(/(^|\s)(후기|리뷰|내돈내산|가격|최저가|구매|추천|비교|효과|부작용)(?=\s|$)/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return normalizeProductSearchKeyword(cleaned);
+}
+
+export async function recordProductSearchDemand(db, keyword, now = new Date(), count = 1) {
   const normalizedKeyword = normalizeProductSearchKeyword(keyword);
   if (!normalizedKeyword) return { recorded: false, normalizedKeyword: null, rollingCount: 0 };
+  const safeCount = Math.min(Math.max(Number.parseInt(count, 10) || 1, 1), 100);
   const result = await db.query(
     `WITH upserted AS (
        INSERT INTO product_search_demand (
          business_date_kst, normalized_keyword, search_count,
          first_searched_at, last_searched_at, created_at, updated_at
        ) VALUES (
-         ($2::timestamptz AT TIME ZONE 'Asia/Seoul')::date, $1, 1, $2, $2, NOW(), NOW()
+         ($2::timestamptz AT TIME ZONE 'Asia/Seoul')::date, $1, $3, $2, $2, NOW(), NOW()
        )
        ON CONFLICT (business_date_kst, normalized_keyword) DO UPDATE SET
-         search_count = product_search_demand.search_count + 1,
+         search_count = product_search_demand.search_count + EXCLUDED.search_count,
          last_searched_at = EXCLUDED.last_searched_at,
          updated_at = NOW()
        RETURNING normalized_keyword
@@ -31,7 +42,7 @@ export async function recordProductSearchDemand(db, keyword, now = new Date()) {
        FROM product_search_demand d, upserted u
       WHERE d.normalized_keyword = u.normalized_keyword
         AND d.business_date_kst >= (($2::timestamptz AT TIME ZONE 'Asia/Seoul')::date - 13)`,
-    [normalizedKeyword, now.toISOString()]
+    [normalizedKeyword, now.toISOString(), safeCount]
   );
   return {
     recorded: true,
