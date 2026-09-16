@@ -22,7 +22,10 @@ test('상품 검색 수요는 2~50자 정상 키워드만 일관되게 정규화
 test('외부 검색 키워드는 후기성 수식어를 제거해 상품 수집 키워드로 바꾼다', () => {
   assert.equal(normalizeExternalProductDemandKeyword(' 다우니 호텔 컬렉션 후기 '), '다우니 호텔 컬렉션');
   assert.equal(normalizeExternalProductDemandKeyword('비렌느 스팟 엑스 내돈내산'), '비렌느 스팟 엑스');
+  assert.equal(normalizeExternalProductDemandKeyword('쿠팡 에브콜라겐'), '에브콜라겐');
   assert.equal(normalizeExternalProductDemandKeyword('가격'), null);
+  assert.equal(normalizeExternalProductDemandKeyword('세모링크'), null);
+  assert.equal(normalizeExternalProductDemandKeyword('런닝맨 허남준'), null);
 });
 
 test('검색 수요는 KST 일별 upsert 후 14일 누적수를 반환한다', async () => {

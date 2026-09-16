@@ -14,9 +14,11 @@ export function normalizeExternalProductDemandKeyword(value) {
   const normalized = normalizeProductSearchKeyword(value);
   if (!normalized) return null;
   const cleaned = normalized
+    .replace(/^쿠팡\s*/u, '')
     .replace(/(^|\s)(후기|리뷰|내돈내산|가격|최저가|구매|추천|비교|효과|부작용)(?=\s|$)/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  if (/(세모링크|네이버|런닝맨|김창완|h5studio|ai시대|약사)/iu.test(cleaned)) return null;
   return normalizeProductSearchKeyword(cleaned);
 }
 
