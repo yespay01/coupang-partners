@@ -60,6 +60,48 @@ function affiliateUrlError(message, status = 400) {
   return error;
 }
 
+function newsSearchTerms(value) {
+  return [...new Set(
+    String(value || '')
+      .toLowerCase()
+      .replace(/[^0-9a-z가-힣\s]/gi, ' ')
+      .split(/\s+/)
+      .map((term) => term.trim())
+      .filter((term) => term.length >= 2)
+      .filter((term) => !/^(뉴스|오늘|관련|최신|소식|트렌드|이슈|전망|공개|발표)$/u.test(term))
+  )].slice(0, 6);
+}
+
+async function findRelatedNewsProducts(db, topic, title) {
+  const terms = newsSearchTerms(`${topic} ${title}`);
+  if (terms.length === 0) return [];
+
+  const conditions = terms.map((_, index) => `p.product_name ILIKE $${index + 1}`).join(' OR ');
+  const result = await db.query(
+    `SELECT p.product_id, p.product_name, p.product_price, p.product_image,
+            al.link_id
+       FROM products p
+       JOIN affiliate_links al ON al.link_id = p.affiliate_link_id
+      WHERE al.validation_status = 'verified'
+        AND al.is_active = TRUE
+        AND (${conditions})
+      ORDER BY p.search_demand_count DESC NULLS LAST, p.updated_at DESC
+      LIMIT 3`,
+    terms.map((term) => `%${term}%`)
+  );
+
+  return result.rows.map((row) => ({
+    productId: String(row.product_id),
+    productName: row.product_name,
+    productPrice: row.product_price == null ? null : Number(row.product_price),
+    productImage: row.product_image || null,
+    affiliateLink: {
+      linkId: String(row.link_id),
+      goUrl: buildPublicGoUrl(String(row.link_id)),
+    },
+  }));
+}
+
 /**
  * 관리자가 입력한 URL을 검증된 제휴 URL로 변환한다.
  * - 긴 제휴 URL: lptag 검증 후 그대로 저장
@@ -1270,10 +1312,15 @@ router.post('/news/generate', async (req, res) => {
 
     const db = getDb();
     const slug = await generateUniqueSlug(db, 'news', parsed.title || topic.trim());
+    const relatedProducts = await findRelatedNewsProducts(
+      db,
+      topic.trim(),
+      parsed.title || topic.trim()
+    );
     const targetStatus = autoPublish ? 'published' : 'draft';
     const insertResult = await db.query(
-      `INSERT INTO news (title, summary, content, category, slug, status, published_at)
-       VALUES ($1, $2, $3, $4, $5, $6, ${autoPublish ? 'NOW()' : 'NULL'}) RETURNING id`,
+      `INSERT INTO news (title, summary, content, category, slug, status, published_at, related_products)
+       VALUES ($1, $2, $3, $4, $5, $6, ${autoPublish ? 'NOW()' : 'NULL'}, $7::jsonb) RETURNING id`,
       [
         parsed.title || topic.trim(),
         parsed.summary || '',
@@ -1281,6 +1328,7 @@ router.post('/news/generate', async (req, res) => {
         parsed.category || category || '트렌드',
         slug,
         targetStatus,
+        JSON.stringify(relatedProducts),
       ]
     );
 
@@ -1292,6 +1340,7 @@ router.post('/news/generate', async (req, res) => {
         title: parsed.title,
         slug,
         status: targetStatus,
+        relatedProducts,
       },
     });
   } catch (error) {

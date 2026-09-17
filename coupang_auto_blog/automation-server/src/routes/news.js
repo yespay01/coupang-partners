@@ -4,6 +4,15 @@ import { getDb } from '../config/database.js';
 const router = express.Router();
 
 function mapNewsRow(row) {
+  let relatedProducts = [];
+  try {
+    relatedProducts = Array.isArray(row.related_products)
+      ? row.related_products
+      : JSON.parse(row.related_products || '[]');
+  } catch {
+    relatedProducts = [];
+  }
+
   return {
     id: String(row.id),
     title: row.title,
@@ -17,6 +26,7 @@ function mapNewsRow(row) {
     publishedAt: row.published_at?.toISOString(),
     createdAt: row.created_at?.toISOString(),
     updatedAt: row.updated_at?.toISOString(),
+    relatedProducts,
   };
 }
 

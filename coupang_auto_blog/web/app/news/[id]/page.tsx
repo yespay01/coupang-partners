@@ -3,6 +3,8 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
+import { AffiliateOutboundLink } from "@/components/AffiliateOutboundLink";
 
 export const revalidate = 3600;
 export const dynamicParams = true;
@@ -20,6 +22,13 @@ interface NewsItem {
   publishedAt: string;
   createdAt: string;
   updatedAt?: string;
+  relatedProducts?: Array<{
+    productId: string;
+    productName: string;
+    productPrice?: number | null;
+    productImage?: string | null;
+    affiliateLink?: { linkId: string; goUrl?: string | null };
+  }>;
 }
 
 interface PageProps {
@@ -177,6 +186,41 @@ export default async function NewsDetailPage({ params }: PageProps) {
             ) : null
           )}
         </article>
+
+        {news.relatedProducts && news.relatedProducts.length > 0 && (
+          <section className="mt-10 border-t border-slate-200 pt-8" aria-label="관련 상품">
+            <h2 className="text-xl font-bold text-slate-900">이 소식과 함께 확인할 상품</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              기사 주제와 관련된 상품을 가격과 옵션을 확인할 수 있도록 연결했습니다.
+            </p>
+            <div className="mt-5 grid gap-3">
+              {news.relatedProducts.map((product, index) => (
+                <AffiliateOutboundLink
+                  key={product.productId}
+                  href={product.affiliateLink?.goUrl || undefined}
+                  linkId={product.affiliateLink?.linkId}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 p-4 transition hover:border-slate-400"
+                  tracking={{
+                    contentId: news.slug,
+                    productId: product.productId,
+                    position: `news_related_${index + 1}`,
+                  }}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-slate-900">{product.productName}</span>
+                    {product.productPrice != null && (
+                      <span className="mt-1 block text-sm text-slate-600">
+                        {product.productPrice.toLocaleString("ko-KR")}원
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-sm font-semibold text-blue-700">쿠팡에서 확인</span>
+                </AffiliateOutboundLink>
+              ))}
+            </div>
+            <AffiliateDisclosure className="mt-4" />
+          </section>
+        )}
 
         {/* Back */}
         <div className="border-t border-slate-200 pt-8 mt-12">

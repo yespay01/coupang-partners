@@ -112,7 +112,7 @@ const DEFAULT_SETTINGS = {
       pauseWhenDraftCountExceeds: 50,
     },
     newsGeneration: {
-      enabled: false,
+      enabled: true,
       morningSchedule: "07:00",
       afternoonSchedule: "18:00",
     },
