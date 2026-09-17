@@ -70,6 +70,15 @@ test('신규 coupa.ng URL은 같은 응답의 landingUrl로 Partner ID를 검증
   );
 });
 
+test('쿠팡 API의 link.coupang.com/a 단축 URL도 landingUrl로 검증한다', () => {
+  const shortUrl = 'https://link.coupang.com/a/test123';
+  assert.equal(validateShortAffiliateUrl(shortUrl, LONG_URL, PARTNER_ID).valid, true);
+  assert.equal(
+    validateAffiliateUrl(shortUrl, PARTNER_ID).reason,
+    AffiliateUrlReason.SHORT_URL_REQUIRES_LANDING_URL
+  );
+});
+
 test('기존 DB의 동일한 단축 URL은 변경 없이 보존할 수 있다', () => {
   const preserved = validateAffiliateUrl('https://coupa.ng/legacy', PARTNER_ID, {
     allowExistingShortUrl: true,

@@ -8,6 +8,7 @@
 const PARTNER_ID_PATTERN = /^AF[0-9]+$/;
 const LONG_AFFILIATE_HOST = 'link.coupang.com';
 const SHORT_AFFILIATE_HOST = 'coupa.ng';
+const COUPANG_DEEPLINK_HOST = 'link.coupang.com';
 const PLAIN_COUPANG_HOSTS = new Set(['coupang.com', 'www.coupang.com']);
 
 export const AffiliateUrlReason = Object.freeze({
@@ -126,7 +127,9 @@ export function validateShortAffiliateUrl(shortUrl, landingUrl, partnerId) {
   if (!shortResult.valid) return shortResult;
 
   const { parsed, normalizedUrl } = shortResult;
-  if (parsed.hostname !== SHORT_AFFILIATE_HOST) {
+  const isKnownShortHost = parsed.hostname === SHORT_AFFILIATE_HOST
+    || (parsed.hostname === COUPANG_DEEPLINK_HOST && parsed.pathname.startsWith('/a/'));
+  if (!isKnownShortHost) {
     return result(false, {
       reason: AffiliateUrlReason.HOST_NOT_ALLOWED,
       hostname: parsed.hostname,
@@ -167,10 +170,28 @@ export function validateAffiliateUrl(
   if (!parsedResult.valid) return parsedResult;
 
   const { parsed, normalizedUrl } = parsedResult;
+  if (parsed.hostname === LONG_AFFILIATE_HOST && parsed.pathname.startsWith('/a/')) {
+    if (landingUrl) {
+      return validateShortAffiliateUrl(normalizedUrl, landingUrl, partnerId);
+    }
+    if (allowExistingShortUrl) {
+      return result(true, {
+        kind: 'legacy_short_affiliate',
+        normalizedUrl,
+        partnerId,
+        verified: false,
+        preservedExisting: true,
+      });
+    }
+    return result(false, {
+      reason: AffiliateUrlReason.SHORT_URL_REQUIRES_LANDING_URL,
+    });
+  }
   if (parsed.hostname === LONG_AFFILIATE_HOST) {
     return validateLongAffiliateUrl(normalizedUrl, partnerId);
   }
-  if (parsed.hostname === SHORT_AFFILIATE_HOST) {
+  if (parsed.hostname === SHORT_AFFILIATE_HOST
+    || (parsed.hostname === COUPANG_DEEPLINK_HOST && parsed.pathname.startsWith('/a/'))) {
     if (landingUrl) {
       return validateShortAffiliateUrl(normalizedUrl, landingUrl, partnerId);
     }
@@ -223,7 +244,10 @@ export function validatePlainCoupangUrl(url) {
 
 export function isShortAffiliateUrl(url) {
   const parsedResult = parseHttpsUrl(url);
-  return parsedResult.valid && parsedResult.parsed.hostname === SHORT_AFFILIATE_HOST;
+  if (!parsedResult.valid) return false;
+  const { hostname, pathname } = parsedResult.parsed;
+  return hostname === SHORT_AFFILIATE_HOST
+    || (hostname === COUPANG_DEEPLINK_HOST && pathname.startsWith('/a/'));
 }
 
 export function isPlainCoupangUrl(url) {
