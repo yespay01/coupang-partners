@@ -2,7 +2,8 @@ import cron from 'node-cron';
 import axios from 'axios';
 import { generateToken } from '../config/auth.js';
 import { pickTrendingTopic } from '../services/trendingTopics.js';
-import { refreshNaverSession } from '../services/naverSearchAdvisor.js';
+import { getNaverSearchData, refreshNaverSession } from '../services/naverSearchAdvisor.js';
+import { getPopularSearchDemandKeywords } from '../services/searchDemand.js';
 import { getDb } from '../config/database.js';
 import {
   isDailyDiagnosticsEnabled,
@@ -32,6 +33,7 @@ let isRunningDailyDiagnostics = false;
 let isRunningDailyPriceObservation = false;
 
 let lastNewsCategory = null;
+let lastNewsTopic = null;
 
 function hhmmToCronExpression(hhmm, fallback = '0 3 * * *') {
   if (typeof hhmm !== 'string') return fallback;
@@ -232,6 +234,55 @@ async function runScheduledReviewGeneration() {
   }
 }
 
+function rankSavedNaverKeywords(keywords = []) {
+  return keywords
+    .map((row) => ({
+      topic: String(row.keyword || '').trim(),
+      score: Math.max(0, Number(row.impressions) || 0) + Math.max(0, Number(row.clicks) || 0) * 20,
+    }))
+    .filter((row) => row.topic.length >= 2 && row.topic !== lastNewsTopic)
+    .sort((a, b) => b.score - a.score || a.topic.localeCompare(b.topic, 'ko-KR'));
+}
+
+async function pickDatabaseBackedNewsTopic(slot) {
+  const snapshot = await getNaverSearchData('30d');
+  const savedNaver = rankSavedNaverKeywords(snapshot?.keywords);
+
+  if (slot === 'morning' && savedNaver.length > 0) {
+    const selected = savedNaver[0];
+    return {
+      topic: selected.topic,
+      category: /로또|당첨|번호/u.test(selected.topic) ? '생활/정보' : '뉴스/트렌드',
+      source: 'naver_saved_search',
+    };
+  }
+
+  const demandKeywords = await getPopularSearchDemandKeywords(getDb(), {
+    days: 14,
+    limit: 10,
+    minimumSearches: 2,
+  });
+  const selectedDemand = demandKeywords.find((keyword) => keyword !== lastNewsTopic);
+  if (selectedDemand) {
+    return {
+      topic: selectedDemand,
+      category: '쇼핑 트렌드',
+      source: 'product_search_demand',
+    };
+  }
+
+  if (savedNaver.length > 0) {
+    const selected = savedNaver[0];
+    return {
+      topic: selected.topic,
+      category: '뉴스/트렌드',
+      source: 'naver_saved_search_fallback',
+    };
+  }
+
+  return null;
+}
+
 async function runScheduledNewsGeneration(slot) {
   console.log(`⏰ Running scheduled news generation (${slot})...`);
 
@@ -244,15 +295,16 @@ async function runScheduledNewsGeneration(slot) {
       return;
     }
 
+    const databaseTopic = await pickDatabaseBackedNewsTopic(slot);
     const excludeCategories = lastNewsCategory ? [lastNewsCategory] : [];
-    const { topic, category } = await pickTrendingTopic({ excludeCategories });
+    const { topic, category, source } = databaseTopic || await pickTrendingTopic({ excludeCategories });
 
     if (!topic) {
       console.warn('⚠️ No trending topic resolved. Skipping news generation.');
       return;
     }
 
-    console.log(`📰 [${slot}] 자동 뉴스 생성: [${category}] "${topic}"`);
+    console.log(`📰 [${slot}] 자동 뉴스 생성: [${category}] "${topic}" (source=${source || 'live_trend'})`);
 
     const response = await axios.post(
       `${API_BASE}/api/admin/news/generate`,
@@ -261,6 +313,7 @@ async function runScheduledNewsGeneration(slot) {
     );
 
     lastNewsCategory = category;
+    lastNewsTopic = topic;
     console.log(`✅ [${slot}] 자동 뉴스 게시 완료:`, response.data?.data);
   } catch (error) {
     console.error(`❌ News generation (${slot}) failed:`, getErrorMessage(error));
