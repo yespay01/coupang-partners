@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { AffiliateOutboundLink } from "@/components/AffiliateOutboundLink";
+import { FloatingAffiliatePrompt } from "@/components/FloatingAffiliatePrompt";
 import { PriceHistoryChart, type PriceHistoryPoint } from "@/components/PriceHistoryChart";
 import { ProductCard, type HomeProduct } from "@/components/HomeProductCollection";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -335,15 +336,15 @@ export default async function ProductPage({ params }: PageProps) {
         )}
       </main>
       {product.affiliateLink?.linkId && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur md:hidden">
-          <AffiliateOutboundLink
-            linkId={product.affiliateLink.linkId}
-            tracking={{ productId: product.productId, productName: product.productName, contentId: product.productId, surface: "detail", position: "product_detail_sticky" }}
-            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-orange-500 px-5 text-sm font-extrabold text-white hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2"
-          >
-            쿠팡에서 현재가 확인 <span aria-hidden="true" className="ml-1">↗</span>
-          </AffiliateOutboundLink>
-        </div>
+        <FloatingAffiliatePrompt
+          linkId={product.affiliateLink.linkId}
+          productId={product.productId}
+          productName={product.productName}
+          productImage={product.productImage}
+          productPrice={product.currentPriceKrw}
+          contentId={product.productId}
+          position="product_floating_prompt"
+        />
       )}
       <SiteFooter />
     </div>

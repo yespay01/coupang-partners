@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { AffiliateOutboundLink } from "@/components/AffiliateOutboundLink";
+import { FloatingAffiliatePrompt } from "@/components/FloatingAffiliatePrompt";
 
 export const revalidate = 3600;
 export const dynamicParams = true;
@@ -14,6 +15,7 @@ const AUTOMATION_SERVER_URL =
 
 interface NewsItem {
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   content: string;
@@ -94,6 +96,9 @@ export default async function NewsDetailPage({ params }: PageProps) {
   const { id } = await params;
   const news = await getNews(id);
   if (!news) notFound();
+  const floatingProduct = news.relatedProducts?.find(
+    (product) => product.affiliateLink?.linkId
+  );
 
   const description = news.summary ? news.summary.slice(0, 160) : news.title;
 
@@ -235,6 +240,18 @@ export default async function NewsDetailPage({ params }: PageProps) {
           </Link>
         </div>
       </main>
+
+      {floatingProduct?.affiliateLink?.linkId && (
+        <FloatingAffiliatePrompt
+          linkId={floatingProduct.affiliateLink.linkId}
+          productId={floatingProduct.productId}
+          productName={floatingProduct.productName}
+          productImage={floatingProduct.productImage}
+          productPrice={floatingProduct.productPrice}
+          contentId={news.slug || news.id}
+          position="news_floating_prompt"
+        />
+      )}
 
       <SiteFooter />
     </div>
