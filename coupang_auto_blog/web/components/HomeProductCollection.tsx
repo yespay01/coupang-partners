@@ -64,6 +64,7 @@ export function ProductCard({
   const detailHref = product.productId
     ? `/products/${encodeURIComponent(product.productId)}`
     : null;
+  const affiliateLinkId = product.affiliateLink?.linkId;
 
   return (
     <ImpressionBoundary
@@ -80,7 +81,23 @@ export function ProductCard({
       <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:border-orange-200 hover:shadow-xl hover:shadow-orange-950/5">
         <div className="relative block overflow-hidden bg-slate-100">
           <div className="aspect-square">
-            {image && detailHref ? (
+            {image && affiliateLinkId ? (
+              <AffiliateOutboundLink
+                linkId={affiliateLinkId}
+                tracking={{ reviewId: product.id, reviewSlug: product.slug, productName: product.productName, productId: product.productId, contentId: product.slug ?? product.id, surface, position: `${surface}_image_${index + 1}` }}
+                aria-label={`${product.productName || "상품"} 쿠팡에서 확인`}
+                className="block h-full w-full"
+              >
+                <img
+                  src={image}
+                  alt={product.productName || "상품 이미지"}
+                  loading={isPriorityImage ? "eager" : "lazy"}
+                  fetchPriority={isPriorityImage ? "high" : "low"}
+                  decoding="async"
+                  className="h-full w-full object-contain p-3 transition duration-500 group-hover:scale-105"
+                />
+              </AffiliateOutboundLink>
+            ) : image && detailHref ? (
               <Link href={detailHref} aria-label={`${product.productName || "상품"} 가격 흐름 보기`} className="block h-full w-full">
                 <img
                   src={image}
@@ -114,7 +131,17 @@ export function ProductCard({
 
         <div className="flex flex-1 flex-col p-4">
           <h3 className="min-h-[2.75rem] line-clamp-2 text-sm font-semibold leading-snug text-slate-900 sm:text-[15px]">
-            {detailHref ? <Link href={detailHref} className="hover:text-orange-600">{product.productName || "상품 정보"}</Link> : product.productName || "상품 정보"}
+            {affiliateLinkId ? (
+              <AffiliateOutboundLink
+                linkId={affiliateLinkId}
+                tracking={{ reviewId: product.id, reviewSlug: product.slug, productName: product.productName, productId: product.productId, contentId: product.slug ?? product.id, surface, position: `${surface}_title_${index + 1}` }}
+                className="hover:text-orange-600"
+              >
+                {product.productName || "상품 정보"}
+              </AffiliateOutboundLink>
+            ) : detailHref ? (
+              <Link href={detailHref} className="hover:text-orange-600">{product.productName || "상품 정보"}</Link>
+            ) : product.productName || "상품 정보"}
           </h3>
           <div className="mt-3 min-h-[3rem]">
             {price ? (
@@ -129,9 +156,9 @@ export function ProductCard({
                 가격 흐름 보기
               </Link>
             )}
-            {product.affiliateLink?.linkId ? (
+            {affiliateLinkId ? (
               <AffiliateOutboundLink
-                linkId={product.affiliateLink.linkId}
+                linkId={affiliateLinkId}
                 tracking={{ reviewId: product.id, reviewSlug: product.slug, productName: product.productName, productId: product.productId, contentId: product.slug ?? product.id, surface, position }}
                 className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-orange-500 px-3 py-2.5 text-center text-sm font-bold text-white transition hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2"
               >
