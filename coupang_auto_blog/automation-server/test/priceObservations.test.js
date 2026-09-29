@@ -9,6 +9,7 @@ import {
   mapPublicProductSummary,
   parsePriceHistoryDays,
   parseProductSitemapPagination,
+  parseProductSitemapPriority,
 } from '../src/routes/priceHistory.js';
 import {
   applyObservedProductPrice,
@@ -181,6 +182,9 @@ test('상품 sitemap은 검증된 중앙 링크 상품을 100개 이상 요청�
     limit: 45000,
     offset: 0,
   });
+  assert.equal(parseProductSitemapPriority('true'), true);
+  assert.equal(parseProductSitemapPriority('false'), false);
+  assert.equal(parseProductSitemapPriority(undefined), false);
 
   const calls = [];
   const db = {
@@ -195,7 +199,7 @@ test('상품 sitemap은 검증된 중앙 링크 상품을 100개 이상 요청�
     },
   };
   const result = await loadProductSitemapRows(db, PARTNER_ID, {
-    limit: '45000', offset: '0',
+    limit: '45000', offset: '0', priority: 'true',
   });
   assert.deepEqual(result, {
     products: [{
@@ -208,7 +212,9 @@ test('상품 sitemap은 검증된 중앙 링크 상품을 100개 이상 요청�
   assert.match(calls[0].sql, /al\.is_active = TRUE/);
   assert.match(calls[0].sql, /al\.validation_status = 'verified'/);
   assert.match(calls[0].sql, /al\.partner_tracking_code = \$1/);
-  assert.deepEqual(calls[0].params, [PARTNER_ID, 45000, 0]);
+  assert.match(calls[0].sql, /observations\.observation_days >= 2/);
+  assert.match(calls[0].sql, /p\.search_demand_count/);
+  assert.deepEqual(calls[0].params, [PARTNER_ID, 45000, 0, true]);
 });
 
 test('실제 관측 적용은 product/review 가격과 이력 insert를 한 transaction으로 묶는다', async () => {

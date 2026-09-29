@@ -26,27 +26,42 @@ export function parseProductSitemapPagination(limitValue, offsetValue) {
   };
 }
 
+export function parseProductSitemapPriority(value) {
+  return String(value || '').toLowerCase() === 'true';
+}
+
 export async function loadProductSitemapRows(db, currentPartnerId, pagination = {}) {
   if (!currentPartnerId) return { products: [], totalCount: 0 };
   const { limit, offset } = parseProductSitemapPagination(
     pagination.limit,
     pagination.offset
   );
+  const priorityOnly = parseProductSitemapPriority(pagination.priority);
   const result = await db.query(
     `SELECT p.product_id, p.product_image, p.updated_at,
             COUNT(*) OVER()::int AS total_count
       FROM products p
       JOIN affiliate_links al ON al.link_id = p.affiliate_link_id
-      WHERE EXISTS (
-        SELECT 1 FROM price_observations po WHERE po.product_id = p.product_id
-      )
+      JOIN LATERAL (
+        SELECT COUNT(DISTINCT po.business_date_kst)::int AS observation_days,
+               MAX(po.observed_at) AS last_observed_at
+          FROM price_observations po
+         WHERE po.product_id = p.product_id
+      ) observations ON observations.observation_days > 0
+      WHERE ($4::boolean = FALSE
+             OR observations.observation_days >= 2
+             OR COALESCE(p.search_demand_count, 0) > 0)
         AND p.product_name IS NOT NULL AND p.product_name <> ''
         AND al.is_active = TRUE
         AND al.validation_status = 'verified'
         AND al.partner_tracking_code = $1
-      ORDER BY p.updated_at DESC, p.id DESC
+      ORDER BY (COALESCE(p.search_demand_count, 0) > 0) DESC,
+               observations.observation_days DESC,
+               observations.last_observed_at DESC,
+               p.updated_at DESC,
+               p.id DESC
       LIMIT $2 OFFSET $3`,
-    [currentPartnerId, limit, offset]
+    [currentPartnerId, limit, offset, priorityOnly]
   );
   return {
     products: result.rows.map((row) => ({
