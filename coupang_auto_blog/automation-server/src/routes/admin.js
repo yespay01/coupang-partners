@@ -22,6 +22,7 @@ import {
   registerAffiliateLink,
 } from '../services/coupang/affiliateLinkRegistry.js';
 import { getSearchConsoleData } from '../services/googleSearchConsole.js';
+import { buildContentUrl, notifyIndexNow } from '../services/indexNow.js';
 import { getNaverSearchData, saveNaverSaCookies, getNaverSaStatus, saveNaverSearchSnapshot } from '../services/naverSearchAdvisor.js';
 import fetch from 'node-fetch';
 
@@ -1125,6 +1126,10 @@ router.put('/recipes/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: '레시피를 찾을 수 없습니다.' });
     }
 
+    if (result.rows[0].status === 'published') {
+      notifyIndexNow([buildContentUrl('recipes', result.rows[0])]);
+    }
+
     res.json({ success: true, data: mapRecipeRow(result.rows[0]) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1332,6 +1337,10 @@ router.post('/news/generate', async (req, res) => {
       ]
     );
 
+    if (autoPublish) {
+      notifyIndexNow([buildContentUrl('news', { id: insertResult.rows[0].id, slug })]);
+    }
+
     res.json({
       success: true,
       message: autoPublish ? '뉴스가 게시되었습니다.' : '뉴스 초안이 생성되었습니다.',
@@ -1382,6 +1391,10 @@ router.put('/news/:id', async (req, res) => {
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: '뉴스를 찾을 수 없습니다.' });
+    }
+
+    if (result.rows[0].status === 'published') {
+      notifyIndexNow([buildContentUrl('news', result.rows[0])]);
     }
 
     res.json({ success: true, data: mapNewsRow(result.rows[0]) });
