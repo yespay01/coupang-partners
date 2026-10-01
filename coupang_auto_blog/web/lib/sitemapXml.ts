@@ -10,7 +10,7 @@ export type SitemapUrl = {
   image?: string | null;
 };
 
-function escapeXml(value: string): string {
+export function escapeXml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

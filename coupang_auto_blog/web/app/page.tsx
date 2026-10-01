@@ -8,7 +8,10 @@ import { HomeProductCollection, type HomeProduct } from "@/components/HomeProduc
 export const metadata: Metadata = {
   title: "세모링크 - 쿠팡 상품을 조건으로 빠르게 찾기",
   description: "상품명, 카테고리와 가격대를 비교하고 검증된 링크로 쿠팡의 현재 가격을 확인하세요.",
-  alternates: { canonical: "https://semolink.store" },
+  alternates: {
+    canonical: "https://semolink.store",
+    types: { "application/rss+xml": [{ url: "/rss.xml", title: "세모링크 RSS" }] },
+  },
 };
 
 export const dynamic = "force-dynamic";

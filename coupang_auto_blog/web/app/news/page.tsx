@@ -10,6 +10,7 @@ export const metadata: Metadata = {
     "최신 소비 트렌드와 쇼핑 뉴스를 전해드립니다. 세모링크에서 트렌드를 확인하세요.",
   alternates: {
     canonical: "https://semolink.store/news",
+    types: { "application/rss+xml": [{ url: "/rss.xml", title: "세모링크 RSS" }] },
   },
   openGraph: {
     title: "뉴스 | 세모링크",

@@ -33,6 +33,11 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
   },
+  alternates: {
+    types: {
+      "application/rss+xml": [{ url: "/rss.xml", title: "세모링크 RSS" }],
+    },
+  },
   icons: {
     icon: [
       { url: "/logo.png", type: "image/png" },
